@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix='booksync-journal-') as directory:
     for mode in ('enqueue', 'checkpoint', 'capacity', 'ack', 'restart', 'restart'):
         boot(mode)
     valid = (sd / 'journal/state').read_bytes()
-    for damaged in (valid[:-1], valid[:-1] + bytes([valid[-1] ^ 1]), valid[:4] + b'\x02' + valid[5:]):
+    for damaged in (valid[:-1], valid[:-1] + bytes([valid[-1] ^ 1]), valid[:4] + b'\x63' + valid[5:]):
         (sd / 'journal/state').write_bytes(damaged)
         # Unknown/corrupt primary must not silently replay an older backup.
         boot('blocked')

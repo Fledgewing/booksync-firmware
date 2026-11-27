@@ -3,6 +3,7 @@
 #include "booksync/interface/Capabilities.h"
 #include "booksync/interface/Commands.h"
 #include "booksync/interface/Models.h"
+#include "booksync/storage/LifecycleJournal.h"
 
 namespace booksync {
 class SyncOwner;
@@ -17,13 +18,21 @@ class SyncWriterToken final {
   SyncWriterToken& operator=(const SyncWriterToken&) = delete;
 };
 
+enum class PhaseOutcome : uint8_t { Confirmed, Uncertain, Unavailable };
+struct PhaseRequest {
+  const storage::JournalEntry& entry;
+  storage::LifecyclePhase phase;
+  bool reconcile;  // Prior attempt may have committed. Never blindly replay.
+};
 // Worker-only contract. No protocol DTO, credential or transport escapes here.
-// F17 supplies owner lifetime/serialization; this stub cannot perform writes.
+// Phase adapters must deduplicate by (adapter, owner, entry.id, phase), or reconcile
+// an uncertain attempt before writing. Confirmed means a durable remote commit.
 class ServerAdapter {
  public:
   virtual ~ServerAdapter() = default;
   virtual Capabilities capabilities() const = 0;
   virtual Snapshot cachedSnapshot() const = 0;
+  virtual PhaseOutcome syncPhase(const SyncWriterToken&, const PhaseRequest&) { return PhaseOutcome::Unavailable; }
   virtual CommandStatus deliver(const SyncWriterToken& token, Intent intent) = 0;
 };
 
