@@ -8,6 +8,7 @@
 
 namespace booksync {
 class SyncOwner;
+class CatalogSource;
 // Only the serial owner can mint this capability. No public/default constructor,
 // copying or moving; adapter writes must require the live owner's borrowed token.
 class SyncWriterToken final {
@@ -34,6 +35,8 @@ class ServerAdapter : public AuthAdapter {
   virtual ~ServerAdapter() = default;
   virtual Capabilities capabilities() const = 0;
   virtual Snapshot cachedSnapshot() const = 0;
+  // Borrowed worker cursor, absent until authenticated catalog transport is available.
+  virtual CatalogSource* catalogSource() { return nullptr; }
   virtual PhaseOutcome syncPhase(const SyncWriterToken&, const PhaseRequest&) { return PhaseOutcome::Unavailable; }
   virtual CommandStatus deliver(const SyncWriterToken& token, Intent intent) = 0;
 };
