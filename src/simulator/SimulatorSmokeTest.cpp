@@ -5791,6 +5791,11 @@ class SimulatorSmokeTest {
     if (activityManager.requestUpdateAndWait() != RequestUpdateResult::Rendered) {
       fail("Render was rejected for %s", name);
     }
+    // F02 retains baseline frames using the existing one-buffer capture path.
+    if (std::getenv("BOOKSYNC_CI_CAPTURE")) {
+      RenderLock lock;
+      captureStatusBarScreen(name);
+    }
   }
 
   void queueStep(const char* name, SmokeStep nextStep, int framesToSettle = 3) {
