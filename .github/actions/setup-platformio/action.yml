@@ -4,6 +4,10 @@ inputs:
   cache-scope:
     description: Firmware environment or analysis job name
     required: true
+  environment:
+    description: Build environment whose packages should be installed with retries
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -24,6 +28,9 @@ runs:
           ~/.platformio/packages
           ~/.platformio/platforms
         key: ${{ runner.os }}-platformio-py3.14-core6.1.19-penv-v2-${{ inputs.cache-scope }}-${{ hashFiles('platformio.ini', 'platformio.local.example.ini') }}
+        restore-keys: |
+          ${{ runner.os }}-platformio-py3.14-core6.1.19-penv-v2-${{ inputs.cache-scope }}-
+          ${{ runner.os }}-platformio-py3.14-core6.1.19-penv-v2-
 
     - name: Install PlatformIO Core
       shell: bash
@@ -34,3 +41,20 @@ runs:
         uv pip install --python "$HOME/.platformio/penv/bin/python" "pioarduino==6.1.19"
         echo "$HOME/.platformio/penv/bin" >> "$GITHUB_PATH"
         "$HOME/.platformio/penv/bin/pio" --version
+
+    - name: Install build packages with retries
+      if: inputs.environment != ''
+      shell: bash
+      env:
+        BUILD_ENV: ${{ inputs.environment }}
+      run: |
+        # Retry dependency downloads only; compilation and tests run separately.
+        for delay in 30 60 120; do
+          if pio pkg install -e "$BUILD_ENV"; then
+            exit 0
+          fi
+          echo "Package install failed; retrying in ${delay}s"
+          sleep "$delay"
+        done
+        # Preserve failure after the initial attempt and three retries.
+        pio pkg install -e "$BUILD_ENV"

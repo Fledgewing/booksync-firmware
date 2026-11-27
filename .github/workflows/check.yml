@@ -67,6 +67,7 @@ jobs:
       - uses: ./.github/actions/setup-platformio
         with:
           cache-scope: ${{ matrix.environment }}
+          environment: ${{ matrix.environment }}
       - name: Install native dependencies
         if: contains(matrix.environment, 'simulator')
         run: |
