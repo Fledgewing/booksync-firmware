@@ -17,6 +17,7 @@ struct FakeCard {
   int cutWrite = -1, prefix = 0, writes = 0;
   bool readOnly = false, full = false, eager = false, dead = false;
   int handles = 0, maxHandles = 0;
+  size_t reportedSize = 0;
   bool event(const std::string& name) {
     events.push_back(name);
     const int n = static_cast<int>(events.size()) - 1;
@@ -100,7 +101,7 @@ class HalFile {
     offset = position;
     return true;
   }
-  size_t fileSize() const { return card.files.at(path).size(); }
+  size_t fileSize() const { return card.reportedSize ? card.reportedSize : card.files.at(path).size(); }
 };
 using FsFile = HalFile;
 class HalStorage {

@@ -6,12 +6,17 @@
 #include "NativeHistory.h"
 #include "OfflineLibrary.h"
 #include "SdIndexSource.h"
+#include "booksync/storage/LayoutStore.h"
 namespace booksync {
 namespace {
 struct LocalState {
   storage::Index index{{"/.booksync/device.index", "/.booksync/device.index.tmp", "/.booksync/device.index.bak"},
                        "/.booksync/device.a",
                        "/.booksync/device.b"};
+  storage::LayoutStore layout{
+      {"/.booksync/home-layout.json", "/.booksync/home-layout.json.tmp", "/.booksync/home-layout.json.bak"},
+      Layout::deviceClass()};
+  bool layoutPending = true;
   ReadModel model{index};
   DeviceIndex worker{index, model};
   SdIndexSource source;
@@ -124,6 +129,10 @@ void leaveLocalLibrary() {
 void workLocalLibrary() {
   if (!local) return;
   auto& state = *local;
+  if (state.layoutPending) {
+    state.layoutPending = false;
+    state.layout.load();  // Read-only recovery before F34 consumes a Library projection.
+  }
   if (state.rescan) {
     state.rescan = false;
     auto provenance = state.index.provenance();
