@@ -10,7 +10,8 @@ shim_dir = os.path.join(here, "shim")
 config_h = os.path.join(here, "ml_config.h")
 pioenv = env.subst("$PIOENV")
 SIMULATOR = "simulator" in pioenv
-has_psram = False if SIMULATOR else env.BoardConfig().get("build.mcu", "") == "esp32s3"
+# The build matrix declares this capability; MCU family alone is not proof of PSRAM.
+has_psram = not SIMULATOR and "-DFREEINK_FB_PSRAM=1" in env.get("BUILD_FLAGS", [])
 SWITCHES = {'CONFIG_ML_LITE': (1, None, None),
  'ML_LITE_TASKS': (1, 0, 0),
  'ML_LITE_CONTEXT': (1, 0, 0),
@@ -57,7 +58,8 @@ SWITCHES = {'CONFIG_ML_LITE': (1, None, None),
  'TAILNET_WIFI_PARKED_RX_MGMT': (5, 0, 0),
  'TAILNET_WIFI_NO_NVS': (1, 1, 1),
  'TAILNET_WIFI_ALLOC_COUNT': (0, 0, 0)}
-SWITCH_VALUES = {name: row[1 if has_psram else 0] for name, row in SWITCHES.items()}
+column = 2 if has_psram and "x4-classic" in pioenv else 1 if has_psram else 0
+SWITCH_VALUES = {name: row[column] for name, row in SWITCHES.items()}
 ML_DEFINES = [(name, value) for name, value in SWITCH_VALUES.items()
               if value is not None and name.startswith(("ML_", "CONFIG_ML_"))]
 if not SIMULATOR:
