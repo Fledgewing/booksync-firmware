@@ -2,6 +2,7 @@
 #pragma once
 #include <Logging.h>
 // Included only by the native simulator harness, after Storage.begin().
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -35,5 +36,6 @@ inline void runFilePublishScenario() {
     LOG_INF("BSP", "BookSync publication scenario PASS");
   else
     LOG_ERR("BSP", "BookSync publication scenario FAIL");
-  std::exit(ok ? 0 : 1);
+  std::fflush(nullptr);
+  std::_Exit(ok ? 0 : 1);
 }
