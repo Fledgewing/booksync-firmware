@@ -1,3 +1,9 @@
+## [Unreleased] - 2026-11-27
+
+### Added
+
+- BookSync CI builds three device and three simulator profiles, runs retained host and offline reader smoke tests, and enforces the shared 128 KiB application reserve without publishing releases.
+
 ## [v2.0.0] - 2026-11-24
 
 ### Added

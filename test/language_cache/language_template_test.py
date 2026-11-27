@@ -155,18 +155,10 @@ for invalid in ["", "bad\nversion", "bad\x00version"]:
     except ValueError:
         pass
 
-for workflow in ["release.yml", "release_candidate.yml"]:
-    text = (root / ".github/workflows" / workflow).read_text()
-    # Stable builds package the triggering commit; RC rebuilds may select an
-    # older exact firmware commit and must use that same source for languages.
-    source = '${{ github.sha }}' if workflow == "release.yml" else '$RC_HASH'
-    assert f'--source-commit "{source}" --status release-build' in text
-    if workflow == "release_candidate.yml":
-        assert 'RC_HASH: ${{ inputs.source_commit || github.sha }}' in text
-        assert 'ref: ${{ inputs.source_commit || github.sha }}' in text
-    assert '/language-template/english_template.yaml' in text
-    assert '/language-template/language-template.json' in text
-assert "cp -R release-firmware/language-template/." in (root / ".github/workflows/release.yml").read_text()
+# Publication belongs to BookSync's integration repository. Firmware CI retains
+# the language format tests, but must never restore inherited release jobs.
+assert {p.name for p in (root / ".github/workflows").iterdir()} == {"check.yml"}
+assert "contents: read" in (root / ".github/workflows/check.yml").read_text()
 assert "copyDirectoryWithoutMacMetadata" in (root / "site/scripts/sync_site_assets.mjs").read_text()
 assert "docs/languages/template" in (root / "site/scripts/sync_site_assets.mjs").read_text()
 print("Language editor contract passed: exact source/keyset/template hashes, parser limits, schema, immutable normalized starters and release artifacts")

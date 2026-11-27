@@ -142,7 +142,7 @@ int main() {
     }
     assert(taskLookups == tasksBefore && boundLookups == boundsBefore);
     readableNameBytes = sizeof(task.name);
-    for (const auto bounds : {std::pair{0u, 0u}, std::pair{0x2000u, 0x1000u}}) {
+    for (const auto& bounds : {std::pair{0u, 0u}, std::pair{0x2000u, 0x1000u}}) {
         currentMin = bounds.first;
         currentMax = bounds.second;
         captureRiscvPanicRegisters(&frame, 0);

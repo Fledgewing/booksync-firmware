@@ -110,7 +110,7 @@ int main() {
   for (T transport : {T::WOLFSSL, T::ESP_HTTP}) {
     const uint32_t minFree = transport == T::WOLFSSL ? 40000 : 65536;
     const uint32_t minLargest = transport == T::WOLFSSL ? 20000 : 32768;
-    for (const auto memory : {std::pair{minFree - 1, minLargest}, std::pair{minFree, minLargest - 1},
+    for (const auto& memory : {std::pair{minFree - 1, minLargest}, std::pair{minFree, minLargest - 1},
                              std::pair{minFree, minLargest}, std::pair{65536u, 32768u}}) {
       ESP.free = memory.first;
       ESP.largest = memory.second;

@@ -438,117 +438,15 @@ class PreparedReleaseIdentityTest(unittest.TestCase):
                 self.assertIn('must be used together', result.stderr)
 
 
-class ReleaseWorkflowTest(unittest.TestCase):
-    def jobs(self, filename):
-        text = (ROOT / '.github/workflows' / filename).read_text().split('\njobs:\n', 1)[1]
-        parts = re.split(r'^  ([a-z0-9-]+):\n', text, flags=re.M)
-        return dict(zip(parts[1::2], parts[2::2]))
-
-    def needs(self, job):
-        match = re.search(r'^    needs:([^\n]*)\n((?:      - [^\n]*\n)*)', job, re.M)
-        self.assertIsNotNone(match)
-        return ([match[1].strip()] if match[1].strip() else
-                re.findall(r'^      - ([a-z0-9-]+)$', match[2], re.M))
-
-    def test_stable_and_rc_drafts_require_successful_download_preparation(self):
-        for filename, draft_job, build_job in (
-                ('release.yml', 'publish-release', 'build-release'),
-                ('release_candidate.yml', 'publish-release-candidate', 'build-release-candidate')):
-            with self.subTest(workflow=filename):
-                jobs = self.jobs(filename)
-                draft, gate = jobs[draft_job], jobs['prepare-language-assets']
-                self.assertIn('softprops/action-gh-release@', draft)
-                self.assertIn('draft: true', draft)
-                self.assertIn('prepare-language-assets', self.needs(draft))
-                self.assertIn(build_job, self.needs(gate))
-                self.assertIn('scripts/prepare_release_downloads.py --tag', gate)
-                source = ('${{ github.sha }}' if filename == 'release.yml' else
-                          '${{ inputs.source_commit || github.sha }}')
-                self.assertIn('SOURCE_COMMIT: ' + source, gate)
-                self.assertIn('GH_TOKEN: ${{ secrets.RELEASE_PAT }}', gate)
-                self.assertNotIn('continue-on-error:', draft + gate)
-                self.assertNotIn('always()', draft + gate)
-                # GitHub's default needs semantics must block the draft for
-                # failure, cancellation and a skipped preparation workflow.
-                for outcome in ('failure', 'cancelled', 'skipped'):
-                    results = {job: 'success' for job in self.needs(draft)}
-                    results['prepare-language-assets'] = outcome
-                    self.assertFalse(all(results[job] == 'success' for job in self.needs(draft)))
-
-    def test_rc_override_pins_firmware_downloads_and_release_to_one_source(self):
-        jobs = self.jobs('release_candidate.yml')
-        source = '${{ inputs.source_commit || github.sha }}'
-        for name in ('build-release-candidate', 'prepare-language-assets',
-                     'publish-release-candidate'):
-            with self.subTest(job=name):
-                job = jobs[name]
-                self.assertIn('ref: ' + source, job)
-                variable = 'SOURCE_COMMIT' if name == 'prepare-language-assets' else 'RC_HASH'
-                self.assertIn(variable + ': ' + source, job)
-        draft = jobs['publish-release-candidate']
-        self.assertIn('target_commitish: ' + source, draft)
-        self.assertIn('--source-commit "$RC_HASH" --status release-build', draft)
-        self.assertIn('--source-commit "$SOURCE_COMMIT"', jobs['prepare-language-assets'])
-
-    def test_rc_metadata_executes_exact_source_validation_and_tag_derivation(self):
-        # Run the actual shell steps locally: no release or network operations.
-        # The workflow wiring above checks the GitHub expression; these cases
-        # exercise the selected SHA against the actual checkout in both jobs.
-        jobs = self.jobs('release_candidate.yml')
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            subprocess.run(['git', 'init', '-q', directory], check=True)
-            subprocess.run(['git', '-C', directory, '-c', 'user.name=Release test',
-                            '-c', 'user.email=release-test@example.invalid',
-                            '-c', 'commit.gpgsign=false', 'commit', '--allow-empty',
-                            '-qm', 'source'], check=True)
-            commit = subprocess.check_output(['git', '-C', directory, 'rev-parse', 'HEAD'],
-                                             text=True).strip()
-            for name in ('build-release-candidate', 'publish-release-candidate'):
-                step = jobs[name].split('      - name: Resolve release-candidate metadata\n', 1)[1]
-                script = textwrap.dedent(step.split('        run: |\n', 1)[1]
-                                        .split('\n      - ', 1)[0])
-                for source in (commit, 'f' * 40, commit[:7], 'main'):
-                    with self.subTest(job=name, source=source):
-                        env_file, output = root / 'env', root / 'output'
-                        env_file.write_text('')
-                        output.write_text('')
-                        result = subprocess.run(['bash', '-e', '-c', script], cwd=root,
-                                                env={**os.environ, 'RC_BRANCH': 'release/next',
-                                                     'RC_HASH': source, 'GITHUB_ENV': str(env_file),
-                                                     'GITHUB_OUTPUT': str(output)},
-                                                capture_output=True, text=True)
-                        if source == commit:
-                            self.assertEqual(result.returncode, 0, result.stderr)
-                            self.assertIn('RC_TAG=rc-next-' + commit[:7], env_file.read_text())
-                            if name == 'build-release-candidate':
-                                self.assertIn('rc_tag=rc-next-' + commit[:7], output.read_text())
-                        else:
-                            self.assertNotEqual(result.returncode, 0)
-                            self.assertIn('exact source commit', result.stdout)
-                            self.assertEqual(env_file.read_text(), '')
-                            self.assertEqual(output.read_text(), '')
-
-    def test_shared_workflow_prepares_both_destinations_without_release_events(self):
-        path = ROOT / '.github/workflows/publish-language-assets.yml'
-        text = path.read_text()
-        self.assertIn('  workflow_dispatch:', text)
-        self.assertNotIn('  release:', text)
-        self.assertNotIn('github.event.release', text)
-        jobs = self.jobs(path.name)
-        self.assertEqual(set(jobs), {'verify-source', 'publish-github', 'publish'})
-        verification = jobs['verify-source']
-        self.assertIn('$GITHUB_REF_TYPE\" == tag', verification)
-        self.assertIn('$GITHUB_SHA\" == \"$SOURCE_COMMIT', verification)
-        for name in ('publish-github', 'publish'):
-            job = jobs[name]
-            self.assertEqual(self.needs(job), ['verify-source'])
-            self.assertIn('ref: ${{ inputs.source_commit }}', job)
-            self.assertIn('--prepare-release "$RELEASE_TAG" --source-commit "$SOURCE_COMMIT"', job)
-            self.assertNotIn('continue-on-error:', job)
-        rc = self.jobs('release_candidate.yml')
-        self.assertIn('rc_tag: ${{ steps.metadata.outputs.rc_tag }}', rc['build-release-candidate'])
-        self.assertIn('RELEASE_TAG: ${{ needs.build-release-candidate.outputs.rc_tag }}', rc['prepare-language-assets'])
+class BookSyncWorkflowTest(unittest.TestCase):
+    def test_inherited_publication_workflows_are_absent(self):
+        workflows = ROOT / '.github/workflows'
+        self.assertEqual({p.name for p in workflows.iterdir()}, {'check.yml'})
+        text = (workflows / 'check.yml').read_text()
+        self.assertNotIn('workflow_dispatch:', text)
+        self.assertNotIn('softprops/action-gh-release', text)
+        self.assertNotIn('secrets.', text)
+        self.assertIn('contents: read', text)
 
 
 class ReleaseBundleTest(unittest.TestCase):
