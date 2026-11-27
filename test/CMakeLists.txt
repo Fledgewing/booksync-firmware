@@ -267,3 +267,4 @@ add_test(NAME BookSyncHomeContract COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/to
 add_test(NAME BookSyncHomeMapGuard COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/tools/test/test-home-map.py --self-test)
 
 add_subdirectory(host/reader_capture)
+add_subdirectory(host/delivery)
