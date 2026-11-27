@@ -89,4 +89,5 @@ subprocess.run([sys.executable, 'test/simulator/version.py', profile], cwd=root,
 
 subprocess.run([sys.executable, "test/simulator/lifecycle_stats.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/editor.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/lifecycle_state.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

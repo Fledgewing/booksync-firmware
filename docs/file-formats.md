@@ -2571,6 +2571,32 @@ Unknown/truncated records fail decoding. Inputs leaving insufficient checkpoint
 capacity are retained without sending a request. Uncertain attempts keep the
 original checkpoint until reconciliation confirms the same scoped association.
 
+### BookSync private pending state checkpoint (`BSS1`)
+
+F18d nests the original `BSM1` checkpoint unchanged inside the existing lifecycle
+journal checkpoint field; journal envelope version and native caches do not change.
+All lengths are unsigned little-endian 16-bit values, read bytewise.
+
+| Offset | Bytes | Meaning |
+| --- | ---: | --- |
+| 0 | 4 | `BSS1` tag |
+| 4 | 1 | Known status/rating/review bits 0–2; review-present bit 3; other bits rejected |
+| 5 | 1 | Rating 1–5, or zero for clear/absent according to known bit |
+| 6 | 2 | Original matched checkpoint length |
+| 8 | 2 | Status byte length (at most 32; nonempty if known) |
+| 10 | 2 | Normalized status date byte length (at most 10) |
+| 12 | 2 | Review byte length (at most 10000, subject to total checkpoint capacity) |
+| 14 | variable | Original matched checkpoint, then UTF-8 status, date, review bytes |
+
+The lengths must exactly consume the checkpoint, at most 1024 bytes total.
+Text cannot contain NUL. Known rating with zero means cleared; unknown rating
+means no local change. Known review without its present bit means cleared;
+a present empty review remains distinct. Invalid or unsupported records stay
+pending. The surrounding journal checksum protects all bytes and associates the
+reply with its immutable scoped entry. Only F17 publishes it. Native writeback
+is idempotent and durable before phase acknowledgement restores the original
+matched checkpoint; pending responses are never resent as new writes on restart.
+
 ## BookSync private credential import snapshot (BSI1)
 
 F26b writes owned snapshots only below `/.booksync/`; the legacy source and its

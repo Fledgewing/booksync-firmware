@@ -92,3 +92,10 @@ match-only scenarios, five abrupt exits and 25 boots against a durable fake
 server, using F15 accounts and the F17 owner. The dormant handler is retained in
 all real images for size measurement. No real outgoing lifecycle delivery is
 enabled. See `docs/booksync/F18a.md` for the checkpoint and hardware checks.
+
+F18d adds `test/simulator/lifecycle_state.py` to each boot gate: eleven state-phase
+scenarios, seven deliberate abrupt exits and 34 boots per profile. It proves
+remote commit/reconciliation, pending-checkpoint restart, deferred native
+writeback and dedup using the production F17 owner and real HAL, with independently
+persisted fake remote/native receipts. See `docs/booksync/F18d.md` for bounds,
+private seam contracts and maintainer-only hardware verification.
