@@ -30,6 +30,7 @@ Provenance decode(const uint8_t* p) {
   return {static_cast<uint32_t>(get(p, 4)), static_cast<uint32_t>(get(p + 4, 4)), get(p + 8, 8), get(p + 16, 8)};
 }
 bool text(const char* p, size_t n) { return p[0] && memchr(p, 0, n); }
+bool path(const char* p, size_t n, bool catalog) { return memchr(p, 0, n) && (p[0] == '/' || (catalog && !p[0])); }
 }  // namespace
 Index::~Index() { cancel(); }
 bool Index::fail(const char* step) {
@@ -39,17 +40,18 @@ bool Index::fail(const char* step) {
 }
 bool Index::validate(FsFile& f, void* context) {
   uint8_t h[HeaderBytes];
-  const bool valid = f.fileSize() == HeaderBytes && f.read(h, sizeof(h)) == sizeof(h) && !memcmp(h, "BSI1", 4) &&
-                     h[4] < 2 && !h[5] && !h[6] && !h[7] && get(h + 8, 4) > 0 && get(h + 12, 4) > 0 &&
-                     get(h + 32, 4) <= MaxBooks && get(h + 36, 4) == RecordBytes && get(h + 40, 4) == 0 &&
-                     get(h + 44, 4) == checksum(h, 44);
+  const bool catalog = context && static_cast<Index*>(context)->catalogRecords_;
+  const bool valid = f.fileSize() == HeaderBytes && f.read(h, sizeof(h)) == sizeof(h) &&
+                     !memcmp(h, catalog ? "BSI2" : "BSI1", 4) && h[4] < 2 && !h[5] && !h[6] && !h[7] &&
+                     get(h + 8, 4) > 0 && get(h + 12, 4) > 0 && get(h + 32, 4) <= MaxBooks &&
+                     get(h + 36, 4) == RecordBytes && get(h + 40, 4) == 0 && get(h + 44, 4) == checksum(h, 44);
   if (!valid || !context) return valid;
   auto& index = *static_cast<Index*>(context);
   auto data = Storage.open(index.slots_[h[4]], O_RDONLY);
   uint8_t dataHeader[DataHeaderBytes]{};
   const bool complete = data && data.fileSize() == DataHeaderBytes + get(h + 32, 4) * RecordBytes &&
                         data.read(dataHeader, sizeof(dataHeader)) == sizeof(dataHeader) &&
-                        !memcmp(dataHeader, "BSD1", 4) && !memcmp(dataHeader + 4, h + 8, 24) &&
+                        !memcmp(dataHeader, catalog ? "BSD2" : "BSD1", 4) && !memcmp(dataHeader + 4, h + 8, 24) &&
                         get(dataHeader + 28, 4) == RecordBytes && get(dataHeader + 32, 4) == 0 &&
                         get(dataHeader + 36, 4) == checksum(dataHeader, 36);
   const bool closed = data.close();
@@ -97,7 +99,7 @@ bool Index::begin(Provenance p) {
   if (!writing_) return fail("data open");
   active_ = true;
   uint8_t dataHeader[DataHeaderBytes]{};
-  memcpy(dataHeader, "BSD1", 4);
+  memcpy(dataHeader, catalogRecords_ ? "BSD2" : "BSD1", 4);
   encode(dataHeader + 4, pending_);
   put(dataHeader + 28, RecordBytes, 4);
   put(dataHeader + 36, checksum(dataHeader, 36), 4);
@@ -109,7 +111,7 @@ bool Index::begin(Provenance p) {
   return true;
 }
 bool Index::append(const IndexRecord& r) {
-  if (!active_ || failed_ || pendingCount_ >= MaxBooks || !text(r.path.data(), r.path.size()) || r.path[0] != '/' ||
+  if (!active_ || failed_ || pendingCount_ >= MaxBooks || !path(r.path.data(), r.path.size(), catalogRecords_) ||
       !text(r.title.data(), r.title.size()))
     return fail("record bounds");
   auto* p = scratch_.data();
@@ -135,6 +137,12 @@ void Index::cancel() {
   if (writing_ && !writing_.close()) LOG_ERR("BSI", "Index close failed");
   active_ = false;
 }
+void Index::retire() {
+  cancel();
+  ready_ = false;
+  provenance_ = {};
+  count_ = 0;
+}
 bool Index::commit() {
   if (!active_ || failed_) {
     cancel();
@@ -145,7 +153,7 @@ bool Index::commit() {
   active_ = false;
   if (!synced || !closed) return fail("data sync/close");
   uint8_t h[HeaderBytes]{};
-  memcpy(h, "BSI1", 4);
+  memcpy(h, catalogRecords_ ? "BSI2" : "BSI1", 4);
   h[4] = pendingSlot_;
   encode(h + 8, pending_);
   put(h + 32, pendingCount_, 4);
@@ -172,7 +180,7 @@ bool Index::read(BookKey key, IndexRecord& r) {
       f && f.seekSet(DataHeaderBytes + size_t(key.ordinal) * RecordBytes) && f.read(p, RecordBytes) == RecordBytes;
   const bool closed = f.close();
   if (!read || !closed || get(p + RecordBytes - 4, 4) != checksum(p + 192, RecordBytes - 196) ||
-      !text(reinterpret_cast<char*>(p + 192), 1025) || !text(reinterpret_cast<char*>(p + 64), 96) || p[192] != '/' ||
+      !path(reinterpret_cast<char*>(p + 192), 1025, catalogRecords_) || !text(reinterpret_cast<char*>(p + 64), 96) ||
       (p[172] > 1 || p[173] > 1 || p[174] > 1) || get(p + 188, 4) != checksum(p, 188))
     return fail("record read/integrity");
   memcpy(r.source.book.bytes.data(), p, 16);

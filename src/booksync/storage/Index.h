@@ -18,13 +18,17 @@ class Index {
   static constexpr uint32_t MaxBooks = 10000;
   static constexpr size_t RecordBytes = 1224;
   static constexpr size_t DataHeaderBytes = 40;
-  Index(PublishPaths paths, const char* a, const char* b) : paths_(paths), slots_{a, b} {}
+  Index(PublishPaths paths, const char* a, const char* b, bool catalogRecords = false)
+      : catalogRecords_(catalogRecords), paths_(paths), slots_{a, b} {}
   ~Index();
   bool recover();
   bool begin(Provenance provenance);
   bool append(const IndexRecord& record);
   bool commit();
   void cancel();
+  // Hide rejected recovered bytes without deleting or repairing them. Used by
+  // scoped projections so failed validation cannot leave a readable foreign index.
+  void retire();
   bool read(BookKey key, IndexRecord& record);
   bool summary(BookKey key, BookRow& row);
   uint32_t count() const { return count_; }
@@ -32,6 +36,9 @@ class Index {
   Provenance provenance() const { return provenance_; }
 
  private:
+  // Version 1 is the retained on-device index. Catalog version 2 additionally
+  // permits an empty local path; remote aliases never masquerade as file paths.
+  const bool catalogRecords_;
   PublishPaths paths_;
   const char* slots_[2];
   FsFile writing_;

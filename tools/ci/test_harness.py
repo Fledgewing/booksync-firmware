@@ -26,6 +26,7 @@ class HarnessTests(unittest.TestCase):
                                  if isinstance(node, ast.Constant) and isinstance(node.value, str))
             terminated = terminated or isinstance(statement, ast.Raise)
         self.assertIn('test/simulator/widgets.py', scenarios)
+        self.assertIn('test/simulator/catalog_jobs.py', scenarios)
 
     def test_partitions(self):
         with tempfile.TemporaryDirectory() as directory:

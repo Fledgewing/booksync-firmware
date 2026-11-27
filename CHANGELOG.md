@@ -3,6 +3,7 @@
 ### Added
 
 - BookSync streams server catalog and manifest records with fixed memory bounds, rejects incomplete or revoked responses, and preserves the prior offline index after interrupted refreshes.
+- BookSync commits account-scoped catalog generations only after complete refreshes, coalesces refresh requests under one network lease, and keeps closed Home views quiet after cancellation or late completion.
 - BookSync checkpoints verified local-to-server book matches under its sole sync owner, preserving native captures and reconciling uncertain results after restart; validated against a fake server with account and edition isolation.
 - BookSync Home hosts Continue reading, Shelf and Browse widgets from one bounded offline batch, with independent failure cards and touch, button and X3 text presentations.
 - BookSync audits legacy Tailnet identity in place without rewriting NVS or regenerating keys; incomplete, unknown and corrupt state remains untouched for later upgrade recovery. Activation remains deferred.

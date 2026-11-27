@@ -2472,6 +2472,79 @@ record integrity before exposing values. Missing/truncated current data falls
 back to the complete backup. An interrupted inactive slot is never selected.
 Only the two data slots and the two complete manifests are retained.
 
+## BookSync catalog projection, version 2
+
+The durable owner is F08's **stable opaque server-instance/account token pair**,
+not F15's process-local auth owner or F12's presentation epoch. Both tokens are
+required, exact/case-sensitive, nonempty, at most 128 bytes and contain no NUL.
+The store copies them once; credentials, origins and backend identities are not
+inferred or derived here. Live refresh admission separately checks the captured
+stable scope and current process owner/epoch. A reboot can reuse a process ticket
+number without adopting a peer's cache; the same account can recover its cache
+under a new process ticket.
+
+Files use `/.booksync/catalog-<bucket hex/u64>.index`, with `.tmp`/`.bak`
+publication siblings, `.a`/`.b` index data and `.rows-a`/`.rows-b` catalog streams.
+The 16-digit bucket is FNV-1a/64 over the two separately zero-padded 129-byte
+scope fields (zero maps to one). This is only a filesystem locator. Recovery
+checks the exact embedded tokens before exposing any index or admitting a writer;
+even a collision cannot adopt or overwrite another scope. Invalid bytes are
+retained. No hash is canonical identity or authorization evidence.
+
+Catalog indexes use `BSI2`/`BSD2` (version 2). Their layout matches F13, additionally
+allowing an empty local path for server-only rows. The retained on-device index
+remains `BSI1`/`BSD1` version 1 and requires an absolute path. Each reader validates
+its expected version. In catalog v2, provenance owner is the checked storage
+bucket and its epoch is the stable cache domain `1`; neither is a live auth ticket.
+F12's full-width process epoch is independent and is never truncated into storage.
+
+The index manifest is the sole commit pointer for both streams: generation modulo
+two selects the catalog slot (zero selects a, one selects b). The catalog stream
+is synced and closed before publishing the index manifest. The shared parent
+directory barrier precedes the manifest rename, so a committed manifest cannot
+select an unsynced catalog stream. Interrupted replacement retains the selected
+prior generation. No lifecycle journal, local capture or queued intent is rewritten.
+
+Catalog streams have a 288-byte `BCP2` header: magic/u32, bucket/u64, generation/u32,
+record width/u32, server and account lengths/u16 each, two 129-byte zero-padded
+scope fields, reserved/u16 zero, then FNV-1a/u32 over bytes 0–283. Lengths and exact
+scope fields must agree with the caller's captured stable scope. The complete
+stream length is `288 + index count * record width`. Version 1's process-local
+scope header is not adopted. Unknown or damaged formats fail closed, leave no
+readable rejected index, and retain the source bytes.
+
+Each 9,643-byte fixed record explicitly encodes the neutral `CatalogRow` fields in declaration
+order, except file flags use source-audio, playable-audio, bytes/u64, size-known.
+Character arrays retain their declared widths and must contain a zero terminator;
+all eight author and format slots and all four file slots are encoded, followed by
+the three used counts. Fraction uses its IEEE-754 binary64 bits in little-endian
+order; reading state is one byte. Four boolean display flags and one reserved zero
+byte precede a trailing FNV-1a/u32 of all preceding record bytes. No compiler
+padding is serialized. Checksums detect corruption, never prove identity. Opaque
+aliases and acquisition hints stay account scoped and untrusted; the independent
+optional binder supplies F08 identity/local-path evidence. Without a local
+binding, identity remains unknown and the local path stays empty. A failed claimed
+binding fails the whole generation rather than silently omitting books.
+
+`CatalogJobsTest` cuts every storage boundary under buffered and eager persistence,
+checks full/read-only cards, identity scope, stale keys, coalesced and stale run
+leases, reading refusal, and retired/overdue Home delivery. The three simulator
+profiles additionally terminate the process without destructors after refresh
+begin and during streaming, then reboot against the same synthetic SD and verify
+the prior committed catalog. Native memory is not hardware acceptance.
+
+Maintainer verification, when the account/Home surfaces are integrated: on X4 Pro,
+X4 Classic and C3, refresh from Home, cancel or leave Home, and reopen the saved
+catalog. Interrupt refresh during SD writes and reboot; expect the previous whole
+generation or the newly committed whole generation, never a partial catalog.
+Switch accounts during refresh and confirm no prior-account rows or late redraws;
+enter reading and confirm transport drains without changing reader behavior.
+Check internal heap/largest block and worker stack high-water on each device.
+No EPUB cache reset is required. This slice adds no screen or live adapter wiring.
+The dormant service anchor and retained constructor/destructor keep generation,
+lease and record codecs inside all real-image reserve measurements, without
+constructing a job or initiating transport at boot.
+
 ## BookSync match checkpoint (F18a)
 
 The lifecycle journal envelope remains version 2. Its opaque checkpoint gains

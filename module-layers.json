@@ -13301,6 +13301,7 @@
       "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices.",
       "includes": [
         "../../test/simulator/AccountScenario.h",
+        "../../test/simulator/CatalogJobsScenario.h",
         "../../test/simulator/CatalogScenario.h",
         "../../test/simulator/CredentialsScenario.h",
         "../../test/simulator/DeliveryScenario.h",
@@ -15197,6 +15198,22 @@
     "src/booksync/server/bookorbit/Catalog.cpp": {
       "role": "server",
       "rationale": "F16 private streaming protocol translation with fixed parser scratch, no response tree; only neutral worker records leave the adapter."
+    },
+    "src/booksync/services/CatalogJobs.h": {
+      "role": "services",
+      "rationale": "F21 scoped catalog generations and refresh leases; worker-only F16 streaming through F11 admission into F13 snapshots, with F12 presentation retirement kept independent."
+    },
+    "src/booksync/services/CatalogJobs.cpp": {
+      "role": "services",
+      "rationale": "F21 scoped catalog generations and refresh leases; worker-only F16 streaming through F11 admission into F13 snapshots, with F12 presentation retirement kept independent."
+    },
+    "src/booksync/storage/ProjectionStore.h": {
+      "role": "storage",
+      "rationale": "F21 scoped catalog generations and refresh leases; worker-only F16 streaming through F11 admission into F13 snapshots, with F12 presentation retirement kept independent."
+    },
+    "src/booksync/storage/ProjectionStore.cpp": {
+      "role": "storage",
+      "rationale": "F21 scoped catalog generations and refresh leases; worker-only F16 streaming through F11 admission into F13 snapshots, with F12 presentation retirement kept independent."
     },
     "src/booksync/services/CatalogSource.h": {
       "role": "services",

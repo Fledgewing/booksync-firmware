@@ -88,8 +88,13 @@ void ReadModel::invalidate(Invalidation reason) {
   historyBusy_ = false;
   window_.stale = true;
   if (reason == Invalidation::Account) {
+    // Account retirement clears counts/provenance as well as row contents; a
+    // cached source total must not escape into the next account's snapshot.
     window_.rows.fill({});
     window_.windows.fill({});
+    window_.provenance = {};
+    window_.request = {};
+    window_.total = window_.bytes = 0;
     window_.windowCount = 0;
     window_.count = 0;
     window_.availability = Availability::NotSaved;
