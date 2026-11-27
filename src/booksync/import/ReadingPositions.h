@@ -29,7 +29,9 @@ class ReadingPositions {
   // Views borrow the envelope; failure leaves output unchanged.
   static bool decode(std::string_view envelope, PositionEvidence& evidence);
   // Native alternating-slot policy. Only valid, edition-bound EPUB evidence
-  // becomes a locator/sample. Missing/corrupt/unknown slots remain preserved.
+  // becomes a locator/sample. A pair must be the primary path and its .bak
+  // sibling; independent alias-cache sequences are never compared.
+  // Missing/corrupt/unknown slots remain preserved.
   static bool select(const PositionEvidence* primary, const PositionEvidence* backup, reader::LocatorView& locator,
                      reader::Sample& sample);
 

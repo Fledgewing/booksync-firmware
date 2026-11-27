@@ -54,6 +54,9 @@ inline void runReadingPositionsScenario() {
   }
   pe.raw = "torn";
   ok = ok && ReadingPositions::select(&pe, &be, locator, sample) && sample.sourceOffset == 96;
+  be.path = "/other/progress.bin.bak";
+  ok = ok && !ReadingPositions::select(&pe, &be, locator, sample);
+  be.path = "/legacy/progress.bin.bak";
   be.source.edition.bytes[0] = 8;
   ok = ok && !ReadingPositions::select(&pe, &be, locator, sample);
   ok = ok && journal.pending() == 13 && (before == 0 || before == 13);

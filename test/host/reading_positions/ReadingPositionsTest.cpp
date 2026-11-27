@@ -81,6 +81,9 @@ TEST(ReadingPositions, NativeSelectionPreservesRawBackupAndCaptureAnchor) {
   p.raw = "broken";
   ASSERT_TRUE(ReadingPositions::select(&p, &q, locator, sample));
   EXPECT_EQ(sample.sourceOffset, 96);
+  q.path = "another-cache/progress.bin.bak";
+  EXPECT_FALSE(ReadingPositions::select(&p, &q, locator, sample));
+  q.path = backup;
   q.source.edition.bytes[0] = 4;
   EXPECT_FALSE(ReadingPositions::select(&p, &q, locator, sample));
   q.source = {};

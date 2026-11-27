@@ -138,6 +138,13 @@ storage::JournalResult ReadingPositions::retain(const char* path, PositionFormat
 bool ReadingPositions::select(const PositionEvidence* primary, const PositionEvidence* backup,
                               reader::LocatorView& locator, reader::Sample& sample) {
   if ((!primary && !backup) || (primary && backup && primary->source != backup->source)) return false;
+  // Sequence numbers belong to one native cache's alternating pair. Separate
+  // path/content aliases may have independent sequences even for the same file.
+  if (primary && backup &&
+      (backup->path.size() != primary->path.size() + 4 ||
+       backup->path.substr(0, primary->path.size()) != primary->path ||
+       backup->path.substr(primary->path.size()) != ".bak"))
+    return false;
   const auto& source = primary ? primary->source : backup->source;
   if (!storage::valid(source)) return false;
   const auto slot = [](const PositionEvidence* e) {
@@ -179,9 +186,10 @@ bool ReadingPositions::select(const PositionEvidence* primary, const PositionEvi
 extern "C" __attribute__((used, retain)) bool booksync_positions_import_link(
     booksync::importer::ReadingPositions& worker, const char* path, booksync::importer::PositionFormat format,
     const booksync::storage::SourceIdentity& source, booksync::importer::PositionStatus& status, uint64_t& id,
-    std::string_view envelope, booksync::importer::PositionEvidence& evidence, booksync::reader::LocatorView& locator,
+    std::string_view envelope, booksync::importer::PositionEvidence& evidence,
+    const booksync::importer::PositionEvidence* backup, booksync::reader::LocatorView& locator,
     booksync::reader::Sample& sample) {
   using booksync::importer::ReadingPositions;
   return worker.retain(path, format, source, status, id) == booksync::storage::JournalResult::Ok &&
-         ReadingPositions::decode(envelope, evidence) && ReadingPositions::select(&evidence, nullptr, locator, sample);
+         ReadingPositions::decode(envelope, evidence) && ReadingPositions::select(&evidence, backup, locator, sample);
 }

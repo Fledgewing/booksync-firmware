@@ -52,6 +52,8 @@ cut in host tests, then recovery/retry must yield one complete proof per source.
 `select` delegates to native alternating-slot policy and returns borrowed F08
 locator bytes and an F09 sample. It never opens a native session, checkpoints
 capture, adjusts native saves or chooses a position across different editions.
+A primary/backup pair must use the same source path plus its `.bak` sibling;
+independent cache aliases never share a sequence order.
 Only native EPUB evidence is selectable; other records remain reviewable raw
 provenance. A valid backup can recover a torn primary. Unknown bytes remain in
 the proof even when they cannot fit F09's 20-byte native slot fields.
