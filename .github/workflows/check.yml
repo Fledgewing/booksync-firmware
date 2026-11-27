@@ -30,7 +30,7 @@ jobs:
           path: .ci-booksync
           persist-credentials: false
           sparse-checkout: tools/firmware
-      - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libexpat1-dev libssl-dev zlib1g-dev
+      - run: sudo apt-get -o Dir::Etc::sourcelist=sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- update -qq && sudo apt-get install -y --no-install-recommends libexpat1-dev libssl-dev zlib1g-dev
       - run: python3 tools/ci/check_shared.py .ci-booksync
       - run: python3 tools/ci/host.py 2>&1 | tee host.log
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -59,8 +59,9 @@ jobs:
         with:
           cache-scope: ${{ matrix.environment }}
       - name: Install native dependencies
+        if: contains(matrix.environment, 'simulator')
         run: |
-          sudo apt-get update -qq
+          sudo apt-get -o Dir::Etc::sourcelist=sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- update -qq
           sudo apt-get install -y --no-install-recommends libsdl2-dev libssl-dev libwolfssl-dev pkg-config
       - name: Build one profile
         env:
