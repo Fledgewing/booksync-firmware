@@ -262,3 +262,6 @@ add_subdirectory(host/lifecycle_journal)
 add_subdirectory(host/tailnet)
 add_subdirectory(host/identity)
 add_subdirectory(host/locator)
+# F04 production Library/Home policy and retired-symbol rejection.
+add_test(NAME BookSyncHomeContract COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/tools/test/test-library-contract.py)
+add_test(NAME BookSyncHomeMapGuard COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/tools/test/test-home-map.py --self-test)

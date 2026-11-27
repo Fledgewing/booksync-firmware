@@ -24,5 +24,5 @@ class Lyra3CoversTheme : public LyraTheme {
                            int selectorIndex, bool& coverRendered, bool& coverBufferStored, bool& bufferRestored,
                            const std::function<bool()>& storeCoverBuffer, const BookReadingStats* stats = nullptr,
                            float progressPercent = -1.0f, const GlobalReadingStats* globalStats = nullptr,
-                           const char* currentChapterTitle = nullptr) const override;
+                           const char* currentChapterTitle = nullptr) const;
 };

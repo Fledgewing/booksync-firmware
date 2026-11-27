@@ -618,9 +618,9 @@ inline SettingInfo buildSideButtonActionSetting(const StrId nameId, uint8_t Cros
 // UI consumers own their descriptors; persistence visits and releases each entry.
 // Counts include conditional publisher-font, touch and slide-switch entries.
 #if CROSSINK_SCALABLE_FONTS
-inline constexpr size_t BASE_SETTINGS_CAPACITY = 104 + (CROSSINK_APP_CAP_TOUCH ? 5 : 0);
+inline constexpr size_t BASE_SETTINGS_CAPACITY = 102 + (CROSSINK_APP_CAP_TOUCH ? 5 : 0);
 #else
-inline constexpr size_t BASE_SETTINGS_CAPACITY = 103 + (CROSSINK_APP_CAP_TOUCH ? 5 : 0);
+inline constexpr size_t BASE_SETTINGS_CAPACITY = 101 + (CROSSINK_APP_CAP_TOUCH ? 5 : 0);
 #endif
 
 #if FREEINK_DEVICE_PICCO

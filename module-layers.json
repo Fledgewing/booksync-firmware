@@ -6550,7 +6550,7 @@
     },
     "src/CrossPointSettings.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "F04 explicitly preserves stored reader/list/sleep theme and legacy menu preferences after retiring Home selectors; existing persistence format and unrelated settings remain intact.",
       "includes": [
         "BoardConfig.h",
         "CrossInkHalFrontlight.h",
@@ -7058,7 +7058,7 @@
     },
     "src/activities/ActivityManager.cpp": {
       "role": "retained-runtime",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
+      "rationale": "F04 owns boot/Home routing and offline Home regression coverage; F05 retires native writers while retaining local capture; F06 retains isolated publication probes.",
       "includes": [
         "ActivityManager.h",
         "CrossInkHalFrontlight.h",
@@ -7082,17 +7082,13 @@
         "SilentRestart.h",
         "Xtc.h",
         "algorithm",
-        "boot_sleep/BootActivity.h",
+        "booksync/system/Bootstrap.h",
         "boot_sleep/SleepActivity.h",
-        "browser/OpdsBookBrowserActivity.h",
         "components/TouchRegistry.h",
         "components/UITheme.h",
         "home/AlertActivity.h",
         "home/CrashActivity.h",
-        "home/FileBrowserActivity.h",
-        "home/HomeActivity.h",
         "home/RecentBookProgress.h",
-        "library/LibraryActivity.h",
         "network/CrossPointWebServerActivity.h",
         "network/NearbyBookTransferActivity.h",
         "network/UsbDriveActivity.h",
@@ -7102,7 +7098,6 @@
         "reader/EpubReaderActivity.h",
         "reader/GlobalReadingStats.h",
         "reader/ReaderActivity.h",
-        "settings/OpdsServerListActivity.h",
         "settings/ReleaseNotesActivity.h",
         "settings/SettingsActivity.h",
         "util/BatteryDiagnosticLog.h",
@@ -13132,7 +13127,7 @@
     },
     "src/simulator/BookmarkListSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "F04 replaces native Home/catalog entry with the neutral system Bootstrap bridge; retained reader/list/sleep and regression helpers remain isolated.",
       "includes": [
         "BookmarkListSmokeTest.h",
         "BookmarkStore.h",
@@ -13142,7 +13137,6 @@
         "Logging.h",
         "activities/ActivityManager.h",
         "activities/home/BookActions.h",
-        "activities/home/HomeActivity.h",
         "activities/home/SavedItemsHomeActivity.h",
         "activities/reader/EpubReaderActivity.h",
         "activities/reader/EpubReaderBookmarkListActivity.h",
@@ -13297,7 +13291,7 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F05 retires native network scenarios and verifies local reader capture; F06/F07 retain bounded publication and journal fault/restart hooks after storage initialization, with no product UI dependency. F08 simulator-only reader-friend scenario verifies raw anchors with native reflow and reopen.",
+      "rationale": "F04 owns offline Home coverage; F05 retains local capture after retiring writers; F06/F07/F08 retain isolated publication, journal and native locator/reopen probes.",
       "includes": [
         "../../test/simulator/FilePublishScenario.h",
         "../../test/simulator/LifecycleJournalScenario.h",
@@ -13307,6 +13301,7 @@
         "AssetDownloadSmokeTest.h",
         "Bitmap.h",
         "BookFontSystem.h",
+        "BookSyncHomeSmokeTest.h",
         "BookmarkListSmokeTest.h",
         "ClippingSelectionSmokeTest.h",
         "ClippingStore.h",
@@ -14896,6 +14891,41 @@
     "src/booksync/reader/Locator.cpp": {
       "role": "reader",
       "rationale": "F08 worker-only identity evidence and raw native locator inspection; allocation-free, no UI or transport. Locator delegates EPUB decoding to the retained pure ProgressRecord codec."
+    },
+    "src/booksync/ui/Home.h": {
+      "role": "ui",
+      "rationale": "F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store."
+    },
+    "src/booksync/system/Bootstrap.cpp": {
+      "role": "system",
+      "rationale": "F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store."
+    },
+    "src/booksync/system/Bootstrap.h": {
+      "role": "system",
+      "rationale": "F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store."
+    },
+    "src/simulator/BookSyncHomeSmokeTest.cpp": {
+      "role": "retained-simulator",
+      "rationale": "F04 isolated synthetic offline owned Home/open/Back scenario; calls production Library and mapped input, no real transport or device.",
+      "includes": [
+        "ArduinoJson.h",
+        "BookSyncHomeSmokeTest.h",
+        "CrossPointState.h",
+        "Logging.h",
+        "MappedInputManager.h",
+        "activities/Activity.h",
+        "activities/ActivityManager.h",
+        "booksync/system/Bootstrap.h",
+        "components/UITheme.h",
+        "cstdio",
+        "cstdlib",
+        "filesystem"
+      ]
+    },
+    "src/simulator/BookSyncHomeSmokeTest.h": {
+      "role": "retained-simulator",
+      "rationale": "F04 isolated synthetic offline owned Home/open/Back scenario; calls production Library and mapped input, no real transport or device.",
+      "includes": []
     }
   },
   "generators": {

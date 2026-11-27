@@ -50,6 +50,8 @@ def main():
         if not (build / name).is_file() or not (build / name).stat().st_size:
             raise SystemExit(f'missing build evidence: {name}')
     validate_partition_binary(build / 'partitions.bin', config)
+    subprocess.run([sys.executable, str(root / 'tools/test/test-home-map.py'),
+                    str(build / 'firmware.map')], check=True)
     sys.argv = [sys.argv[0], '--environment', args.environment, '--bin', str(build / 'firmware.bin'),
                 '--log', str(root / 'reports' / f'{args.environment}.log'), '--out', str(out)]
     status = size_main()

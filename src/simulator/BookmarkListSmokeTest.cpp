@@ -14,7 +14,6 @@
 #include "CrossPointSettings.h"
 #include "activities/ActivityManager.h"
 #include "activities/home/BookActions.h"
-#include "activities/home/HomeActivity.h"
 #include "activities/home/SavedItemsHomeActivity.h"
 #include "activities/reader/EpubReaderActivity.h"
 #include "activities/reader/EpubReaderBookmarkListActivity.h"
@@ -84,7 +83,8 @@ struct BookmarkListSmokeTest {
       }
       case 1:
         render();
-        current<HomeActivity>().onSavedItemsOpen();
+        activityManager.simulatorCurrentActivity()->startActivityForResult(
+            std::make_unique<SavedItemsHomeActivity>(renderer, mappedInputManager), [](const ActivityResult&) {});
         break;
       case 2: {
         render();
@@ -241,7 +241,8 @@ struct BookmarkListSmokeTest {
       }
       case 1:
         render();
-        current<HomeActivity>().onSavedItemsOpen();
+        activityManager.simulatorCurrentActivity()->startActivityForResult(
+            std::make_unique<SavedItemsHomeActivity>(renderer, mappedInputManager), [](const ActivityResult&) {});
         break;
       case 2: {
         render();

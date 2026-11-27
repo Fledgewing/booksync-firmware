@@ -109,6 +109,8 @@ bool RoundedRaffTheme::tabIndexFromPoint(const GfxRenderer& renderer, const Rect
   return true;
 }
 
+#ifdef SIMULATOR
+// Native Home drawing exists only for retained regression fixtures.
 void RoundedRaffTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
                                            int selectorIndex, bool& coverRendered, bool& coverBufferStored,
                                            bool& bufferRestored, const std::function<bool()>& storeCoverBuffer,
@@ -196,11 +198,14 @@ void RoundedRaffTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, con
                               tr(STR_NO_OPEN_BOOK));
   }
 }
+#endif
 
 int RoundedRaffTheme::getMenuRowHeight(const GfxRenderer& renderer) const {
   return renderer.getLineHeight(kTitleFontId) + 15;
 }
 
+#ifdef SIMULATOR
+// Native Home-only menu renderer; absent from device images.
 void RoundedRaffTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                                       const std::function<const char*(int index)>& buttonLabel,
                                       const std::function<UIIcon(int index)>& rowIcon) const {
@@ -242,6 +247,7 @@ void RoundedRaffTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int butt
 
   drawScrollBar(renderer, rect, buttonCount, pageStartIndex, pageItems);
 }
+#endif
 
 void RoundedRaffTheme::drawTextField(const GfxRenderer& renderer, Rect rect, const int textWidth, bool cursorMode,
                                      int contentStartX, int contentWidth) const {

@@ -36,17 +36,8 @@ void forEachBaseSetting(SettingVisitor visitor, void* context) {
                               CrossPointSettings::REFRESH_30, CrossPointSettings::REFRESH_NEVER}));
   add(SettingInfo::Toggle(StrId::STR_READER_DARK_MODE, &CrossPointSettings::screenInverted, "screenInverted",
                           StrId::STR_CAT_DISPLAY));
-  add(SettingInfo::Enum(StrId::STR_UI_THEME, &CrossPointSettings::uiTheme,
-                        {StrId::STR_THEME_CLASSIC, StrId::STR_THEME_MINIMAL, StrId::STR_THEME_DASHBOARD,
-                         StrId::STR_THEME_LYRA, StrId::STR_THEME_LYRA_EXTENDED, StrId::STR_THEME_LYRA_CAROUSEL,
-                         StrId::STR_THEME_ROUNDEDRAFF, StrId::STR_THEME_COVER_GRID},
-                        "uiTheme", StrId::STR_CAT_DISPLAY)
-          .withEnumRawValues({CrossPointSettings::UI_THEME::CLASSIC, CrossPointSettings::UI_THEME::MINIMAL,
-                              CrossPointSettings::UI_THEME::DASHBOARD, CrossPointSettings::UI_THEME::LYRA,
-                              CrossPointSettings::UI_THEME::LYRA_3_COVERS, CrossPointSettings::UI_THEME::LYRA_CAROUSEL,
-                              CrossPointSettings::UI_THEME::ROUNDEDRAFF, CrossPointSettings::UI_THEME::COVER_GRID}));
-  add(SettingInfo::Toggle(StrId::STR_SWAP_LIBRARY_FILE_BROWSER, &CrossPointSettings::swapLibraryFileBrowser,
-                          "swapLibraryFileBrowser", StrId::STR_CAT_DISPLAY));
+  // BookSync has one Home. Persisted uiTheme remains reader/list/sleep styling;
+  // native Home variant and menu-order choices are no longer entry points.
   add(SettingInfo::Enum(StrId::STR_UI_SCALE, &CrossPointSettings::uiScale, {StrId::STR_SMALL, StrId::STR_LARGE},
                         "uiScale", StrId::STR_CAT_DISPLAY)
           .withEnumRawValues({CrossPointSettings::UI_SCALE_SMALL, CrossPointSettings::UI_SCALE_LARGE}));

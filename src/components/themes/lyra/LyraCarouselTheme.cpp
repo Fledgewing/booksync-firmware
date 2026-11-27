@@ -319,6 +319,8 @@ void LyraCarouselTheme::setPreRenderIndex(int idx) {
   }
 }
 
+#ifdef SIMULATOR
+// Native Home drawing exists only for retained regression fixtures.
 void LyraCarouselTheme::drawCarouselBorder(GfxRenderer& renderer, Rect coverRect,
                                            const std::vector<RecentBook>& recentBooks, int centerIdx,
                                            bool inCarouselRow) const {
@@ -328,10 +330,13 @@ void LyraCarouselTheme::drawCarouselBorder(GfxRenderer& renderer, Rect coverRect
   renderer.drawRoundedRect(borderRect.x, borderRect.y, borderRect.width, borderRect.height, kSelectionLineW,
                            kCornerRadius, true);
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // Carousel cover strip
 // ---------------------------------------------------------------------------
+#ifdef SIMULATOR
+// Native Home drawing exists only for retained regression fixtures.
 void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
                                             const std::vector<RecentBook>& recentBooks, int selectorIndex,
                                             bool& coverRendered, bool& coverBufferStored, bool& bufferRestored,
@@ -557,7 +562,10 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
   renderer.drawRoundedRect(lastCenterCoverRect.x, lastCenterCoverRect.y, lastCenterCoverRect.width,
                            lastCenterCoverRect.height, outlineW, kCornerRadius, true);
 }
+#endif
 
+#ifdef SIMULATOR
+// Native Home drawing exists only for retained regression fixtures.
 void LyraCarouselTheme::drawReadingProgress(GfxRenderer& renderer, Rect rect,
                                             const std::vector<RecentBook>& recentBooks, const BookReadingStats* stats,
                                             float progressPercent) const {
@@ -599,10 +607,13 @@ void LyraCarouselTheme::drawReadingProgress(GfxRenderer& renderer, Rect rect,
                       EpdFontFamily::REGULAR);
   }
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // Horizontal icon-only menu row — anchored to bottom of screen
 // ---------------------------------------------------------------------------
+#ifdef SIMULATOR
+// Native Home-only menu renderer; absent from device images.
 void LyraCarouselTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                                        const std::function<const char*(int index)>& buttonLabel,
                                        const std::function<UIIcon(int index)>& rowIcon) const {
@@ -650,6 +661,7 @@ void LyraCarouselTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int but
                       true, EpdFontFamily::REGULAR);
   }
 }
+#endif
 
 void LyraCarouselTheme::registerButtonMenuTouchTargets(const GfxRenderer& renderer, int buttonCount) const {
   if (buttonCount <= 0) return;

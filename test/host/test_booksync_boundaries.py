@@ -33,7 +33,8 @@ class Boundaries(unittest.TestCase):
 
     def test_alias_forward_declaration_and_hidden_call(self):
         for source in ('using Alias = PrivateStore;', 'class PrivateStore;', 'void hiddenWrite(); hiddenWrite();',
-                       '#include <HTTPClient.h>', '#include "../storage/Index.h"'):
+                       '#include <HTTPClient.h>', '#include "../storage/Index.h"',
+                       '#include "booksync/ui/../storage/Index.h"'):
             self.assertTrue(boundary.ui_source_errors('src/booksync/ui/Probe.cpp', source))
 
     def test_new_stale_and_transitive_entries(self):
@@ -118,6 +119,9 @@ class Boundaries(unittest.TestCase):
             with patch.object(boundary.subprocess, 'check_output', side_effect=altered):
                 errors = boundary.check_ui(ROOT)
             self.assertTrue(any('microlink:' in error for error in errors), errors)
+    def test_public_interface_cannot_include_ui(self):
+        self.assertTrue(boundary.ui_source_errors('src/booksync/interface/Leak.h',
+                                                 '#include "booksync/ui/Home.h"'))
 
     def test_import_cannot_link_transport(self):
         self.assertTrue(boundary.ui_source_errors('src/booksync/import/Probe.cpp', '#include <HTTPClient.h>'))

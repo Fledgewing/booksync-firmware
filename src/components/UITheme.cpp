@@ -125,12 +125,30 @@ void UITheme::setTheme(CrossPointSettings::UI_THEME type) {
       break;
     case CrossPointSettings::UI_THEME::LYRA_3_COVERS:
       LOG_DBG("UI", "Using Lyra 3 Covers theme");
+#ifdef SIMULATOR
       currentTheme = std::make_unique<Lyra3CoversTheme>();
+#else
+      if (auto retained = makeUniqueNoThrow<LyraTheme>()) {
+        currentTheme = std::move(retained);
+      } else {
+        LOG_ERR("UI", "Cannot allocate retained reader theme; keeping previous style");
+        return;
+      }
+#endif
       currentMetrics = &Lyra3CoversMetrics::values;
       break;
     case CrossPointSettings::UI_THEME::LYRA_CAROUSEL:
       LOG_DBG("UI", "Using Lyra Carousel theme");
+#ifdef SIMULATOR
       currentTheme = std::make_unique<LyraCarouselTheme>();
+#else
+      if (auto retained = makeUniqueNoThrow<LyraTheme>()) {
+        currentTheme = std::move(retained);
+      } else {
+        LOG_ERR("UI", "Cannot allocate retained reader theme; keeping previous style");
+        return;
+      }
+#endif
       currentMetrics = &LyraCarouselMetrics::values;
       break;
     case CrossPointSettings::UI_THEME::MINIMAL:

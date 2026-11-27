@@ -10,5 +10,6 @@ struct Snapshot {
   Availability catalog = Availability::NotSaved;
   uint32_t generation = 0;
   uint32_t accountEpoch = 0;
+  bool canOpenLastBook = false;
 };
 }  // namespace booksync

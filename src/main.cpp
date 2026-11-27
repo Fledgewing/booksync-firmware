@@ -1728,7 +1728,7 @@ void setup() {
       }
       break;
     case BootResume::Splash:
-      activityManager.goToBoot();
+      // The owned shell below supplies first paint; no native product splash.
       break;
   }
 
@@ -1795,11 +1795,8 @@ void setup() {
     }
   } else if (resume == BootResume::Silent && snapshotTarget == SILENT_REBOOT_TARGET_HOME &&
              APP_STATE.pendingOverlayResume.returnsToBookList()) {
-    if (APP_STATE.pendingOverlayResume.origin == PendingOverlayOrigin::Library) {
-      activityManager.goToLibrary();
-    } else {
-      activityManager.goToFileBrowser(APP_STATE.pendingOverlayResume.fileBrowserPath);
-    }
+    APP_STATE.pendingOverlayResume.clear();
+    activityManager.goHome();
   } else if (resume == BootResume::Silent && snapshotTarget == SILENT_REBOOT_TARGET_READER &&
              !APP_STATE.openEpubPath.empty()) {
     activityManager.goToReader(APP_STATE.openEpubPath, false, false, cleanImageBaseOnEntry);

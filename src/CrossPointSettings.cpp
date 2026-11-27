@@ -497,6 +497,11 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
     }
   });
 
+  // Native Home selectors are retired, but existing reader/list/sleep styling
+  // and the legacy menu preference must survive settings exports and saves.
+  doc["uiTheme"] = uiTheme;
+  doc["swapLibraryFileBrowser"] = swapLibraryFileBrowser;
+
   // Images is a combined UI choice; retain the original persisted pair for compatibility.
   doc["imageRendering"] = imageRendering;
   doc["imageGrayscale"] = imageGrayscale;
@@ -563,6 +568,10 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc, bool importingCrossPoint
   auto clamp = [](const uint8_t value, const uint8_t maxValue, const uint8_t fallback) {
     return value < maxValue ? value : fallback;
   };
+  // These values no longer have visible Home selectors. Keep the same stored
+  // ranges and missing-key behavior without reconstructing their UI descriptors.
+  uiTheme = clamp(doc["uiTheme"] | uiTheme, UI_THEME_COUNT, uiTheme);
+  swapLibraryFileBrowser = clamp(doc["swapLibraryFileBrowser"] | swapLibraryFileBrowser, 2, swapLibraryFileBrowser);
   const bool migrateLegacyTiltMode = !doc["tiltPageTurn"].isNull() && doc["tiltPageTurnDirection"].isNull();
   const uint8_t legacyTiltMode = doc["tiltPageTurn"] | static_cast<uint8_t>(TILT_OFF);
   const bool migrateTiltDirectionSchema =

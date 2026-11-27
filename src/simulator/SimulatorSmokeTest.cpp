@@ -27,6 +27,7 @@
 
 #include "AssetDownloadSmokeTest.h"
 #include "BookFontSystem.h"
+#include "BookSyncHomeSmokeTest.h"
 #include "BookmarkListSmokeTest.h"
 #include "ClippingSelectionSmokeTest.h"
 #include "OpdsCatalogSmokeTest.h"
@@ -10203,8 +10204,12 @@ class SimulatorSmokeTest {
           renderer.setOrientation(originalOrientation);
           LOG_INF("SMOKE", "Immediate book loading feedback passed");
         }
-        activityManager.goToFileBrowser("/books");
-        queueStep("File Browser", SmokeStep::FileBrowser);
+        if (!activityManager.isHomeActivity()) fail("Reader baseline did not return to owned Home");
+        // Native Home/catalog entry scenes are retired. Keep the hardware
+        // settings, reader menu, sleep and reading checks below; F04's separate
+        // Library-driven scenario proves owned Home/open/Back on every profile.
+        activityManager.goToSettings();
+        queueStep("Settings from owned Home", SmokeStep::Settings);
         break;
 
       case SmokeStep::FileBrowser:
@@ -12136,7 +12141,7 @@ SimulatorSmokeTest smokeTest;
 }  // namespace
 
 void runSimulatorSmokeTestTick() {
-  if (!EpubReaderCompletionSmokeTest::locatorScenarioTick()) smokeTest.tick();
+  if (!runBookSyncHomeSmokeTestTick() && !EpubReaderCompletionSmokeTest::locatorScenarioTick()) smokeTest.tick();
 }
 
 bool simulatorInterceptNetworkRestart(const uint32_t target, const uint32_t payload) {
