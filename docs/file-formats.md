@@ -2497,3 +2497,10 @@ identity merge or cross-edition locator conversion follows from this record.
 Unknown/truncated records fail decoding. Inputs leaving insufficient checkpoint
 capacity are retained without sending a request. Uncertain attempts keep the
 original checkpoint until reconciliation confirms the same scoped association.
+
+## BookSync BSA1 annotation import archives
+
+F27b stores immutable, versioned raw-source archives with source path, opaque
+account/inventory provenance and CRC32. It never rewrites a legacy annotation,
+bookmark, tombstone or exchange sidecar. See [F27b](booksync/F27b.md#archive-format-bsa1-version-1)
+for the byte layout, bounds and read-only recovery contract. Activation is F29.

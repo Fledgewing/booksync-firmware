@@ -11,6 +11,7 @@
 #include "../../test/simulator/CatalogScenario.h"
 #include "../../test/simulator/DeviceIndexScenario.h"
 #include "../../test/simulator/LayoutScenario.h"
+#include "../../test/simulator/ReadingAnnotationsScenario.h"
 #include "../../test/simulator/UpdateScenario.h"
 #include "../../test/simulator/WidgetScenario.h"
 
@@ -12175,6 +12176,7 @@ void prepareSimulatorSmokeState() {
   runAccountScenario();
   runCatalogScenario();
   runDeviceIndexScenario();
+  runReadingAnnotationsScenario();
   runLayoutScenario();
   runUpdateScenario();
   // Smoke tests and scripted-input harnesses (scripts/test_*.py) expect to drive Home directly.

@@ -5,6 +5,7 @@
 - BookSync streams server catalog and manifest records with fixed memory bounds, rejects incomplete or revoked responses, and preserves the prior offline index after interrupted refreshes.
 - BookSync checkpoints verified local-to-server book matches under its sole sync owner, preserving native captures and reconciling uncertain results after restart; validated against a fake server with account and edition isolation.
 - BookSync Home hosts Continue reading, Shelf and Browse widgets from one bounded offline batch, with independent failure cards and touch, button and X3 text presentations.
+- BookSync can stage legacy highlights, bookmarks, tombstones and raw exchange/path evidence without changing the originals; repeated imports preserve backups, anchors and provenance. Activation remains deferred.
 
 - BookSync preserves shared Home layouts and device-class overrides across interrupted saves, retaining unknown widgets and damaged layouts while falling back safely.
 - BookSync allows one sync owner at a time, preserves offline work across owner changes, and checkpoints uncertain phase delivery for safe reconciliation; validated with a toy adapter only.
