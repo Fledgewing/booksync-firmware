@@ -389,3 +389,17 @@ TEST(LifecycleJournal, MaximumOpaquePayloadAndCheckpointRoundTripWithoutInterpre
   EXPECT_EQ(entry.payload, payload);
   EXPECT_EQ(entry.checkpoint, checkpoint);
 }
+
+TEST(LifecycleJournal, MediaDamageAfterRecoveryCannotBeResealedOrOverwritePendingWork) {
+  seed();
+  LifecycleJournal journal(paths);
+  ASSERT_EQ(journal.recover(), JournalResult::Ok);
+  uint64_t id = 0;
+  ASSERT_EQ(journal.enqueue(intent(), id), JournalResult::Ok);
+  ASSERT_EQ(journal.checkpoint(id, "uncertain"), JournalResult::Ok);
+  card.files[paths.current].back() ^= 1;
+  const auto damaged = card.files[paths.current];
+  EXPECT_EQ(journal.checkpoint(id, "new"), JournalResult::IoError);
+  EXPECT_EQ(journal.checkpoint(id, "new"), JournalResult::RecoveryRequired);
+  EXPECT_EQ(card.files[paths.current], damaged);
+}

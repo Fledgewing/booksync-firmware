@@ -203,6 +203,15 @@ JournalResult LifecycleJournal::finish(uint64_t id) { return change(Change::Fini
 JournalResult LifecycleJournal::change(Change kind, uint64_t id, const JournalEntry& entry, uint8_t bit) {
   if (!ready_) return error(JournalResult::RecoveryRequired);
   if (entry.checkpoint.size() > MaxCheckpoint) return error(JournalResult::Invalid);
+  // Do not recompute a fresh CRC over damaged bytes or silently use a different
+  // generation if media errors occurred since recover().
+  const auto expected = !selected_                    ? PublishedFile::Missing
+                        : selected_ == paths_.current ? PublishedFile::Current
+                                                      : PublishedFile::Backup;
+  if (FilePublish::select(paths_, validate) != expected) {
+    ready_ = false;
+    return error(JournalResult::IoError);
+  }
   uint32_t target = 0, targetSize = 0;
   uint16_t newCount = count_;
   uint32_t newBytes = bytes_;
