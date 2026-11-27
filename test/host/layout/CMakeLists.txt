@@ -1,5 +1,6 @@
 add_executable(BookSyncLayoutTest LayoutTest.cpp
   ${REPO_ROOT}/src/booksync/services/Layout.cpp
+  ${REPO_ROOT}/src/booksync/services/LayoutEditor.cpp
   ${REPO_ROOT}/src/booksync/storage/LayoutStore.cpp
   ${REPO_ROOT}/src/booksync/storage/FilePublish.cpp)
 target_include_directories(BookSyncLayoutTest PRIVATE ../file_publish/stubs ${REPO_ROOT}/src)
