@@ -19,22 +19,32 @@ OUT = ROOT / 'reports' / PROFILE / 'native-writers'
 OUT.mkdir(parents=True, exist_ok=True)
 AUDIT = OUT / 'requests.log'
 AUDIT.write_text('')
+DETAILS = OUT / 'request-details.log'
+IPC = OUT / 'local-ipc.log'
+DETAILS.write_text('')
+IPC.write_text('')
 LIB = OUT / ('network-audit.dylib' if sys.platform == 'darwin' else 'network-audit.so')
 subprocess.run(['cc', '-dynamiclib' if sys.platform == 'darwin' else '-shared', '-fPIC',
                 str(ROOT / 'test/simulator/network_audit.c'), '-o', str(LIB)], check=True)
 transport_env = os.environ.copy()
 transport_env['BOOKSYNC_NETWORK_AUDIT'] = str(AUDIT)
+transport_env['BOOKSYNC_NETWORK_DETAILS'] = str(DETAILS)
+transport_env['BOOKSYNC_LOCAL_IPC_AUDIT'] = str(IPC)
 transport_env['BOOKSYNC_NATIVE_WRITER_PROOF'] = '1'
 transport_env['DYLD_INSERT_LIBRARIES' if sys.platform == 'darwin' else 'LD_PRELOAD'] = str(LIB)
 # Use a disposable executable so macOS SIP cannot remove the preload variable.
 probe = OUT / 'probe'
 source = OUT / 'probe.c'
-source.write_text('#include <sys/socket.h>\n#include <netdb.h>\nint main(void) { connect(-1, 0, 0); sendto(-1, 0, 0, 0, 0, 0); sendmsg(-1, 0, 0); getaddrinfo(0, 0, 0, 0); }\n')
+source.write_text('#include <sys/socket.h>\n#include <netdb.h>\nint main(void) {\n  struct sockaddr internet = {.sa_family = AF_INET};\n  struct sockaddr local = {.sa_family = AF_UNIX};\n  struct msghdr message = {0};\n  message.msg_name = &internet; message.msg_namelen = sizeof(internet);\n  connect(-1, &internet, sizeof(internet));\n  sendto(-1, 0, 0, 0, &internet, sizeof(internet));\n  sendmsg(-1, &message, 0); getaddrinfo(0, 0, 0, 0);\n  connect(-1, &local, sizeof(local));\n}\n')
 subprocess.run(['cc', str(source), '-o', str(probe)], check=True)
 subprocess.run([str(probe)], env=transport_env, check=True)
 if AUDIT.read_text().splitlines() != ['request'] * 4:
     raise SystemExit('fake transport failed its positive control')
+if len(IPC.read_text().splitlines()) != 1:
+    raise SystemExit('host-local IPC classification failed its positive control')
 AUDIT.write_text('')
+DETAILS.write_text('')
+IPC.write_text('')
 
 spec = importlib.util.spec_from_file_location('reader_smoke', ROOT / 'scripts/run_simulator_smoke_test.py')
 smoke = importlib.util.module_from_spec(spec)
@@ -63,13 +73,13 @@ def verify(command, **kwargs):
     global sessions
     if Path(command[0]).name != 'program':
         return run(command, **kwargs)
-    kwargs['env'].update({k: transport_env[k] for k in ('BOOKSYNC_NATIVE_WRITER_PROOF', 'BOOKSYNC_NETWORK_AUDIT',
+    kwargs['env'].update({k: transport_env[k] for k in ('BOOKSYNC_NATIVE_WRITER_PROOF', 'BOOKSYNC_NETWORK_AUDIT', 'BOOKSYNC_NETWORK_DETAILS', 'BOOKSYNC_LOCAL_IPC_AUDIT',
         'DYLD_INSERT_LIBRARIES' if sys.platform == 'darwin' else 'LD_PRELOAD')})
     result = run(command, **kwargs)
     if result.returncode:
         return result
     if AUDIT.read_bytes():
-        raise AssertionError('Reader attempted network I/O')
+        raise AssertionError('Reader attempted network I/O: ' + DETAILS.read_text())
     sd = Path(kwargs['cwd']) / 'fs_'
     progress = list(sd.rglob('progress*'))
     stats = list(sd.rglob('stats_v*.bin'))
@@ -91,6 +101,6 @@ for options in ([],):
     if smoke.main():
         raise SystemExit('reader/sleep scenario failed')
 (OUT / 'result.json').write_text(json.dumps({'profile': PROFILE, 'sessions': sessions,
-    'requests': 0, 'transport_positive_controls': 4, 'local_capture': True,
+    'requests': 0, 'local_ipc_attempts': len(IPC.read_text().splitlines()), 'transport_positive_controls': 4, 'ipc_positive_controls': 1, 'local_capture': True,
     'runtime_memory': 'native allocations are not hardware heap/stack acceptance'}, indent=2) + '\n')
 print(f'BookSync F05: {sessions} reader/sleep sessions, zero network requests, local saves/capture retained')
