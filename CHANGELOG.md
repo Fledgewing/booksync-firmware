@@ -2,6 +2,8 @@
 
 ### Added
 
+- BookSync CI records per-device image, static-memory, partition and symbol baselines with informational deltas, and gates offline reader capture/restart plus network admission in every simulator.
+
 - BookSync streams the local SD catalog into recoverable generations and publishes bounded offline Library windows, with native reading capture provenance and invalidation.
 
 - BookSync locally journals reader opens, page/source anchors, native reading time and sessions, highlights and bookmarks without changing native saves or sending network requests.

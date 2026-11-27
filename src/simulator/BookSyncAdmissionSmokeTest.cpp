@@ -17,8 +17,11 @@ void require(bool ok, const char* why) {
   std::_Exit(1);
 }
 void work(void*) {
-  auto buffer = booksync::allocateData(4096);
+  constexpr size_t bytes = 4096;
+  auto buffer = booksync::allocateData(bytes);
   require(static_cast<bool>(buffer), "bounded worker buffer");
+  if (std::getenv("BOOKSYNC_SIZE_GATE"))
+    LOG_INF("F14", "F14_WORKER_ALLOCATION %u", static_cast<unsigned>(bytes));
   ran.store(true);
   // A bounded fake transport operation observes cancellation; no radio/NVS.
   while (booksync::networkAdmission().permitted()) std::this_thread::yield();

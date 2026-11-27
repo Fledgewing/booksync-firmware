@@ -40,6 +40,8 @@ def validate_partition_binary(path, config):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('environment', choices=('x4-pro', 'x4-classic', 'default'))
+    parser.add_argument('--collect-baseline', action='store_true',
+                        help='collect reserve/partition/map-checked evidence before an explicit baseline refresh')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     config = json.loads(Path(__file__).with_name('budgets.json').read_text())
@@ -60,24 +62,30 @@ def main():
     # Toolchain executables are selected from the exact environment's installed packages.
     prefix = 'riscv32-esp-elf' if args.environment == 'default' else 'xtensa-esp32s3-elf'
     core = Path(__import__('os').environ.get('PLATFORMIO_CORE_DIR', Path.home() / '.platformio'))
+    versions = {}
     for tool, flags, name in [('size', ['-A'], 'sections.txt'),
-                              ('nm', ['--print-size', '--size-sort', '--radix=d'], 'symbols.txt')]:
+                              ('nm', ['-C', '--print-size', '--size-sort', '--radix=d'], 'symbols.txt')]:
         candidates = sorted((core / 'packages').glob(f'*/bin/{prefix}-{tool}'))
         if not candidates:
             raise SystemExit(f'missing toolchain evidence tool: {prefix}-{tool}')
         result = subprocess.run([str(candidates[0]), *flags, str(build / 'firmware.elf')],
                                 check=True, capture_output=True, text=True)
         (out / name).write_text(result.stdout)
+        versions[tool] = subprocess.check_output([str(candidates[0]), '--version'], text=True).splitlines()[0]
     from retired_writers import check
     nm = sorted((core / 'packages').glob(f'*/bin/{prefix}-nm'))[0]
     check(build / 'firmware.elf', nm, build / 'firmware.map')
     receipt = {'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+               'toolchain': versions,
                'submodules': subprocess.check_output(['git', 'submodule', 'status', '--recursive'], text=True).splitlines(),
                'inputs': {p: hashlib.sha256((root / p).read_bytes()).hexdigest() for p in
                           ('platformio.ini', 'partitions.csv', 'tools/ci/budgets.json', 'tools/ci/simulator.json')},
                'artifacts': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in build.iterdir()
                              if p.name in ('firmware.bin', 'firmware.elf', 'firmware.map', 'partitions.bin')}}
     (out / 'inputs.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    if not args.collect_baseline:
+        from size import report
+        report(args.environment)
     return 0
 
 

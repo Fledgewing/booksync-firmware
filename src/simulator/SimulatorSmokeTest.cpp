@@ -29,6 +29,7 @@
 
 #include "AssetDownloadSmokeTest.h"
 #include "BookFontSystem.h"
+#include "BookSyncAdmissionSmokeTest.h"
 #include "BookSyncHomeSmokeTest.h"
 #include "BookmarkListSmokeTest.h"
 #include "ClippingSelectionSmokeTest.h"

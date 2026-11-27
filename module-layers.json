@@ -13298,7 +13298,7 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport.",
       "includes": [
         "../../test/simulator/DeliveryScenario.h",
         "../../test/simulator/DeviceIndexScenario.h",
@@ -13311,6 +13311,7 @@
         "AssetDownloadSmokeTest.h",
         "Bitmap.h",
         "BookFontSystem.h",
+        "BookSyncAdmissionSmokeTest.h",
         "BookSyncHomeSmokeTest.h",
         "BookmarkListSmokeTest.h",
         "ClippingSelectionSmokeTest.h",

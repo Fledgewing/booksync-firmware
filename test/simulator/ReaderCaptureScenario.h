@@ -19,7 +19,12 @@ static bool readerCaptureScenarioTick() {
   constexpr PublishPaths paths{"/.booksync/reader.journal", "/.booksync/reader.journal.tmp",
                                "/.booksync/reader.journal.bak"};
   if (phase == 0) {
+    if (std::getenv("BOOKSYNC_SIZE_GATE") && !verifyBookSyncAdmissionHomeTick()) return true;
     if (strcmp(mode, "restart") == 0) {
+      if (std::getenv("BOOKSYNC_SIZE_GATE")) {
+        verifyBookSyncAdmissionReconnect();
+        LOG_INF("F14", "BookSync F14 admission PASS: restart Home worker drained, display restored");
+      }
       RenderLock lock;
       LifecycleJournal journal(paths);
       bool ok = journal.recover() == JournalResult::Ok;
@@ -72,6 +77,7 @@ static bool readerCaptureScenarioTick() {
     RenderLock lock;
     if (!reader.section || reader.section->isBuilding() || reader.pendingRelayoutReposition) return true;
     if (reader.section->pageCount < 2) return true;
+    if (std::getenv("BOOKSYNC_SIZE_GATE")) verifyBookSyncAdmissionReading();
     // Advance both native time sources consistently. The F03 harness already
     // injects monotonic dwell; here the native session UTC start matches it.
     const time_t startedAt = time(nullptr) - 12;
@@ -90,7 +96,11 @@ static bool readerCaptureScenarioTick() {
     if (!reader.saveProgress(reader.currentSpineIndex, reader.section->currentPage, reader.section->pageCount))
       finish(false, "native save");
     reader.observeBookSync();
-    if (strcmp(mode, "cut") == 0) finish(true, "cut after native turn, without close or sleep");
+    if (strcmp(mode, "cut") == 0) {
+      if (std::getenv("BOOKSYNC_SIZE_GATE"))
+        LOG_INF("F14", "BookSync F14 admission PASS: Home worker drained, reader refused network");
+      finish(true, "cut after native turn, without close or sleep");
+    }
     const auto added = BOOKMARKS.addBookmark(reader.currentSpineIndex, 0.25f, reader.section->pageCount,
                                              "Synthetic chapter", 1, "Synthetic passage");
     if (added != BookmarkStore::AddResult::Added) finish(false, "native bookmark add");

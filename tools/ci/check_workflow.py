@@ -15,6 +15,8 @@ if workflow.count('branches: [main]') != 2 or 'contents: read' not in workflow:
     raise SystemExit('main-only read-only workflow required')
 if 'set -euo pipefail\n          python3 tools/ci/host.py 2>&1 | tee host.log' not in workflow:
     raise SystemExit('host failures must propagate through the log pipeline')
+if '--collect-baseline' in workflow or 'python3 tools/ci/measure.py "$BUILD_ENV"' not in workflow:
+    raise SystemExit('CI must compare measurements against the committed baseline')
 for path in [*workflows, root / '.github/actions/setup-platformio/action.yml']:
     text = path.read_text()
     if re.search(r'\bwrite\b|secrets\.|id-token:|(?m:^[ ]+permissions:)', text):
