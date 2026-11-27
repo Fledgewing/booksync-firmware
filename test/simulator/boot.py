@@ -67,4 +67,5 @@ for scenario in ('reading', 'sleep', 'bookmarks', 'typography'):
 subprocess.run([sys.executable, 'test/simulator/file_publish.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/native_writers_retired.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/lifecycle_journal.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/locator.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)
