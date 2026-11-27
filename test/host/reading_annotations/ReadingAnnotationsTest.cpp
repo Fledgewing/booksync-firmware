@@ -263,3 +263,60 @@ TEST(ReadingAnnotations, BOD2RejectsBadOffsetsLengthsHashAndCounts) {
   EXPECT_EQ(summary.serverCrc32, 42u);
   EXPECT_EQ(summary.watermark, 0u);
 }
+TEST(ReadingAnnotations, HistoricalNativeVersionsRetainTheirOriginalEncoding) {
+  // Derive historical wire layouts from F03 values, preserving all shared fields.
+  auto clipping = fixture(cases[0]);
+  struct Spans {
+    size_t tomb = 0, record = 0;
+  } spans;
+  auto visit = [](void* p, const AnnotationSpan& span) {
+    auto& s = *static_cast<Spans*>(p);
+    (span.tombstone ? s.tomb : s.record) = span.offset;
+    return true;
+  };
+  AnnotationSummary summary;
+  ASSERT_EQ(inspectAnnotations(input(clipping), formats[0], summary, visit, &spans), AnnotationStatus::Ready);
+  auto nativeHeader = clipping.substr(0, spans.tomb - 2);
+  auto record = clipping.substr(spans.record);
+  for (unsigned version = 1; version <= 7; ++version) {
+    auto bytes = nativeHeader;
+    bytes[0] = version;
+    if (version >= 5) bytes += clipping.substr(spans.tomb - 2, spans.record - (spans.tomb - 2));
+    const size_t fixed = 20 + (version >= 3 ? 4 : 0) + (version >= 4 ? 2 : 0);
+    bytes += record.substr(0, fixed);
+    if (version == 7) bytes += record.substr(26, 8);
+    if (version >= 5) bytes += record.substr(34, 5);  // exact empty ID plus upload flag
+    bytes += record.substr(39, 48);
+    if (version == 1) {
+      bytes += record.substr(87, 2);
+      bytes.append(2, '\0');
+      bytes += record.substr(89);
+    } else
+      bytes += record.substr(87);
+    ASSERT_EQ(inspectAnnotations(input(bytes), formats[0], summary), AnnotationStatus::Ready) << version;
+    EXPECT_EQ(summary.version, version);
+    EXPECT_EQ(summary.records, 1u);
+    EXPECT_EQ(summary.tombstones, version >= 5 ? 1u : 0u);
+    card = {};
+    card.eager = true;
+    card.files["/old"] = bytes;
+    ReadingAnnotations importer;
+    ASSERT_EQ(importer.preserve("/old",
+                                {"/.booksync/import/annotations/old", "/.booksync/import/annotations/old.tmp",
+                                 "/.booksync/import/annotations/old.bak"},
+                                formats[0], "historical"),
+              AnnotationStatus::Ready);
+    EXPECT_NE(card.files.at("/.booksync/import/annotations/old").find(bytes), std::string::npos);
+    EXPECT_EQ(card.files.at("/old"), bytes);
+  }
+  auto bookmark = fixture(cases[1]);
+  for (unsigned version = 2; version <= 5; ++version) {
+    auto bytes = bookmark.substr(0, bookmark.size() - 124);
+    bytes[0] = version;
+    if (version == 2) bytes.erase(2, 1);  // v2 count is u8
+    bytes += bookmark.substr(bookmark.size() - 124, 58 + (version >= 4 ? 2 : 0) + (version >= 5 ? 64 : 0));
+    ASSERT_EQ(inspectAnnotations(input(bytes), formats[1], summary), AnnotationStatus::Ready) << version;
+    EXPECT_EQ(summary.records, 1u);
+    EXPECT_EQ(summary.version, version);
+  }
+}
