@@ -2,6 +2,9 @@
 // Ported from BookSync; Ed25519 field/group arithmetic derives from public-domain TweetNaCl.
 #include "UpdateVerify.h"
 
+#include <Logging.h>
+#include <Memory.h>
+
 #include <cstring>
 
 #include "Ed25519Verify.h"
@@ -154,18 +157,24 @@ const char* describe(Result result) {
 
 // Link-only budget root: never invoked at runtime; no URL, network or installer.
 // Retain keeps the parser/verifier in application size measurements on GCC and Clang.
-extern "C" __attribute__((used, retain)) bool booksync_update_trust_link(booksync::Feed& parser, const char* data,
-                                                                         size_t length, const uint8_t* signature,
+extern "C" __attribute__((used, retain)) bool booksync_update_trust_link(const char* data, size_t length,
+                                                                         const uint8_t* signature,
                                                                          const uint8_t digest[32]) {
-  parser.reset();
-  parser.feedResponse(200, data, length);
-  const auto& r = parser.release();
+  // This dormant budget entry constructs the callback graph explicitly. The bounded
+  // SAX state is too large for a C3 task stack; owned allocation also avoids static RAM.
+  auto parser = makeUniqueNoThrow<booksync::Feed>();
+  if (!parser) {
+    LOG_ERR("UPDATE", "Cannot allocate feed parser");
+    return false;
+  }
+  parser->feedResponse(200, data, length);
+  const auto& r = parser->release();
   namespace sig = booksync::update_signature;
   uint8_t detached[sig::kSignatureBytes];
   uint8_t root[32];
   if (sig::decodeDetached(data, length, "releases.json", detached) && sig::decodeHex(sig::kRootHex, root, sizeof(root)))
     return sig::accepted(sig::checkFeed(detached, {root, sig::kMinSerial}, r.firmwareSha256), sig::kEnforce);
-  return parser.complete() &&
+  return parser->complete() &&
          sig::accepted(sig::checkStaged(sig::kRootHex, sig::kMinSerial, r.tagName, r.firmwareUrl, r.firmwareSha256,
                                         signature, "firmware-x4-pro", digest, r.firmwareSize, r.firmwareSize),
                        sig::kEnforce);

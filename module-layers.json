@@ -15171,6 +15171,8 @@
       "includes": [
         "Ed25519Verify.h",
         "Feed.h",
+        "Logging.h",
+        "Memory.h",
         "UpdateVerify.h",
         "cstring"
       ]

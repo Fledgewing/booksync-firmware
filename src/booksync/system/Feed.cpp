@@ -29,9 +29,7 @@ void copyGithubSha256Digest(char* dst, size_t dstSize, const char* value, size_t
 
 }  // namespace
 
-// Keep the constructor/callback graph measured before F32 creates update jobs.
-__attribute__((used, retain)) Feed::Feed(AssetMatcher assetMatcher, ReleaseVisitor releaseVisitor,
-                                         void* releaseVisitorCtx)
+Feed::Feed(AssetMatcher assetMatcher, ReleaseVisitor releaseVisitor, void* releaseVisitorCtx)
     : parser(JsonCallbacks{this, sOnKey, sOnString, sOnNumber, sOnBool, sOnNull, sOnObjectStart, sOnObjectEnd,
                            sOnArrayStart, sOnArrayEnd}),
       assetMatcher(assetMatcher),
