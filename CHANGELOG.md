@@ -2,6 +2,8 @@
 
 ### Added
 
+- BookSync durable lifecycle journal preserves offline work and phase checkpoints across restarts, blocks unsafe writes at capacity, and never evicts unacknowledged entries.
+
 - BookSync atomic SD publication keeps a complete prior file available after interrupted writes, full cards and read-only recovery.
 
 - BookSync CI builds three device and three simulator profiles, runs retained host and offline reader smoke tests, and enforces the shared 128 KiB application reserve without publishing releases.

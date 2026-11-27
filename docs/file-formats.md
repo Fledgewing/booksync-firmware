@@ -2330,3 +2330,81 @@ The defined-property mask uses bit 31 for CSS visibility. In the background byte
 Mixed-case selectors now use the same comparison when merging and matching
 rules. Revision 24 rebuilds the rules and chapter layouts on book reopen so
 cached pages pick up the corrected styling. The binary format is unchanged.
+
+## BookSync lifecycle journal (F07, version 1)
+
+This is a worker-private SD format, separate from EPUB caches. The owner supplies
+three sibling paths (`current`, `current.tmp`, `current.bak`) to `LifecycleJournal`.
+No production activation or legacy import is enabled by F07. Identity/dedup/import
+proof contracts remain subject to the F08/F17/F28/F29 gates; import originals must
+not be retired using this primitive alone.
+
+All integers are unsigned little endian, encoded byte by byte (no packed structs
+or unaligned casts). A generation has a 24-byte header, zero or more records in
+increasing ID order, and a four-byte IEEE CRC32 of every preceding byte:
+
+| Header offset | Bytes | Meaning |
+|---|---:|---|
+| 0 | 4 | ASCII `BSLJ` |
+| 4 | 4 | Version, currently 1 |
+| 8 | 8 | Next monotonically increasing local entry ID; survives an empty queue |
+| 16 | 4 | Entry count |
+| 20 | 4 | Complete file size including CRC |
+
+Each record begins with a 24-byte envelope: ID (8 bytes), five two-byte lengths
+(adapter, account owner, document, payload, checkpoint), a one-byte acknowledgement
+bitmask, then five reserved zero bytes. The variable bytes follow in that order.
+The checkpoint occupies a reserved 1,024-byte region, padded with zeros after its
+actual bytes. Identities are opaque byte strings, each 1–128 bytes; payloads are
+opaque 0–4,096-byte strings. The adapter alone interprets payload/checkpoint bytes,
+including unknown fields and uncertain remote outcomes. No payload is parsed or
+rewritten by storage. Bits 0–4 mean match, stats, annotations, state, progress.
+Enqueue may supply already-completed phases; later acknowledgements only add bits.
+
+`checkpoint()` replaces checkpoint bytes without acknowledging a phase.
+`acknowledge()` publishes its checkpoint and phase bit in the same transaction.
+A deferred/uncertain remote write must use checkpoint only. `finish()` requires all
+five bits; the serial sync owner must additionally prove adapter reconciliation
+before calling it. Completed imported records/provenance require a separate retained
+import proof/archive before any future retirement flow; F07 does not import them.
+Presentation retirement/account switching never removes journal work.
+
+Append means a logical addition to the ordered journal. Each mutation streams a
+new complete generation through F06 `FilePublish`, rather than appending in place.
+This deliberately trades bounded SD write amplification for reuse of the proven
+publication/power-cut boundary. No journal-sized RAM copy is made: transfer/CRC
+buffers are at most 128 bytes; HAL file handles are the only underlying allocations.
+There are no persistent payload allocations, tasks, global store or second writer.
+The owner serializes all calls and excludes concurrent readers during mutations.
+Readers provide their own bounded output buffer; returned views borrow that buffer.
+
+Default limits are 64 pending entries and 262,144 bytes per generation. The owner
+may lower them; larger/unsupported limits fail. Temporary/backup generations may
+each consume another generation's worth of SD space. Enqueue reserves the entire
+checkpoint region, so entry/byte capacity cannot prevent checkpoints,
+acknowledgements or removal of fully acknowledged work. A full/read-only physical
+card can still fail publication; it never becomes a fabricated acknowledgement.
+`Capacity` rejects the operation without changing accepted entries or the output ID.
+Saved-book reading remains available; callers through Library must block operations
+that cannot record durably (SCREENS Q2). F07 adds no screen and does not change reader
+capture/persistence. The approved future presentation is `mockups.html#queue-full`.
+
+Recovery is read-only: ignore staging, validate complete length/order/bounds/CRC,
+and select a complete current or (when current is absent) backup. A malformed or
+unsupported existing current blocks mutation even with a readable older backup;
+unsupported backup also blocks an older writer. This preserves uncertain work and
+future schemas rather than silently reverting to an older queue. Corrupt bytes are
+retained for recovery tooling. A failed publication or source read closes handles
+and disables mutation until `recover()` reconciles the local outcome. An uncertain
+enqueue must be reconciled by the owner, not blindly retried as a new event.
+
+Verification: `LifecycleJournalTest` injects cuts/failures across publication,
+partial staging writes, truncation/checksum/version errors, capacity, opaque
+checkpoints, scoped FIFO and all-phase removal. `test/simulator/lifecycle_journal.py`
+restarts the real native HAL nine times per device profile with synthetic SD data.
+Maintainer hardware acceptance should repeat offline enqueue/checkpoint/reboot,
+read-only/full SD and power cuts around publication on X4 Pro, X4 Classic and C3;
+expect every accepted unacknowledged capture to remain, uncertain outcomes to stay
+unacknowledged, and local EPUB reading/anchors to behave unchanged. No EPUB cache
+reset is needed. Device heap/largest block, stack high-water and SD latency still
+require maintainer measurements; native metrics cannot qualify those constraints.
