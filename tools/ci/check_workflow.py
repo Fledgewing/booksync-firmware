@@ -13,6 +13,8 @@ if workflow.split('\non:\n', 1)[-1].split('permissions:', 1)[0] != expected_even
     raise SystemExit('only pull requests into main and pushes to main are allowed')
 if workflow.count('branches: [main]') != 2 or 'contents: read' not in workflow:
     raise SystemExit('main-only read-only workflow required')
+if 'set -euo pipefail\n          python3 tools/ci/host.py 2>&1 | tee host.log' not in workflow:
+    raise SystemExit('host failures must propagate through the log pipeline')
 for path in [*workflows, root / '.github/actions/setup-platformio/action.yml']:
     text = path.read_text()
     if re.search(r'\bwrite\b|secrets\.|id-token:|(?m:^[ ]+permissions:)', text):
