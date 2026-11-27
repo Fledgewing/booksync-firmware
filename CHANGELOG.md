@@ -5,6 +5,7 @@
 - BookSync preserves shared Home layouts and device-class overrides across interrupted saves, retaining unknown widgets and damaged layouts while falling back safely.
 - BookSync allows one sync owner at a time, preserves offline work across owner changes, and checkpoints uncertain phase delivery for safe reconciliation; validated with a toy adapter only.
 - BookSync account workers isolate account, sync and acquisition logins, reject stale account epochs, erase captured secrets and clear account sessions locally on sign-out while preserving independently configured connector logins; adapters report unavailable permissions and attestation requirements explicitly.
+- BookSync ports signed update feed parsing and release trust verification, with offline tests that reject corrupt or wrong-device images. Live feed checks and installation remain deferred.
 
 - BookSync CI records per-device image, static-memory, partition and symbol baselines with informational deltas, and gates offline reader capture/restart plus network admission in every simulator.
 

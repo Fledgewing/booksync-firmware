@@ -1,0 +1,15 @@
+{
+  "root_public_key": "f399ad5c0ffe0ce74b4a8a4c9cfdd022f40b62d13e22cd35b8c5dc44767c51ac",
+  "other_root_public_key": "83c5b82b808f5354335f3a097215152ee74b751c1e3ce0c4036e4000ed5ffec3",
+  "cases": [
+    {"name": "firmware, valid", "signatures": "SIGNATURES-firmware", "tag": "xteink-v2.0.0.150", "asset": "firmware-x4-pro-v2.0.0.150.bin", "sha256": "ac6afb91a7fb0db21e7cec47ed46fd4ce4b8861f6f7807d805064bbd1cf9022b", "min_serial": 1, "ok": true},
+    {"name": "firmware, tampered image", "signatures": "SIGNATURES-firmware", "tag": "xteink-v2.0.0.150", "asset": "firmware-x4-pro-v2.0.0.150.bin", "sha256": "92e78d0b032962f47792a9fa95fd981ef63e1e3ef074d536d6304c75eddbe29f", "min_serial": 1, "ok": false},
+    {"name": "firmware, offered as another version", "signatures": "SIGNATURES-firmware", "tag": "xteink-v2.0.0.151", "asset": "firmware-x4-pro-v2.0.0.150.bin", "sha256": "ac6afb91a7fb0db21e7cec47ed46fd4ce4b8861f6f7807d805064bbd1cf9022b", "min_serial": 1, "ok": false},
+    {"name": "firmware, another asset name", "signatures": "SIGNATURES-firmware", "tag": "xteink-v2.0.0.150", "asset": "firmware-x4-classic-v2.0.0.150.bin", "sha256": "ac6afb91a7fb0db21e7cec47ed46fd4ce4b8861f6f7807d805064bbd1cf9022b", "min_serial": 1, "ok": false},
+    {"name": "plugin, valid", "signatures": "SIGNATURES-plugin", "tag": "v0.9.0", "asset": "orbit.koplugin.zip", "sha256": "11b183ca7dcd7dd91b4af7d8b48425451c41108aecd025e023bdd3c528a7425b", "min_serial": 1, "ok": true},
+    {"name": "plugin, tampered zip", "signatures": "SIGNATURES-plugin", "tag": "v0.9.0", "asset": "orbit.koplugin.zip", "sha256": "92e78d0b032962f47792a9fa95fd981ef63e1e3ef074d536d6304c75eddbe29f", "min_serial": 1, "ok": false},
+    {"name": "plugin, rotated release key 2", "signatures": "SIGNATURES-plugin-rotated", "tag": "v0.9.0", "asset": "orbit.koplugin.zip", "sha256": "11b183ca7dcd7dd91b4af7d8b48425451c41108aecd025e023bdd3c528a7425b", "min_serial": 2, "ok": true},
+    {"name": "plugin, release key 1 revoked", "signatures": "SIGNATURES-plugin", "tag": "v0.9.0", "asset": "orbit.koplugin.zip", "sha256": "11b183ca7dcd7dd91b4af7d8b48425451c41108aecd025e023bdd3c528a7425b", "min_serial": 2, "ok": false},
+    {"name": "plugin, release key from another root", "signatures": "SIGNATURES-plugin-other-root", "tag": "v0.9.0", "asset": "orbit.koplugin.zip", "sha256": "11b183ca7dcd7dd91b4af7d8b48425451c41108aecd025e023bdd3c528a7425b", "min_serial": 1, "ok": false}
+  ]
+}
