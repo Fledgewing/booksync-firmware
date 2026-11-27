@@ -148,6 +148,7 @@ class Remote final : public AnnotationTransport {
   unsigned calls = 0, commits = 0, acks = 0, reconciles = 0;
   bool committed[2]{}, before = false, timeout = false, cut = false, ackTimeout = false;
   bool expectKeys = false;
+  AnnotationKind cutKind = AnnotationKind::Highlight;
   size_t remoteCount = 0;
   Account* revoke = nullptr;
   AnnotationReply exchange(const SyncWriterToken&, AnnotationKind k, std::string_view h, const AnnotationBatch& batch,
@@ -157,7 +158,7 @@ class Remote final : public AnnotationTransport {
     EXPECT_EQ(h, hash);
     EXPECT_EQ(complete, expectKeys);
     EXPECT_EQ(batch.keyCount, complete && work.progress[unsigned(k)].cursor == 0 ? 1 : 0);
-    if (before) {
+    if (before && k == cutKind) {
       if (cut) throw PowerCut{};
       return {MatchResult::Uncertain};
     }
@@ -166,7 +167,7 @@ class Remote final : public AnnotationTransport {
       ++commits;
     }
     if (revoke) revoke->signOut(revoke->snapshot().ticket);
-    if (cut) throw PowerCut{};
+    if (cut && k == cutKind) throw PowerCut{};
     if (timeout) return {MatchResult::Uncertain};
     return {MatchResult::Ok, work.remoteRows, remoteCount, false, work.remoteReader};
   }
@@ -582,4 +583,25 @@ TEST_F(AnnotationsTest, ServerBookmarkWithoutDatetimeAndHighlightEditWithoutLoca
   change.row.title = "Server bookmark";
   EXPECT_EQ(step(), SyncResult::Uncertain);
   EXPECT_EQ(step(), SyncResult::Advanced);
+}
+
+TEST_F(AnnotationsTest, BookmarkCommitCrashResumesAfterCompletedHighlights) {
+  const auto seed = card.disk;
+  for (bool before : {true, false}) {
+    card.disk = seed;
+    card.restart();
+    adapter.remote.committed[0] = adapter.remote.committed[1] = false;
+    adapter.remote.commits = 0;
+    adapter.remote.cutKind = AnnotationKind::Bookmark;
+    adapter.remote.cut = true;
+    adapter.remote.before = before;
+    EXPECT_THROW(step(), PowerCut);
+    EXPECT_TRUE(adapter.workspace.progress[0].done);
+    EXPECT_EQ(read().acknowledged, 3);
+    card.restart();
+    adapter.remote.cut = adapter.remote.before = false;
+    EXPECT_EQ(step(), SyncResult::Advanced);
+    EXPECT_EQ(adapter.remote.commits, 2);
+    EXPECT_EQ(read().acknowledged, 7);
+  }
 }
