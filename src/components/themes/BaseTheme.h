@@ -304,15 +304,14 @@ class BaseTheme {
                           bool selected) const;
   virtual bool tabIndexFromPoint(const GfxRenderer& renderer, Rect rect, const std::vector<TabInfo>& tabs, int x, int y,
                                  int& index) const;
-  virtual void drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
-                                   int selectorIndex, bool& coverRendered, bool& coverBufferStored,
-                                   bool& bufferRestored, const std::function<bool()>& storeCoverBuffer,
-                                   const BookReadingStats* stats = nullptr, float progressPercent = -1.0f,
-                                   const GlobalReadingStats* globalStats = nullptr,
-                                   const char* currentChapterTitle = nullptr) const;
-  virtual void drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
-                              const std::function<const char*(int index)>& buttonLabel,
-                              const std::function<UIIcon(int index)>& rowIcon) const;
+  void drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
+                           int selectorIndex, bool& coverRendered, bool& coverBufferStored, bool& bufferRestored,
+                           const std::function<bool()>& storeCoverBuffer, const BookReadingStats* stats = nullptr,
+                           float progressPercent = -1.0f, const GlobalReadingStats* globalStats = nullptr,
+                           const char* currentChapterTitle = nullptr) const;
+  void drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
+                      const std::function<const char*(int index)>& buttonLabel,
+                      const std::function<UIIcon(int index)>& rowIcon) const;
   // With preserveBackdrop, leave the popup on the display but restore the backing
   // pixels for the next redraw. An empty rect means preservation failed and the
   // popup was skipped. Caller must own RenderLock.
@@ -339,8 +338,8 @@ class BaseTheme {
   virtual bool showsFileIcons() const { return false; }
   virtual bool usesCompactFileBrowserRows() const { return false; }
   virtual int compactFileBrowserRowHeight(const GfxRenderer&) const { return BaseMetrics::values.listRowHeight; }
-  virtual void drawCarouselBorder(GfxRenderer& renderer, Rect coverRect, const std::vector<RecentBook>& recentBooks,
-                                  int centerIdx, bool inCarouselRow) const {}
+  void drawCarouselBorder(GfxRenderer& renderer, Rect coverRect, const std::vector<RecentBook>& recentBooks,
+                          int centerIdx, bool inCarouselRow) const {}
 
   // Shared constants and helpers for battery drawing (used by all themes)
   static constexpr int batteryPercentSpacing = 4;

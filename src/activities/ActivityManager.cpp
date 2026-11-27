@@ -32,17 +32,13 @@
 #include "RecentBooksStore.h"
 #include "ReleaseNotes.h"
 #include "SilentRestart.h"
-#include "boot_sleep/BootActivity.h"
+#include "booksync/system/Bootstrap.h"
 #include "boot_sleep/SleepActivity.h"
-#include "browser/OpdsBookBrowserActivity.h"
 #include "components/TouchRegistry.h"
 #include "components/UITheme.h"
 #include "home/AlertActivity.h"
 #include "home/CrashActivity.h"
-#include "home/FileBrowserActivity.h"
-#include "home/HomeActivity.h"
 #include "home/RecentBookProgress.h"
-#include "library/LibraryActivity.h"
 #include "network/CrossPointWebServerActivity.h"
 #include "network/NearbyBookTransferActivity.h"
 #include "network/UsbDriveActivity.h"
@@ -52,7 +48,6 @@
 #include "reader/EpubReaderActivity.h"
 #include "reader/GlobalReadingStats.h"
 #include "reader/ReaderActivity.h"
-#include "settings/OpdsServerListActivity.h"
 #include "settings/ReleaseNotesActivity.h"
 #include "settings/SettingsActivity.h"
 #include "util/FrontlightPanelActivity.h"
@@ -802,19 +797,8 @@ void ActivityManager::processPendingActivities() {
     pushActivity(std::make_unique<AlertActivity>(renderer, mappedInput));
   }
 
-  // One-time What's New, only over Home so a wake into a book or a silent reboot into a network screen
-  // never shows it. The flag is set when the screen actually enters, so a push that Home's own navigation
-  // replaces before it applies is retried on the next visit to Home.
-  if (!releaseNotesShown && APP_STATE.releaseNotesSeen < RELEASE_NOTES_REVISION &&
-      pendingAction == PendingAction::None && currentActivity && currentActivity->isHomeActivity()) {
-    if (auto notes =
-            makeUniqueNoThrow<ReleaseNotesActivity>(renderer, mappedInput, ReleaseNotesActivity::Mode::FirstRun)) {
-      pushActivity(std::move(notes));
-    } else {
-      releaseNotesShown = true;  // Don't retry every loop; it shows again next boot.
-      LOG_ERR("ACT", "OOM: What's New activity; showing it next boot");
-    }
-  }
+  // Owned first-run/upgrade presentation is deferred to F43; never overlay
+  // the offline shell with native product release notes.
 
   if (currentActivity && mappedInput.isMenuMode() != currentActivity->usesMenuButtonOrientation()) {
     RenderLock lock;
@@ -1055,73 +1039,23 @@ bool ActivityManager::resumeFileTransferFromNetworkBoot(const uint32_t payload) 
 
 void ActivityManager::goToSettings(const bool dismissOnUpSwipe, const bool openLanguageDownloads,
                                    const bool touchscreenRecovery) {
-  preferredHomeBookPath.clear();
-  returningHomeThroughSettings = false;
-  if (currentActivity && currentActivity->isHomeActivity()) {
-    preferredHomeBookPath = currentActivity->getCurrentBookPath();
-    returningHomeThroughSettings = true;
-  } else if (!stackActivities.empty() && stackActivities.back()->isHomeActivity()) {
-    preferredHomeBookPath = stackActivities.back()->getCurrentBookPath();
-    returningHomeThroughSettings = true;
-  }
   auto settings = std::make_unique<SettingsActivity>(renderer, mappedInput, dismissOnUpSwipe);
   if (openLanguageDownloads) settings->openLanguageDownloadsOnEnter();
   if (touchscreenRecovery) settings->enableTouchscreenRecovery();
   replaceActivity(std::move(settings));
 }
 
-void ActivityManager::goToFileBrowser(std::string path) {
-  replaceActivity(std::make_unique<FileBrowserActivity>(renderer, mappedInput, std::move(path)));
-}
+void ActivityManager::goToFileBrowser(std::string) { goHome(); }
 
-void ActivityManager::goToLibrary() {
-  auto library = makeUniqueNoThrow<LibraryActivity>(renderer, mappedInput);
-  if (!library) {
-    LOG_ERR("ACT", "Cannot allocate Library activity");
-    return;
-  }
-  replaceActivity(std::move(library));
-}
+void ActivityManager::goToLibrary() { goHome(); }
 
 bool ActivityManager::goToPlugins(const bool) { return false; }
 
-void ActivityManager::goToBrowser() {
-  const auto& servers = OPDS_STORE.getServers();
-  // Skip the server picker when there's only one server configured
-  if (servers.size() == 1) {
-    goToOpdsServer(0);
-  } else {
-    replaceActivity(std::make_unique<OpdsServerListActivity>(renderer, mappedInput, true));
-  }
-}
+void ActivityManager::goToBrowser() { goHome(); }
 
-bool ActivityManager::goToOpdsServer(const uint32_t serverIndex, const bool networkBootReady) {
-#ifndef SIMULATOR
-  if (!networkBootReady) {
-    silentRestartToNetwork(NetworkBootTarget::OPDS, serverIndex);
-    return true;
-  }
-#else
-  // The desktop build has no fragmented WiFi heap to clear; keep the preview in-process.
-  (void)networkBootReady;
-#endif
-
-  OPDS_STORE.loadFromFile();
-  const auto* storedServer = OPDS_STORE.getServer(serverIndex);
-  if (!storedServer) {
-    LOG_ERR("ACT", "OPDS network boot server index out of range: %lu", static_cast<unsigned long>(serverIndex));
-    return false;
-  }
-
-  OpdsServer server = *storedServer;
-  OPDS_STORE.release();
-  auto browser = makeUniqueNoThrow<OpdsBookBrowserActivity>(renderer, mappedInput, std::move(server));
-  if (!browser) {
-    LOG_ERR("ACT", "OOM: OPDS browser after minimal boot (free=%u maxAlloc=%u)", ESP.getFreeHeap(),
-            ESP.getMaxAllocHeap());
-    return false;
-  }
-  replaceActivity(std::move(browser));
+bool ActivityManager::goToOpdsServer(uint32_t, bool) {
+  // Retired catalog return targets resolve locally, including old boot receipts.
+  goHome();
   return true;
 }
 
@@ -1181,40 +1115,14 @@ bool ActivityManager::goToSleep(bool fromTimeout) {
   return sleepScreen && sleepScreen->hasMonochromeFrame();
 }
 
-void ActivityManager::goToBoot() { replaceActivity(std::make_unique<BootActivity>(renderer, mappedInput)); }
+void ActivityManager::goToBoot() { goHome(); }
 
 void ActivityManager::goToFullScreenMessage(StrId title, StrId message) {
   replaceActivity(std::make_unique<FullScreenMessageActivity>(renderer, mappedInput, title, message));
 }
 
-void ActivityManager::goHome(HomeMenuItem initialMenuItem, const HalDisplay::RefreshMode initialRefreshMode) {
-  std::string initialBookPath;
-  if (returningHomeThroughSettings) {
-    initialBookPath = std::move(preferredHomeBookPath);
-  }
-  preferredHomeBookPath.clear();
-  returningHomeThroughSettings = false;
-
-  if (initialMenuItem == HomeMenuItem::NONE && currentActivity) {
-    const auto& activityName = currentActivity->name;
-    if (activityName == "FileBrowser") {
-      initialMenuItem = HomeMenuItem::FILE_BROWSER;
-    } else if (activityName == "PluginCatalog") {
-      initialMenuItem = HomeMenuItem::PLUGINS;
-    } else if (activityName == "Library") {
-      initialMenuItem = HomeMenuItem::LIBRARY;
-    } else if (activityName == "OpdsBookBrowser") {
-      initialMenuItem = HomeMenuItem::FILE_TRANSFER;
-    } else if (activityName == "CrossPointWebServer") {
-      initialMenuItem = HomeMenuItem::FILE_TRANSFER;
-    } else if (activityName == "NearbyStatsSync") {
-      initialMenuItem = HomeMenuItem::FILE_TRANSFER;
-    } else if (activityName == "Settings") {
-      initialMenuItem = HomeMenuItem::SETTINGS_MENU;
-    }
-  }
-  replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem, initialRefreshMode,
-                                                 std::move(initialBookPath)));
+void ActivityManager::goHome(HomeMenuItem, const HalDisplay::RefreshMode initialRefreshMode) {
+  booksync::showHome(renderer, mappedInput, initialRefreshMode);
 }
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
 

@@ -707,6 +707,8 @@ Rect MinimalTheme::getSleepCoverRect(const GfxRenderer& renderer, const bool sta
   return coverImageRectForFrame(coverRectForScreen(renderer, content, statsSleep && gpio.deviceIsX3()));
 }
 
+#ifdef SIMULATOR
+// Native Home drawing exists only for retained regression fixtures.
 void MinimalTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
                                        int selectorIndex, bool& coverRendered, bool& coverBufferStored,
                                        bool& bufferRestored, const std::function<bool()>& storeCoverBuffer,
@@ -755,6 +757,7 @@ void MinimalTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const s
 
   drawProgressBlock(renderer, coverRect, stats, progressPercent, false);
 }
+#endif
 
 void MinimalTheme::drawSleepScreen(const GfxRenderer& renderer, const RecentBook& book, const BookReadingStats* stats,
                                    const float progressPercent, const bool inverted) const {
@@ -780,6 +783,8 @@ void MinimalTheme::drawStatsSleepScreen(const GfxRenderer& renderer, const Recen
   if (showStats) drawStatsOverlay(renderer, *globalStats, coverRect, inverted);
 }
 
+#ifdef SIMULATOR
+// Native Home-only menu renderer; absent from device images.
 void MinimalTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                                   const std::function<const char*(int index)>& buttonLabel,
                                   const std::function<UIIcon(int index)>& rowIcon) const {
@@ -824,3 +829,4 @@ void MinimalTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCo
                    label, labelText);
   }
 }
+#endif

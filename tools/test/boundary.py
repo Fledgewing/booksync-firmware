@@ -101,8 +101,13 @@ def ui_source_errors(name, source):
         if name.startswith('src/booksync/import/'):
             if re.search(r'HTTP|TLS|WiFi|Transport|ServerAdapter|server/|tailnet/', inc, re.I):
                 errors.append(f'{name}: importer transport dependency {inc}')
-        elif inc not in STD and not (inc.startswith('booksync/interface/') or '/' not in inc and inc in {'Library.h', 'Models.h', 'Commands.h', 'Capabilities.h', 'Delivery.h'}):
-            errors.append(f'{name}: private/unapproved include {inc}')
+        else:
+            public_path = inc.startswith('booksync/interface/')
+            ui_path = name.startswith('src/booksync/ui/') and inc.startswith('booksync/ui/')
+            local_public = '/' not in inc and inc in {'Library.h', 'Models.h', 'Commands.h', 'Capabilities.h', 'Delivery.h'}
+            approved = (public_path or ui_path or local_public) and '..' not in Path(inc).parts
+            if inc not in STD and not approved:
+                errors.append(f'{name}: private/unapproved include {inc}')
     if name.startswith('src/booksync/interface/'):
         bare = TOKENS.sub(' ', code)
         if re.search(r'\b(?:class|struct)\s+\w+\s*;', bare) or re.search(r'[&*]', bare):
@@ -137,7 +142,10 @@ def private_product_symbols(root):
     public = set()
     private = set()
     for path in (root / 'src/booksync').rglob('*'):
-        if not path.is_file() or path.suffix not in {'.h', '.cpp'}:
+        # UI helpers are part of the isolated UI target, not private services.
+        # Their includes and remaining link symbols still receive full checks.
+        if (not path.is_file() or path.suffix not in {'.h', '.cpp'} or
+                path.is_relative_to(root / 'src/booksync/ui')):
             continue
         code = TOKENS.sub(' ', code_only(path.read_text()))
         if path.is_relative_to(root / 'src/booksync/interface'):

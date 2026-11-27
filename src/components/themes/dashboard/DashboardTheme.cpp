@@ -629,6 +629,8 @@ Rect DashboardTheme::getSleepCoverRect(const GfxRenderer& renderer) {
       .cover;
 }
 
+#ifdef SIMULATOR
+// Native Home drawing exists only for retained regression fixtures.
 void DashboardTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
                                          int selectorIndex, bool& coverRendered, bool& coverBufferStored,
                                          bool& bufferRestored, const std::function<bool()>& storeCoverBuffer,
@@ -658,6 +660,7 @@ void DashboardTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const
   drawBookText(renderer, layout.text, recentBooks[0], currentChapterTitle);
   if (SETTINGS.shouldTrackReadingStats()) drawFooterStats(renderer, layout.footer, globalStats);
 }
+#endif
 
 void DashboardTheme::drawSleepScreen(const GfxRenderer& renderer, const RecentBook& book, const BookReadingStats* stats,
                                      const GlobalReadingStats* globalStats, const float progressPercent,

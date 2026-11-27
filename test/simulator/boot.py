@@ -68,4 +68,5 @@ subprocess.run([sys.executable, 'test/simulator/file_publish.py', profile], cwd=
 subprocess.run([sys.executable, 'test/simulator/native_writers_retired.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/lifecycle_journal.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/locator.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/home.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

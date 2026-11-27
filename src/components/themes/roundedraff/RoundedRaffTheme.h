@@ -98,11 +98,11 @@ class RoundedRaffTheme : public BaseTheme {
                            int selectorIndex, bool& coverRendered, bool& coverBufferStored, bool& bufferRestored,
                            const std::function<bool()>& storeCoverBuffer, const BookReadingStats* stats = nullptr,
                            float progressPercent = -1.0f, const GlobalReadingStats* globalStats = nullptr,
-                           const char* currentChapterTitle = nullptr) const override;
+                           const char* currentChapterTitle = nullptr) const;
   int getMenuRowHeight(const GfxRenderer& renderer) const override;
   void drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                       const std::function<const char*(int index)>& buttonLabel,
-                      const std::function<UIIcon(int index)>& rowIcon) const override;
+                      const std::function<UIIcon(int index)>& rowIcon) const;
   void drawTextField(const GfxRenderer& renderer, Rect rect, int textWidth, bool cursorMode = false,
                      int contentStartX = 0, int contentWidth = 0) const override;
   int getListRowStep(bool hasSubtitle, int rowHeightScale = 1) const override;

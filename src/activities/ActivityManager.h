@@ -105,11 +105,6 @@ class ActivityManager {
   // each child through the ordinary activity-result path.
   Activity* pendingHomeReaderTarget = nullptr;
 
-  // A one-shot Home selection to restore after Settings replaces Home. This
-  // is intentionally not persisted as recent-book order.
-  std::string preferredHomeBookPath;
-  bool returningHomeThroughSettings = false;
-
   // Task to render and display the activity
   TaskHandle_t renderTaskHandle = nullptr;
   // Guarded by RenderLock. Entry may explicitly render a ready loading screen

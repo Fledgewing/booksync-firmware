@@ -19,6 +19,8 @@ constexpr int hPaddingInSelection = 8;
 constexpr int cornerRadius = 6;
 }  // namespace
 
+#ifdef SIMULATOR
+// Native Home drawing exists only for retained regression fixtures.
 void Lyra3CoversTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
                                            int selectorIndex, bool& coverRendered, bool& coverBufferStored,
                                            bool& bufferRestored, const std::function<bool()>& storeCoverBuffer,
@@ -128,3 +130,4 @@ void Lyra3CoversTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, con
     drawEmptyRecents(renderer, rect);
   }
 }
+#endif

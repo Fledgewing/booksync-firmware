@@ -4,14 +4,33 @@ namespace booksync {
 namespace {
 class OfflineLibrary final : public Library {
  public:
+  bool available = false;
+  bool openRequested = false;
   Capabilities capabilities() const override { return {}; }
-  Snapshot snapshot() const override { return {}; }
-  CommandStatus submit(Intent) override { return CommandStatus::Unavailable; }
+  Snapshot snapshot() const override {
+    Snapshot value;
+    value.canOpenLastBook = available;
+    return value;
+  }
+  CommandStatus submit(Intent intent) override {
+    if (intent != Intent::OpenLastBook || !available) return CommandStatus::Unavailable;
+    openRequested = true;
+    return CommandStatus::Accepted;
+  }
 };
-}  // namespace
-
-Library& offlineLibrary() {
+OfflineLibrary& shellLibrary() {
   static OfflineLibrary library;
   return library;
+}
+}  // namespace
+Library& offlineLibrary() { return shellLibrary(); }
+void publishHomeBook(bool available) {
+  shellLibrary().available = available;
+  shellLibrary().openRequested = false;
+}
+bool takeHomeOpenRequest() {
+  const bool requested = shellLibrary().openRequested;
+  shellLibrary().openRequested = false;
+  return requested;
 }
 }  // namespace booksync

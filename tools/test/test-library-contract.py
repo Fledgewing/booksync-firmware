@@ -29,6 +29,7 @@ with tempfile.TemporaryDirectory(prefix='booksync-contract-') as temp:
     public = temp / 'public/booksync/interface'
     public.parent.mkdir(parents=True)
     shutil.copytree(ROOT / 'src/booksync/interface', public)
+    shutil.copytree(ROOT / 'src/booksync/ui', public.parent / 'ui')
     # Compile every public header on its own to reject transitive private paths.
     for header in sorted(public.glob('*.h')):
         subprocess.run([CXX, '-std=c++20', '-fsyntax-only', '-x', 'c++', '-I' + str(temp / 'public'), '-include', str(header), '-'], input='', text=True, check=True, capture_output=True)
