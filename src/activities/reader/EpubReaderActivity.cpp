@@ -9009,10 +9009,12 @@ void EpubReaderActivity::observeBookSync(bool closed) {
     sample.sourceOffset = offset.value_or(0);
     // Progress fallback may read cached spine sizes. Resolve only here on the
     // main loop, never in startDailyReadingInterval(), which rendering calls.
-    const float fraction = sample.pages ? epub->calculateProgress(sample.spine, float(sample.page) / sample.pages) : 0;
-    booksyncCapture.locatePage(sample.spine, sample.page, sample.pages,
-                               static_cast<uint32_t>(std::clamp(fraction, 0.0f, 1.0f) * 10000), 10000,
-                               sample.sourceOffset, sample.hasSourceOffset);
+    if (booksyncCapture.needsPageLocation(sample.spine, sample.page, sample.pages)) {
+      const float fraction = sample.pages ? epub->calculateProgress(sample.spine, float(sample.page) / sample.pages) : 0;
+      booksyncCapture.locatePage(sample.spine, sample.page, sample.pages,
+                                 static_cast<uint32_t>(std::clamp(fraction, 0.0f, 1.0f) * 10000), 10000,
+                                 sample.sourceOffset, sample.hasSourceOffset);
+    }
   }
   booksyncCapture.observeSession(readingSessionJournal.captureSnapshot());
   sample.hasStats = statsTrackingActive;

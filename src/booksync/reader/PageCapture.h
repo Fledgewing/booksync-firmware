@@ -8,6 +8,9 @@ class PageCapture {
  public:
   static constexpr unsigned Pending = 8;
   void start(storage::PageEvent origin) { origin_ = origin; }
+  bool needsLocation(uint32_t spine, uint32_t page, uint32_t pages) const {
+    return origin_.start && !origin_.scale && origin_.spine == spine && origin_.page == page && origin_.pages == pages;
+  }
   void locate(uint32_t spine, uint32_t page, uint32_t pages, uint32_t fraction, uint32_t scale, uint32_t offset = 0,
               bool hasOffset = false) {
     if (origin_.spine == spine && origin_.page == page && origin_.pages == pages) {
@@ -20,6 +23,7 @@ class PageCapture {
   void accept(uint64_t end, uint32_t seconds);
   storage::JournalResult flush(storage::PageJournal& journal);
   unsigned pending() const { return count_; }
+  bool hasWork() const { return count_ || gap_; }
 
  private:
   storage::PageEvent origin_{}, queue_[Pending]{};

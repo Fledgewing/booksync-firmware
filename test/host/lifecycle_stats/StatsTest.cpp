@@ -274,6 +274,10 @@ TEST(PageCaptureTest, QueueIsMemoryOnlyAndOverflowPersistsAnExplicitGap) {
   PageJournal journal{"/pages"};
   ASSERT_EQ(journal.recover(), JournalResult::Ok);
   booksync::reader::PageCapture capture;
+  capture.start({1, 1800000000, 0, 0, 0, 1, 100, 0, 0, 0, 0});
+  EXPECT_TRUE(capture.needsLocation(0, 1, 100));
+  capture.locate(0, 1, 100, 1, 10000);
+  EXPECT_FALSE(capture.needsLocation(0, 1, 100));
   card.events.clear();
   for (unsigned i = 0; i < 12; ++i) {
     capture.start({1, 1800000000 + i, 0, 0, 0, i, 100, 0, i, 10000, 0});
@@ -342,9 +346,11 @@ TEST(PageCaptureTest, ClockCorrectionsBecomeGapsAndFailedWritesKeepTheQueue) {
   card.readOnly = true;
   EXPECT_NE(capture.flush(journal), JournalResult::Ok);
   EXPECT_EQ(capture.pending(), 1);
+  EXPECT_TRUE(capture.hasWork());
   card.readOnly = false;
   ASSERT_EQ(capture.flush(journal), JournalResult::Ok);
   EXPECT_EQ(capture.pending(), 0);
+  EXPECT_FALSE(capture.hasWork());
   capture.start({1, 1800000050, 0, 0, 0, 2, 100, 0, 2, 10000, 0});
   capture.accept(1800000001, 10);
   ASSERT_EQ(capture.flush(journal), JournalResult::Ok);

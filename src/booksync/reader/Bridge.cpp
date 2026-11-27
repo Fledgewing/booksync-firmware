@@ -76,9 +76,11 @@ void Bridge::observeSession(const ReadingSessionJournal::Record& record) {
 void Bridge::observe(Sample sample, const std::string& cache, bool closed) {
   // Most loops do no work. Read raw slots only when live page/stats change or
   // closing, after the caller has excluded paint with RenderLock.
-  if (!pagesReady) pagesReady = pageHistory.recover() == storage::JournalResult::Ok;
-  if (pagesReady && pages_.flush(pageHistory) != storage::JournalResult::Ok)
-    LOG_ERR("BSC", "Page history pending; native saves continue independently");
+  if (pages_.hasWork()) {
+    if (!pagesReady) pagesReady = pageHistory.recover() == storage::JournalResult::Ok;
+    if (pagesReady && pages_.flush(pageHistory) != storage::JournalResult::Ok)
+      LOG_ERR("BSC", "Page history pending; native saves continue independently");
+  }
   if (!capture_.id()) return;
   sample.openingTotalSeconds = capture_.lastSample().openingTotalSeconds;
   sample.openingCounter = capture_.lastSample().openingCounter;

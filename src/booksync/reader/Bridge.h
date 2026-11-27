@@ -18,6 +18,9 @@ class Bridge {
   void open(std::string_view path, uint16_t format);
   void startPage(const ReadingStatsDateTime&, uint8_t utcOffset, uint32_t spine, uint32_t page, uint32_t pages,
                  uint32_t fraction, uint32_t scale);
+  bool needsPageLocation(uint32_t spine, uint32_t page, uint32_t pages) const {
+    return pages_.needsLocation(spine, page, pages);
+  }
   void locatePage(uint32_t spine, uint32_t page, uint32_t pages, uint32_t fraction, uint32_t scale, uint32_t offset = 0,
                   bool hasOffset = false) {
     pages_.locate(spine, page, pages, fraction, scale, offset, hasOffset);
