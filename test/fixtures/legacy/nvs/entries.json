@@ -1,0 +1,103 @@
+{
+  "entries": [
+    {
+      "key": "enabled",
+      "namespace": "tailnet",
+      "type": "u8",
+      "value": 1
+    },
+    {
+      "key": "joined",
+      "namespace": "tailnet",
+      "type": "u8",
+      "value": 1
+    },
+    {
+      "key": "pin_ip",
+      "namespace": "tailnet",
+      "type": "u32",
+      "value": 0
+    },
+    {
+      "key": "relay_mode",
+      "namespace": "tailnet",
+      "type": "u32",
+      "value": 0
+    },
+    {
+      "key": "relay_rgn",
+      "namespace": "tailnet",
+      "type": "u32",
+      "value": 0
+    },
+    {
+      "key": "srv_rgn",
+      "namespace": "tailnet",
+      "type": "u32",
+      "value": 0
+    },
+    {
+      "key": "srv_ip",
+      "namespace": "tailnet",
+      "type": "u32",
+      "value": 0
+    },
+    {
+      "key": "login_url",
+      "namespace": "tailnet",
+      "type": "str",
+      "value": ""
+    },
+    {
+      "hex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "key": "machine_pri",
+      "namespace": "microlink",
+      "type": "blob"
+    },
+    {
+      "hex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "key": "machine_pub",
+      "namespace": "microlink",
+      "type": "blob"
+    },
+    {
+      "hex": "0303030303030303030303030303030303030303030303030303030303030303",
+      "key": "wg_private",
+      "namespace": "microlink",
+      "type": "blob"
+    },
+    {
+      "hex": "0404040404040404040404040404040404040404040404040404040404040404",
+      "key": "wg_public",
+      "namespace": "microlink",
+      "type": "blob"
+    },
+    {
+      "hex": "0505050505050505050505050505050505050505050505050505050505050505",
+      "key": "disco_pri",
+      "namespace": "microlink",
+      "type": "blob"
+    },
+    {
+      "hex": "0606060606060606060606060606060606060606060606060606060606060606",
+      "key": "disco_pub",
+      "namespace": "microlink",
+      "type": "blob"
+    },
+    {
+      "hex": "000102030405060708090a0b0c0d0e0fbad0b4f7cae08eb7c1b5acc763a8ed25242e2c9173e81f3f624b1fa5303cf6ce",
+      "key": "v1",
+      "namespace": "crossink_pin",
+      "type": "blob"
+    },
+    {
+      "key": "ts_floor",
+      "namespace": "ml_wg",
+      "type": "u64",
+      "value": 1
+    }
+  ],
+  "operational": false,
+  "schema": 1,
+  "synthetic": true
+}

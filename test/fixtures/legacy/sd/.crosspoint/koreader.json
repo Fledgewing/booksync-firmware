@@ -1,0 +1,13 @@
+{
+  "cfgVersion": 3,
+  "headers": [],
+  "matchMethod": 0,
+  "password_obf": "QVBWMfbVivhzeW51amV0aWMsbGF0aXZkL3N5bmMscWVjcmV1",
+  "sendMetadata": false,
+  "serverType": 0,
+  "serverUrl": "",
+  "syncBehavior": 0,
+  "syncClippings": true,
+  "syncStats": true,
+  "username": "synthetic-sync-account"
+}

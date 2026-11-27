@@ -1,0 +1,13 @@
+{
+  "servers": [
+    {
+      "downloadFolder": "/Books",
+      "filenameFormat": "author_title",
+      "name": "Synthetic Connector",
+      "password_obf": "QVBWMas7eUxzeW51amV0aWMsbXBkcy1yZ2NyZXQ=",
+      "url": "",
+      "useServerFilename": false,
+      "username": "synthetic-opds-account"
+    }
+  ]
+}

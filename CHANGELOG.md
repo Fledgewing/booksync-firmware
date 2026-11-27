@@ -3,6 +3,7 @@
 ### Added
 
 - BookSync CI builds three device and three simulator profiles, runs retained host and offline reader smoke tests, and enforces the shared 128 KiB application reserve without publishing releases.
+- BookSync synthetic legacy SD/NVS fixtures and preserved-reader host/simulator regression baselines for migration work.
 
 ## [v2.0.0] - 2026-11-24
 
