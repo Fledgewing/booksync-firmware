@@ -172,14 +172,14 @@ void mul(gf o, const gf a, const gf b) {
   carry(o);
   carry(o);
 }
-void sq(gf o, const gf a) { mul(o, a, a); }
+void squareField(gf o, const gf a) { mul(o, a, a); }
 
 // a^(2^252-3), for the square root in unpack.
 void pow2523(gf o, const gf i) {
   gf c;
   set(c, i);
   for (int a = 250; a >= 0; --a) {
-    sq(c, c);
+    squareField(c, c);
     if (a != 1) mul(c, c, i);
   }
   set(o, c);
@@ -189,7 +189,7 @@ void invert(gf o, const gf i) {
   gf c;
   set(c, i);
   for (int a = 253; a >= 0; --a) {
-    sq(c, c);
+    squareField(c, c);
     if (a != 2 && a != 4) mul(c, c, i);
   }
   set(o, c);
@@ -262,13 +262,13 @@ bool unpackNeg(point r, const uint8_t p[32]) {
   gf t, chk, num, den, den2, den4, den6;
   setSmall(r[2], 1);
   unpack25519(r[1], p);
-  sq(num, r[1]);
+  squareField(num, r[1]);
   widen(t, D);
   mul(den, num, t);
   sub(num, num, r[2]);
   add(den, r[2], den);
-  sq(den2, den);
-  sq(den4, den2);
+  squareField(den2, den);
+  squareField(den4, den2);
   mul(den6, den4, den2);
   mul(t, den6, num);
   mul(t, t, den);
@@ -277,13 +277,13 @@ bool unpackNeg(point r, const uint8_t p[32]) {
   mul(t, t, den);
   mul(t, t, den);
   mul(r[0], t, den);
-  sq(chk, r[0]);
+  squareField(chk, r[0]);
   mul(chk, chk, den);
   if (!equal(chk, num)) {
     widen(t, SQRTM1);
     mul(r[0], r[0], t);
   }
-  sq(chk, r[0]);
+  squareField(chk, r[0]);
   mul(chk, chk, den);
   if (!equal(chk, num)) return false;
   if (parity(r[0]) == (p[31] >> 7)) {
