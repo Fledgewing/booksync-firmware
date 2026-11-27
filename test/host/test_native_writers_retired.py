@@ -39,6 +39,15 @@ class NativeWritersRetired(unittest.TestCase):
                 violations.append(name)
         self.assertEqual([], violations)
 
+    def test_persistence_shortcut_catalog_retains_legacy_ids(self):
+        source = (ROOT / 'src/QuickActions.h').read_text()
+        array = re.search(r'array<CrossPointSettings::SHORT_PWRBTN, (\d+)> shortcutActionOrder = \{(.*?)\};', source, re.S)
+        values = re.findall(r'CrossPointSettings::(\w+)', array[2])
+        self.assertEqual(int(array[1]), len(values))
+        self.assertEqual(len(values), len(set(values)))
+        self.assertIn('SYNC_PROGRESS', values)
+        self.assertIn('NEARBY_POSITION_SYNC', values)
+
     def test_guard_rejects_hidden_callers(self):
         for code in ('using Hidden = StatsUploadClient;',
                      'auto writer = &ReadingSyncUpload::stats;',

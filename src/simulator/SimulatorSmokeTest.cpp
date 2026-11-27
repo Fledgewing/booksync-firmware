@@ -9478,6 +9478,26 @@ class SimulatorSmokeTest {
         if (std::getenv("BOOKSYNC_NATIVE_WRITER_PROOF")) {
           // Exercise the quiet reader with a connected fake radio and legacy
           // account flags enabled. Socket I/O is independently audited/refused.
+          JsonDocument originalSettings;
+          SETTINGS.toJson(originalSettings);
+          SETTINGS.shortPwrBtn = CrossPointSettings::SYNC_PROGRESS;
+          SETTINGS.sideButtonChordAction = CrossPointSettings::CHORD_SYNC_PROGRESS;
+          SETTINGS.longPressMenuAction = CrossPointSettings::LONG_MENU_SYNC_PROGRESS;
+          JsonDocument savedSettings;
+          SETTINGS.toJson(savedSettings);
+          SETTINGS.fromJson(savedSettings.as<JsonVariantConst>());
+          if (SETTINGS.shortPwrBtn != CrossPointSettings::SYNC_PROGRESS ||
+              SETTINGS.sideButtonChordAction != CrossPointSettings::CHORD_SYNC_PROGRESS ||
+              SETTINGS.longPressMenuAction != CrossPointSettings::LONG_MENU_SYNC_PROGRESS)
+            fail("Retired shortcut IDs must survive local settings round trips");
+          const auto visibleSettings = getSettingsList();
+          for (const auto& setting : visibleSettings) {
+            if (settingKeyIs(setting, "shortPwrBtn") &&
+                std::find(setting.enumRawValues.begin(), setting.enumRawValues.end(),
+                          CrossPointSettings::SYNC_PROGRESS) != setting.enumRawValues.end())
+              fail("Retired sync shortcut must not be offered by Settings");
+          }
+          SETTINGS.fromJson(originalSettings.as<JsonVariantConst>());
           WiFi.mode(WIFI_STA);
           WiFi.begin("fixture");
           KOREADER_STORE.setCredentials("fixture", "fixture");

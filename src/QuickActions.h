@@ -79,6 +79,8 @@ inline constexpr std::array<CrossPointSettings::SHORT_PWRBTN, 36> shortcutAction
     CrossPointSettings::TOGGLE_FOCUS_READING,
     CrossPointSettings::CYCLE_PAGE_TURN,
     CrossPointSettings::TOGGLE_TILT_PAGE_TURN,
+    CrossPointSettings::SYNC_PROGRESS,
+    CrossPointSettings::NEARBY_POSITION_SYNC,
     CrossPointSettings::LIBRARY,
     CrossPointSettings::FILE_TRANSFER,
     CrossPointSettings::CALIBRE_WIRELESS,
