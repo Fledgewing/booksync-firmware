@@ -78,4 +78,5 @@ subprocess.run([sys.executable, 'test/simulator/size_gate.py', profile], cwd=roo
 subprocess.run([sys.executable, "test/simulator/sync_owner.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/layout.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/account.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/update.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

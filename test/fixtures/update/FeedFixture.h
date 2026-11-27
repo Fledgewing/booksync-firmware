@@ -1,0 +1,36 @@
+#pragma once
+namespace update_fixture {
+inline constexpr char feed[] = R"FIXTURE([
+  {
+    "tag_name": "xteink-v2.0.0.150",
+    "name": "xteink-v2.0.0.150",
+    "draft": false,
+    "prerelease": false,
+    "created_at": "2026-11-24T12:00:00Z",
+    "assets": [
+      {
+        "name": "firmware-x4-classic-v2.0.0.150.bin",
+        "size": 26,
+        "digest": "sha256:ac6afb91a7fb0db21e7cec47ed46fd4ce4b8861f6f7807d805064bbd1cf9022b",
+        "browser_download_url": "https://github.com/Fledgewing/BookSync/releases/download/xteink-v2.0.0.150/firmware-x4-classic-v2.0.0.150.bin"
+      },
+      {
+        "name": "firmware-x4-pro-v2.0.0.150.bin",
+        "size": 30,
+        "digest": "sha256:ac6afb91a7fb0db21e7cec47ed46fd4ce4b8861f6f7807d805064bbd1cf9022b",
+        "browser_download_url": "https://github.com/Fledgewing/BookSync/releases/download/xteink-v2.0.0.150/firmware-x4-pro-v2.0.0.150.bin",
+        "orbify_signature": "00000001f25db21d7cca06a2a91724efde9095edd67e8c70b9a9b95195eda6ee2d46d817f51a29df610f64b51d7e373b261cf644c90732789eb25601f93dabc2ab312f70da1ac7af91f62e405236f7c1493f8b70799491a2a0e73b4ca9c59ece3f88890e9c84b94a11cc8a5cccd19b505821ef0f222db71f9a3e15c4cc219f776c084e1b5a3e59f682d75a00e9f5c33cccc3e5ff96a406dbdba6b745cc0f4efa9d3dd10f"
+      },
+      {
+        "name": "SIGNATURES",
+        "size": 459,
+        "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "browser_download_url": "https://github.com/Fledgewing/BookSync/releases/download/xteink-v2.0.0.150/SIGNATURES"
+      }
+    ]
+  }
+]
+)FIXTURE";
+inline constexpr char root[] = "f399ad5c0ffe0ce74b4a8a4c9cfdd022f40b62d13e22cd35b8c5dc44767c51ac";
+inline constexpr char otherRoot[] = "83c5b82b808f5354335f3a097215152ee74b751c1e3ce0c4036e4000ed5ffec3";
+}

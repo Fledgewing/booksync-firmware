@@ -1,0 +1,16 @@
+{
+  "source": "BookSync integration repository",
+  "design_ref": "origin/feature/0.12",
+  "design_commit": "e44c94284c7c19d678b89dee0b6d585c4c95ef88",
+  "fixtures": "shared/fixtures/release-signing",
+  "private_keys": "None; only existing public verification vectors copied.",
+  "sha256": {
+    "SIGNATURES-firmware": "0c0b154d2ad19c35d2aa2cc560d4e1ac993cc8b0efce95038b47c5c3197121f5",
+    "SIGNATURES-plugin": "36df751d1a51fd32521c3d62408445a5e06a4979eb2faed76459356747416253",
+    "README.md": "38b2044e13637dc47ac9b95411eedab2fae9da8d66e25b7e335eade660850ab8",
+    "SIGNATURES-plugin-other-root": "b6cba842ceba35b88249dc9b877fe42df5cb828f61945ba166259cfd59e763d1",
+    "cases.json": "f7985a002efaea97d562e0640bf5f3da9b3e5a364a44571414477e935e6342b0",
+    "SIGNATURES-plugin-rotated": "b5702db55184c007f108ff5f133eb88035e545e7d426748a17120596ed7e90f3",
+    "xteink-feed.json": "82ea6f521247c5f5d1ce18473284286b04db4fefcda7db273416795c41eab3ef"
+  }
+}

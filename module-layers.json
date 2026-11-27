@@ -13298,7 +13298,7 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer.",
       "includes": [
         "../../test/simulator/AccountScenario.h",
         "../../test/simulator/DeliveryScenario.h",
@@ -13309,6 +13309,7 @@
         "../../test/simulator/LocatorScenario.h",
         "../../test/simulator/ReaderCaptureScenario.h",
         "../../test/simulator/SyncOwnerScenario.h",
+        "../../test/simulator/UpdateScenario.h",
         "AppVersion.h",
         "ArduinoJson.h",
         "AssetDownloadSmokeTest.h",
@@ -15124,6 +15125,65 @@
     "src/booksync/server/bookorbit/Auth.cpp": {
       "role": "server",
       "rationale": "F15 worker-only account epochs and bounded secret capture; auth protocol and key derivation stay inside the adapter."
+    },
+    "src/booksync/system/Ed25519Verify.cpp": {
+      "role": "system",
+      "rationale": "F30: bounded OTA feed decoding and release trust verification; no Library writer, live feed, UI or installer.",
+      "includes": [
+        "Ed25519Verify.h",
+        "Logging.h",
+        "Memory.h",
+        "cstring",
+        "mbedtls/sha512.h"
+      ]
+    },
+    "src/booksync/system/Ed25519Verify.h": {
+      "role": "system",
+      "rationale": "F30: bounded OTA feed decoding and release trust verification; no Library writer, live feed, UI or installer.",
+      "includes": [
+        "cstddef",
+        "cstdint"
+      ]
+    },
+    "src/booksync/system/Feed.cpp": {
+      "role": "system",
+      "rationale": "F30: bounded OTA feed decoding and release trust verification; no Library writer, live feed, UI or installer.",
+      "includes": [
+        "Feed.h",
+        "UpdateVerify.h",
+        "cstdlib",
+        "cstring",
+        "limits"
+      ]
+    },
+    "src/booksync/system/Feed.h": {
+      "role": "system",
+      "rationale": "F30: bounded OTA feed decoding and release trust verification; no Library writer, live feed, UI or installer.",
+      "includes": [
+        "StreamingJsonParser.h",
+        "cstddef",
+        "cstdint"
+      ]
+    },
+    "src/booksync/system/UpdateVerify.cpp": {
+      "role": "system",
+      "rationale": "F30: bounded OTA feed decoding and release trust verification; no Library writer, live feed, UI or installer.",
+      "includes": [
+        "Ed25519Verify.h",
+        "Feed.h",
+        "Logging.h",
+        "Memory.h",
+        "UpdateVerify.h",
+        "cstring"
+      ]
+    },
+    "src/booksync/system/UpdateVerify.h": {
+      "role": "system",
+      "rationale": "F30: bounded OTA feed decoding and release trust verification; no Library writer, live feed, UI or installer.",
+      "includes": [
+        "cstddef",
+        "cstdint"
+      ]
     }
   },
   "generators": {
