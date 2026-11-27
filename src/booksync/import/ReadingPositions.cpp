@@ -83,7 +83,7 @@ storage::JournalResult ReadingPositions::retain(const char* path, PositionFormat
     return JournalResult::Capacity;
   }
   char* raw = payload_.data() + Header + pathBytes;
-  const bool read = file.read(raw, rawBytes) == int(rawBytes);
+  const bool read = file.read(raw, rawBytes) == static_cast<int>(rawBytes);
   const bool closed = file.close();  // No legacy handle remains when the journal is opened.
   if (!read || !closed) {
     LOG_ERR("BSI", "Position source read failed; retained");
