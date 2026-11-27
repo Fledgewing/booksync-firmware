@@ -6483,13 +6483,14 @@
     },
     "src/BookmarkStore.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
       "includes": [
         "AtomicFile.h",
         "BookmarkStore.h",
         "HalStorage.h",
         "Logging.h",
         "Serialization.h",
+        "activities/reader/NativeReaderObserver.h",
         "algorithm",
         "functional",
         "limits",
@@ -6510,7 +6511,7 @@
     },
     "src/ClippingStore.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
       "includes": [
         "Arduino.h",
         "ClippingStore.h",
@@ -6520,6 +6521,7 @@
         "Logging.h",
         "Serialization.h",
         "Utf8.h",
+        "activities/reader/NativeReaderObserver.h",
         "activities/reader/ReadingStatsUtils.h",
         "algorithm",
         "array",
@@ -8772,7 +8774,7 @@
     },
     "src/activities/reader/EpubReaderActivity.cpp": {
       "role": "retained-reader",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
       "includes": [
         "../settings/DictionarySelectActivity.h",
         "Arduino.h",
@@ -8866,7 +8868,7 @@
     },
     "src/activities/reader/EpubReaderActivity.h": {
       "role": "retained-reader",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
       "includes": [
         "BackgroundBuildMemoryGuard.h",
         "BookLoadingFeedback.h",
@@ -8897,6 +8899,7 @@
         "activities/reader/TouchReaderPreviewModel.h",
         "array",
         "atomic",
+        "booksync/reader/Bridge.h",
         "components/OptionPopup.h",
         "freertos/FreeRTOS.h",
         "freertos/task.h",
@@ -9690,7 +9693,7 @@
     },
     "src/activities/reader/ReadingSessionJournal.h": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "F09 read-only view of the native session record for the main-task capture observer; native persistence and timing unchanged.",
       "includes": [
         "ReadingStatsUtils.h",
         "cstdint"
@@ -9850,7 +9853,7 @@
     },
     "src/activities/reader/TxtReaderActivity.cpp": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
       "includes": [
         "BidiUtils.h",
         "CrossPointSettings.h",
@@ -9881,7 +9884,7 @@
     },
     "src/activities/reader/TxtReaderActivity.h": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
       "includes": [
         "BookLoadingFeedback.h",
         "CrossPointSettings.h",
@@ -9893,6 +9896,7 @@
         "Txt.h",
         "activities/Activity.h",
         "activities/reader/ReaderPinchGesture.h",
+        "booksync/reader/Bridge.h",
         "components/OptionPopup.h",
         "optional",
         "vector"
@@ -9912,7 +9916,7 @@
     },
     "src/activities/reader/XtcReaderActivity.cpp": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
       "includes": [
         "BookStatsActivity.h",
         "BookStatsTracking.h",
@@ -9949,7 +9953,7 @@
     },
     "src/activities/reader/XtcReaderActivity.h": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
       "includes": [
         "BookLoadingFeedback.h",
         "BookReadingStats.h",
@@ -9965,6 +9969,7 @@
         "Xtc.h",
         "activities/Activity.h",
         "atomic",
+        "booksync/reader/Bridge.h",
         "components/OptionPopup.h",
         "memory",
         "string",
@@ -13291,11 +13296,12 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owns offline Home coverage; F05 retains local capture after retiring writers; F06/F07/F08 retain isolated publication, journal and native locator/reopen probes.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains.",
       "includes": [
         "../../test/simulator/FilePublishScenario.h",
         "../../test/simulator/LifecycleJournalScenario.h",
         "../../test/simulator/LocatorScenario.h",
+        "../../test/simulator/ReaderCaptureScenario.h",
         "AppVersion.h",
         "ArduinoJson.h",
         "AssetDownloadSmokeTest.h",
@@ -14926,6 +14932,29 @@
       "role": "retained-simulator",
       "rationale": "F04 isolated synthetic offline owned Home/open/Back scenario; calls production Library and mapped input, no real transport or device.",
       "includes": []
+    },
+    "src/booksync/reader/Capture.h": {
+      "role": "reader",
+      "rationale": "F09 main-task local reader capture into F07; bounded native observations, no transport or presentation. Rendering is excluded by the native reader RenderLock."
+    },
+    "src/booksync/reader/Capture.cpp": {
+      "role": "reader",
+      "rationale": "F09 main-task local reader capture into F07; bounded native observations, no transport or presentation. Rendering is excluded by the native reader RenderLock."
+    },
+    "src/booksync/reader/Bridge.h": {
+      "role": "reader",
+      "rationale": "F09 main-task local reader capture into F07; bounded native observations, no transport or presentation. Rendering is excluded by the native reader RenderLock."
+    },
+    "src/booksync/reader/Bridge.cpp": {
+      "role": "reader",
+      "rationale": "F09 main-task local reader capture into F07; bounded native observations, no transport or presentation. Rendering is excluded by the native reader RenderLock."
+    },
+    "src/activities/reader/NativeReaderObserver.h": {
+      "role": "retained-runtime",
+      "includes": [
+        "string_view"
+      ],
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk."
     }
   },
   "generators": {

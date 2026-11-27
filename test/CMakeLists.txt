@@ -265,3 +265,5 @@ add_subdirectory(host/locator)
 # F04 production Library/Home policy and retired-symbol rejection.
 add_test(NAME BookSyncHomeContract COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/tools/test/test-library-contract.py)
 add_test(NAME BookSyncHomeMapGuard COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/tools/test/test-home-map.py --self-test)
+
+add_subdirectory(host/reader_capture)

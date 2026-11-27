@@ -1748,6 +1748,7 @@ void EpubReaderActivity::pauseReadingPaceTimer(const char* reason) {
 void EpubReaderActivity::commitReadingStatsSession() {
   if (!statsTrackingActive) return;
   recordCurrentPageReadingTime("session_commit");
+  booksyncCapture.observeSession(readingSessionJournal.captureSnapshot());
   readingSessionJournal.flush();
   commitReadingSession(stats, globalStats, sessionReadingSeconds, &readingSessionDates);
   sessionReadingSeconds = 0;
@@ -2550,6 +2551,7 @@ void EpubReaderActivity::onEnter() {
   ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
   showOpeningFeedback();
   epub->setupCacheDir();
+  booksyncCapture.open(epub->getPath(), 1);
   {
     GfxRenderer::FrameBufferLoan loan(renderer);
     epub->ensureOptimizerImageIndex();
@@ -2737,6 +2739,8 @@ void EpubReaderActivity::onExit() {
 
   finalizeReadingStatsOnExit();
   flushPendingSyncMark();  // before a Read-folder move below renames the entry
+
+  observeBookSync(true);
 
   BOOKMARKS.unload();
   CLIPPINGS.unload();
@@ -3242,6 +3246,7 @@ void EpubReaderActivity::flushPendingSyncMark() {
 }
 
 void EpubReaderActivity::loop() {
+  observeBookSync();
   if (mappedInput.hasPendingActivity() || RenderLock::peek()) statsSaveDelay.defer(millis());
   pluginEvents.pollWhenIdle(getCurrentBookPath());
   flushPendingSyncMark();
@@ -8978,4 +8983,33 @@ bool EpubReaderActivity::saveProgressBeforeRestart() {
   // The restart skips loop() and onExit(), so queue the book for sync now.
   flushPendingSyncMark();
   return saved;
+}
+
+void EpubReaderActivity::observeBookSync(bool closed) {
+  std::optional<RenderLock> lock;
+  if (!RenderLock::heldByCurrentTask()) {
+    lock.emplace(closed ? RenderLock::Mode::Blocking : RenderLock::Mode::Try);
+    if (!lock->ownsLock()) return;
+  }
+  if (!epub) return;
+  if (!closed && (activeFootnotePreview || !section || section->isBuilding())) return;
+  // Exiting from a preview or between chapters still closes the observed
+  // reading origin, without attaching the preview's page table to that origin.
+  booksync::reader::Sample sample = booksyncCapture.lastObservation();
+  if (!activeFootnotePreview && section && !section->isBuilding()) {
+    sample.spine = currentSpineIndex;
+    sample.page = section->currentPage;
+    sample.pages = section->pageCount;
+    const auto offset = section->getVisibleTextOffsetForPage(section->currentPage);
+    sample.hasSourceOffset = offset.has_value();
+    sample.sourceOffset = offset.value_or(0);
+  }
+  booksyncCapture.observeSession(readingSessionJournal.captureSnapshot());
+  sample.hasStats = statsTrackingActive;
+  sample.nativeSessions = stats.sessionCount;
+  sample.totalSeconds = stats.totalReadingSeconds;
+  sample.sessionSeconds = sessionReadingSeconds;
+  sample.forwardTurns = stats.totalPagesTurned;
+  sample.counter = stats.counterId.bytes;
+  booksyncCapture.observe(sample, epub->getCachePath(), closed);
 }

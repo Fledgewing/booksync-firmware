@@ -25,10 +25,14 @@
 #include "ReadingSessionJournal.h"
 #include "ReadingSessionStats.h"
 #include "activities/Activity.h"
+#include "booksync/reader/Bridge.h"
 #include "components/OptionPopup.h"
 #include "sync/SyncPending.h"
 
 class XtcReaderActivity final : public Activity {
+  booksync::reader::Bridge booksyncCapture;
+  void observeBookSync(bool closed = false);
+
   PluginReaderEvents pluginEvents;
   ReaderUtils::DeferredGrayscalePlanes deferredGrayscalePlanes;
 #ifdef SIMULATOR

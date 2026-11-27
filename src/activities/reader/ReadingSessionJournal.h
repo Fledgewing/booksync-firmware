@@ -30,6 +30,7 @@ class Session {
     intervalStart = local;
     intervalOffset = offset;
   }
+  const Record& captureSnapshot() const { return pending; }
   uint32_t revision() const { return checkpointRevision; }
   bool checkpoint();
   bool checkpointIfDue();

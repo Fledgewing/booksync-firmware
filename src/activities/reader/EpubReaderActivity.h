@@ -5,6 +5,7 @@
 #include <Memory.h>
 
 #include "BackgroundBuildMemoryGuard.h"
+#include "booksync/reader/Bridge.h"
 #if CROSSINK_SCALABLE_FONTS
 #include <FontCacheManager.h>
 #endif
@@ -51,6 +52,9 @@ struct ToastRect {
 };
 
 class EpubReaderActivity final : public Activity {
+  booksync::reader::Bridge booksyncCapture;
+  void observeBookSync(bool closed = false);
+
   PluginReaderEvents pluginEvents;
 #ifdef SIMULATOR
   friend struct BookmarkListSmokeTest;

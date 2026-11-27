@@ -10,6 +10,8 @@
 #include <functional>
 #include <limits>
 
+#include "activities/reader/NativeReaderObserver.h"
+
 namespace {
 constexpr uint8_t LEGACY_VERSION = 2;
 constexpr uint8_t COUNT_U16_VERSION = 3;
@@ -482,6 +484,7 @@ void BookmarkStore::clearAll() {
       if (!bookmarkSiblingPath(storeFilePath, suffix, target) || !deleteBookmarkStorePath(target, "cleared")) return;
     }
   }
+  native_reader_observer::published("bookmarks", bookFilePath, storeFilePath.c_str(), true);
   bookmarks.clear();
   dirty = false;
 }
@@ -599,6 +602,7 @@ bool BookmarkStore::writeToFile() const {
     Storage.remove(temporary);
     return false;
   }
+  native_reader_observer::published("bookmarks", bookFilePath, storeFilePath.c_str());
   return true;
 }
 

@@ -33,6 +33,7 @@ class LifecycleJournal {
   // Returned views expire when the caller-owned bounded buffer is reused.
   JournalResult read(uint64_t id, JournalEntry& entry, char* buffer, size_t capacity);
   JournalResult next(std::string_view adapter, std::string_view owner, uint64_t after, uint64_t& id);
+  const JournalLimits& limits() const { return limits_; }
   uint16_t pending() const { return count_; }
   uint32_t bytes() const { return bytes_; }
 

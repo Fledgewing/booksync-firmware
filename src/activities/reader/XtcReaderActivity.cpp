@@ -128,6 +128,7 @@ void XtcReaderActivity::onEnter() {
   }
 
   xtc->setupCacheDir();
+  booksyncCapture.open(xtc->getPath(), 2);
 
   // Activate reader-specific front button mapping (if configured).
   mappedInput.setReaderMode(true);
@@ -176,6 +177,8 @@ void XtcReaderActivity::onExit() {
 
   finalizeReadingStatsOnExit();
 
+  observeBookSync(true);
+
   // Generate carousel thumbnails while XTC is still loaded so the home screen
   // can display the cover on the very first render without a loading popup.
   if (xtc &&
@@ -215,6 +218,7 @@ void XtcReaderActivity::openReaderMenu() {
 }
 
 void XtcReaderActivity::loop() {
+  observeBookSync();
   if (mappedInput.hasPendingActivity() || RenderLock::peek()) statsSaveDelay.defer(millis());
   pluginEvents.pollWhenIdle(getCurrentBookPath());
   if (!xtc) {
@@ -779,6 +783,7 @@ void XtcReaderActivity::commitReadingStats() {
   }
   if (statsTrackingActive) {
     recordCurrentPageReadingTime("session_commit");
+    booksyncCapture.observeSession(readingSessionJournal.captureSnapshot());
     readingSessionJournal.flush();
     commitReadingSession(stats, globalStats, sessionReadingSeconds, &readingSessionDates);
   }
@@ -1717,4 +1722,23 @@ bool XtcReaderActivity::saveProgressBeforeRestart() {
     saved = false;
   }
   return saved;
+}
+
+void XtcReaderActivity::observeBookSync(bool closed) {
+  std::optional<RenderLock> lock;
+  if (!RenderLock::heldByCurrentTask()) {
+    lock.emplace(closed ? RenderLock::Mode::Blocking : RenderLock::Mode::Try);
+    if (!lock->ownsLock()) return;
+  }
+  if (!xtc) return;
+  booksync::reader::Sample sample;
+  sample.page = currentPage;
+  booksyncCapture.observeSession(readingSessionJournal.captureSnapshot());
+  sample.hasStats = statsTrackingActive;
+  sample.nativeSessions = stats.sessionCount;
+  sample.totalSeconds = stats.totalReadingSeconds;
+  sample.sessionSeconds = sessionReadingSeconds;
+  sample.forwardTurns = stats.totalPagesTurned;
+  sample.counter = stats.counterId.bytes;
+  booksyncCapture.observe(sample, xtc->getCachePath(), closed);
 }
