@@ -1076,7 +1076,158 @@
       "tools/.keep",
       "tools/firmware/esp_image_to_elf.py"
     ],
-    "rationale": "SDK source/resources are immutable inputs, isolated behind HAL and renderer wrappers. New product UI has no SDK include path. Pin or input changes require boundary review."
+    "rationale": "SDK source/resources are immutable inputs, isolated behind HAL and renderer wrappers. New product UI has no SDK include path. Pin or input changes require boundary review.",
+    "tailnet/third_party/microlink": "ca6ea5c02dfabe47404b95fa1a7a5abe3bb334d4",
+    "tailnet/third_party/microlink-inputs": [
+      ".gitattributes",
+      ".github/ISSUE_TEMPLATE/bug_report.yml",
+      ".github/ISSUE_TEMPLATE/config.yml",
+      ".github/dependabot.yml",
+      ".github/pull_request_template.md",
+      ".github/workflows/ci.yml",
+      ".github/workflows/codeql.yml",
+      ".github/workflows/conformance.yml",
+      ".github/workflows/release.yml",
+      ".github/workflows/scorecard.yml",
+      ".gitignore",
+      "CMakeLists.txt",
+      "LICENSE",
+      "README.md",
+      "SECURITY.md",
+      "TESTING_GUIDE.md",
+      "components/microlink/CMakeLists.txt",
+      "components/microlink/Kconfig",
+      "components/microlink/LICENSE",
+      "components/microlink/components/wireguard_lwip/CMakeLists.txt",
+      "components/microlink/components/wireguard_lwip/LICENSE",
+      "components/microlink/components/wireguard_lwip/README.md",
+      "components/microlink/components/wireguard_lwip/src/crypto.c",
+      "components/microlink/components/wireguard_lwip/src/crypto.h",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/blake2s.c",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/blake2s.h",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/chacha20.c",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/chacha20.h",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/chacha20poly1305.c",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/chacha20poly1305.h",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/poly1305-donna-32.h",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/poly1305-donna.c",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/poly1305-donna.h",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/x25519-license.txt",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/x25519.c",
+      "components/microlink/components/wireguard_lwip/src/crypto/refc/x25519.h",
+      "components/microlink/components/wireguard_lwip/src/lwip_compat.h",
+      "components/microlink/components/wireguard_lwip/src/wireguard-filter.c",
+      "components/microlink/components/wireguard_lwip/src/wireguard-filter.h",
+      "components/microlink/components/wireguard_lwip/src/wireguard-platform-esp32.c",
+      "components/microlink/components/wireguard_lwip/src/wireguard-platform.h",
+      "components/microlink/components/wireguard_lwip/src/wireguard.c",
+      "components/microlink/components/wireguard_lwip/src/wireguard.h",
+      "components/microlink/components/wireguard_lwip/src/wireguardif.c",
+      "components/microlink/components/wireguard_lwip/src/wireguardif.h",
+      "components/microlink/idf_component.yml",
+      "components/microlink/include/microlink.h",
+      "components/microlink/include/microlink_internal.h",
+      "components/microlink/include/ml_at_socket.h",
+      "components/microlink/include/ml_at_validate.h",
+      "components/microlink/include/ml_cellular.h",
+      "components/microlink/include/ml_config_httpd.h",
+      "components/microlink/include/ml_filter.h",
+      "components/microlink/include/ml_lite.h",
+      "components/microlink/include/ml_nat66.h",
+      "components/microlink/include/ml_net_switch.h",
+      "components/microlink/include/ml_routes.h",
+      "components/microlink/src/microlink.c",
+      "components/microlink/src/ml_at_socket.c",
+      "components/microlink/src/ml_at_validate.c",
+      "components/microlink/src/ml_cellular.c",
+      "components/microlink/src/ml_config_html.h",
+      "components/microlink/src/ml_config_httpd.c",
+      "components/microlink/src/ml_coord.c",
+      "components/microlink/src/ml_coord_lite.h",
+      "components/microlink/src/ml_coord_tls.c",
+      "components/microlink/src/ml_derp.c",
+      "components/microlink/src/ml_filter.c",
+      "components/microlink/src/ml_h2.c",
+      "components/microlink/src/ml_map_stream.c",
+      "components/microlink/src/ml_map_stream.h",
+      "components/microlink/src/ml_nat66.c",
+      "components/microlink/src/ml_net_io.c",
+      "components/microlink/src/ml_net_switch.c",
+      "components/microlink/src/ml_noise.c",
+      "components/microlink/src/ml_noise_aead.h",
+      "components/microlink/src/ml_ota.c",
+      "components/microlink/src/ml_peer_nvs.c",
+      "components/microlink/src/ml_routes.c",
+      "components/microlink/src/ml_stun.c",
+      "components/microlink/src/ml_tcp.c",
+      "components/microlink/src/ml_udp.c",
+      "components/microlink/src/ml_wg_mgr.c",
+      "components/microlink/src/ml_zerocopy.c",
+      "components/microlink/src/nacl_box.c",
+      "components/microlink/src/nacl_box.h",
+      "docs/ARCHITECTURE.md",
+      "docs/LARGE_TAILNET.md",
+      "docs/TAILSCALE_REFERENCE.md",
+      "examples/basic_connect/CMakeLists.txt",
+      "examples/basic_connect/main/CMakeLists.txt",
+      "examples/basic_connect/main/Kconfig.projbuild",
+      "examples/basic_connect/main/idf_component.yml",
+      "examples/basic_connect/main/main.c",
+      "examples/basic_connect/sdkconfig.credentials.example",
+      "examples/basic_connect/sdkconfig.defaults",
+      "examples/cellular_connect/CMakeLists.txt",
+      "examples/cellular_connect/main/CMakeLists.txt",
+      "examples/cellular_connect/main/Kconfig.projbuild",
+      "examples/cellular_connect/main/main.c",
+      "examples/cellular_connect/sdkconfig.credentials.example",
+      "examples/cellular_connect/sdkconfig.defaults",
+      "examples/cellular_heartbeat/CMakeLists.txt",
+      "examples/cellular_heartbeat/main/CMakeLists.txt",
+      "examples/cellular_heartbeat/main/Kconfig.projbuild",
+      "examples/cellular_heartbeat/main/main.c",
+      "examples/cellular_heartbeat/sdkconfig.credentials.example",
+      "examples/cellular_heartbeat/sdkconfig.defaults",
+      "examples/ethernet_connect/CMakeLists.txt",
+      "examples/ethernet_connect/main/CMakeLists.txt",
+      "examples/ethernet_connect/main/Kconfig.projbuild",
+      "examples/ethernet_connect/main/main.c",
+      "examples/ethernet_connect/sdkconfig.defaults",
+      "examples/ethernet_connect/sdkconfig.qemu.defaults",
+      "examples/failover_connect/CMakeLists.txt",
+      "examples/failover_connect/main/CMakeLists.txt",
+      "examples/failover_connect/main/Kconfig.projbuild",
+      "examples/failover_connect/main/main.c",
+      "examples/failover_connect/sdkconfig.credentials.example",
+      "examples/failover_connect/sdkconfig.defaults",
+      "examples/partitions_ota.csv",
+      "examples/rebind_test/CMakeLists.txt",
+      "examples/rebind_test/main/CMakeLists.txt",
+      "examples/rebind_test/main/main.c",
+      "examples/rebind_test/sdkconfig.defaults",
+      "examples/sdkconfig.httpd.defaults",
+      "examples/sdkconfig.ota.defaults",
+      "examples/sdkconfig.router.defaults",
+      "examples/sdkconfig.size.defaults",
+      "test/host/CMakeLists.txt",
+      "test/host/include/arch/cc.h",
+      "test/host/include/freertos/FreeRTOS.h",
+      "test/host/include/lwipopts.h",
+      "test/host/include/sdkconfig.h",
+      "test/host/test_at_validate.c",
+      "test/host/test_crypto_kat.c",
+      "test/host/test_filter.c",
+      "test/host/test_map_stream.c",
+      "test/host/test_nat66.c",
+      "test/host/test_noise_aead.c",
+      "test/host/test_wg_filter.c",
+      "tests/conformance/headscale_qemu.sh",
+      "tests/package_consumer/CMakeLists.txt",
+      "tests/package_consumer/main/CMakeLists.txt",
+      "tests/package_consumer/main/idf_component.yml",
+      "tests/package_consumer/main/main.c",
+      "tools/ml_ota.py",
+      "x25519-license.txt"
+    ]
   },
   "files": {
     ".gitmodules": {
@@ -14426,6 +14577,170 @@
         "string",
         "vector"
       ]
+    },
+    "tailnet/README.md": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": []
+    },
+    "tailnet/ml_config.h": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": []
+    },
+    "tailnet/provenance.json": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": []
+    },
+    "tailnet/shim/Tailnet.cpp": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "Tailnet.h",
+        "TailnetNetPhase.h",
+        "TailnetSysSwitches.h",
+        "WiFi.h",
+        "atomic",
+        "esp_heap_caps.h",
+        "esp_log.h",
+        "esp_system.h",
+        "esp_timer.h",
+        "freertos/FreeRTOS.h",
+        "freertos/queue.h",
+        "freertos/semphr.h",
+        "freertos/task.h",
+        "lwip/dns.h",
+        "lwip/tcpip.h",
+        "microlink.h",
+        "nvs.h",
+        "stdio.h",
+        "string.h"
+      ]
+    },
+    "tailnet/shim/Tailnet.h": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "stdbool.h",
+        "stddef.h",
+        "stdint.h"
+      ]
+    },
+    "tailnet/shim/TailnetLog.cpp": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "Tailnet.h",
+        "esp_attr.h",
+        "esp_log.h",
+        "freertos/FreeRTOS.h",
+        "stdarg.h",
+        "stdio.h",
+        "string.h"
+      ]
+    },
+    "tailnet/shim/TailnetLwipLock.c": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "errno.h",
+        "lwip/dns.h",
+        "lwip/opt.h",
+        "lwip/tcpip.h",
+        "stdbool.h",
+        "stddef.h"
+      ]
+    },
+    "tailnet/shim/TailnetNetPhase.cpp": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "TailnetNetPhase.h",
+        "atomic"
+      ]
+    },
+    "tailnet/shim/TailnetNetPhase.h": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "stdbool.h",
+        "stdint.h"
+      ]
+    },
+    "tailnet/shim/TailnetResolver.cpp": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "Tailnet.h",
+        "atomic",
+        "errno.h",
+        "esp_log.h",
+        "freertos/FreeRTOS.h",
+        "freertos/task.h",
+        "lwip/netdb.h",
+        "lwip/sockets.h",
+        "stdio.h",
+        "string.h",
+        "strings.h"
+      ]
+    },
+    "tailnet/shim/TailnetStacks.c": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "Tailnet.h",
+        "TailnetSysSwitches.h",
+        "esp_heap_caps.h",
+        "esp_wifi.h",
+        "freertos/FreeRTOS.h",
+        "freertos/task.h",
+        "stdio.h",
+        "stdlib.h",
+        "string.h"
+      ]
+    },
+    "tailnet/shim/TailnetSysSwitches.h": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "stdbool.h",
+        "stddef.h"
+      ]
+    },
+    "tailnet/shim/TailnetTlsMem.c": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "esp_heap_caps.h",
+        "stddef.h"
+      ]
+    },
+    "tailnet/shim/TailnetWifiMem.c": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "TailnetNetPhase.h",
+        "TailnetSysSwitches.h",
+        "esp_heap_caps.h",
+        "esp_private/wifi_os_adapter.h",
+        "esp_wifi.h",
+        "sdkconfig.h"
+      ]
+    },
+    "tailnet/shim/ml_priority.c": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": [
+        "microlink_internal.h",
+        "stdio.h",
+        "wireguardif.h"
+      ]
+    },
+    "tailnet/tailnet_build.py": {
+      "role": "transport",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "includes": []
     },
     "tools/ci/simulator_build.py": {
       "role": "retained-build-input",

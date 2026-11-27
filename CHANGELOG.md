@@ -5,6 +5,7 @@
 - BookSync durable lifecycle journal preserves offline work and phase checkpoints across restarts, blocks unsafe writes at capacity, and never evicts unacknowledged entries.
 
 - BookSync atomic SD publication keeps a complete prior file available after interrupted writes, full cards and read-only recovery.
+- BookSync owned Tailnet transport with preserved pairing identity, DNS/core-lock protection, and service leases that refuse connection while reading.
 
 - BookSync CI builds three device and three simulator profiles, runs retained host and offline reader smoke tests, and enforces the shared 128 KiB application reserve without publishing releases.
 - BookSync synthetic legacy SD/NVS fixtures and preserved-reader host/simulator regression baselines for migration work.

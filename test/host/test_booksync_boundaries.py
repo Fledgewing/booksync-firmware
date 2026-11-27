@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/test'))
@@ -102,6 +103,21 @@ class Boundaries(unittest.TestCase):
             self.assertTrue(boundary.server_errors(path, source))
         self.assertFalse(boundary.server_errors('web/assets/probe.yaml', '# BookOrbit'))
         self.assertFalse(boundary.server_errors('web/assets/probe.html', '<!-- BookOrbit -->'))
+
+    def test_pinned_transport_cannot_hide_modified_or_wrong_revision_inputs(self):
+        original = boundary.subprocess.check_output
+        module = str(ROOT / 'tailnet/third_party/microlink')
+        for kind in ('pin', 'dirty'):
+            def altered(command, **kwargs):
+                if len(command) > 2 and command[2] == module:
+                    if kind == 'pin' and 'rev-parse' in command:
+                        return '0' * 40 + '\n'
+                    if kind == 'dirty' and 'status' in command:
+                        return '?? unclassified.cpp\n'
+                return original(command, **kwargs)
+            with patch.object(boundary.subprocess, 'check_output', side_effect=altered):
+                errors = boundary.check_ui(ROOT)
+            self.assertTrue(any('microlink:' in error for error in errors), errors)
 
     def test_import_cannot_link_transport(self):
         self.assertTrue(boundary.ui_source_errors('src/booksync/import/Probe.cpp', '#include <HTTPClient.h>'))
