@@ -5,6 +5,7 @@
 #include "../../test/simulator/FilePublishScenario.h"
 #include "../../test/simulator/LifecycleJournalScenario.h"
 #include "../../test/simulator/SyncOwnerScenario.h"
+#include "../../test/simulator/LifecycleMatchScenario.h"
 #include "../../test/simulator/DeliveryScenario.h"
 #include "../../test/simulator/AccountScenario.h"
 #include "../../test/simulator/CatalogScenario.h"
@@ -12166,6 +12167,7 @@ bool simulatorInterceptNetworkRestart(const uint32_t target, const uint32_t payl
 // Every scenario except the release notes one starts with What's New already dismissed so it cannot cover Home.
 void prepareSimulatorSmokeState() {
   runFilePublishScenario();
+  runLifecycleMatchScenario();
   runSyncOwnerScenario();
   runLifecycleJournalScenario();
   runDeliveryScenario();

@@ -25,6 +25,9 @@ struct PhaseRequest {
   const storage::JournalEntry& entry;
   storage::LifecyclePhase phase;
   bool reconcile;  // Prior attempt may have committed. Never blindly replay.
+  // Optional adapter-owned bounded output, borrowed through acknowledge(). The
+  // owner consumes it only on Confirmed; all other outcomes retain old bytes.
+  std::string_view* confirmedCheckpoint = nullptr;
 };
 // Worker-only contract. No protocol DTO, session or transport escapes here.
 // Neutral credential captures enter only through the private auth boundary.

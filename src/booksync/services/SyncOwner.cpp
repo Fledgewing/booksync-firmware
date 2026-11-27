@@ -78,11 +78,12 @@ SyncResult SyncOwner::step() {
   observe(SyncCheckpoint::AttemptStored, id, phase);
   // Only this serial call can borrow a token; it never survives owner transition.
   SyncWriterToken token;
-  const auto outcome = adapter_.syncPhase(token, {entry, selected, reconcile});
+  auto checkpoint = entry.checkpoint;
+  const auto outcome = adapter_.syncPhase(token, {entry, selected, reconcile, &checkpoint});
   observe(SyncCheckpoint::RemoteReturned, id, phase);
   if (outcome == PhaseOutcome::Uncertain) return SyncResult::Uncertain;
   if (outcome != PhaseOutcome::Confirmed) return SyncResult::Unavailable;
-  if (journal_.acknowledge(id, selected, entry.checkpoint) != JournalResult::Ok) return storageError();
+  if (journal_.acknowledge(id, selected, checkpoint) != JournalResult::Ok) return storageError();
   observe(SyncCheckpoint::AckStored, id, phase);
   return SyncResult::Advanced;
 }

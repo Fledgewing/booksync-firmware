@@ -86,3 +86,9 @@ without losing its display or position. Inspect internal free/largest RAM and
 worker stack-watermark logs, including C3 display release/restoration. Expect no
 native upload requests. No cache format changes or cache reset are needed. Agents
 must not flash devices or open serial ports.
+
+F18a adds `test/simulator/lifecycle_match.py` to each profile boot gate: eight
+match-only scenarios, five abrupt exits and 25 boots against a durable fake
+server, using F15 accounts and the F17 owner. The dormant handler is retained in
+all real images for size measurement. No real outgoing lifecycle delivery is
+enabled. See `docs/booksync/F18a.md` for the checkpoint and hardware checks.
