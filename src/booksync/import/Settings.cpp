@@ -4,6 +4,7 @@
 #include "Settings.h"
 
 #include <Logging.h>
+#include <Memory.h>
 
 #include <algorithm>
 #include <cstring>
@@ -442,8 +443,15 @@ Status Settings::readNvsPin(storage::PublishPaths rawBackup) {
 }  // namespace booksync::import
 
 // Dormant full-link gate only. No caller at boot; F29 will own activation.
-extern "C" booksync::import::Status booksync_settings_import_link(booksync::import::Settings* workspace,
-                                                                  booksync::import::Source source,
+extern "C" booksync::import::Status booksync_settings_import_link(booksync::import::Source source,
                                                                   booksync::storage::PublishPaths paths, bool pin) {
+  // A single cold worker workspace is too large for a task stack. Constructing
+  // it also roots its allocator vtable/callbacks and cleanup in the size gate.
+  // The anchor is never called at boot; F29 owns the actual worker lifetime.
+  auto workspace = makeUniqueNoThrow<booksync::import::Settings>();
+  if (!workspace) {
+    LOG_ERR("BSI", "Cannot allocate bounded settings import workspace");
+    return booksync::import::Status::IoError;
+  }
   return pin ? workspace->readNvsPin(paths) : workspace->readFile(source, paths);
 }

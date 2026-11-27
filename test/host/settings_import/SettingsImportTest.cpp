@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <Memory.h>
 #include <gtest/gtest.h>
 #include <nvs.h>
 
@@ -299,4 +300,25 @@ TEST(SettingsImport, ExtendedLegacyCardFontStepsArePreserved) {
   EXPECT_EQ(settings.enumValue("fontSize").value, 18);
   seed(R"({"fontSize":6})");
   EXPECT_EQ(settings.readFile(Source::Native, backup), Status::Unresolved);
+}
+
+extern "C" Status booksync_settings_import_link(Source source, booksync::storage::PublishPaths paths, bool pin);
+TEST(SettingsImport, FullLinkAnchorIncludesFallibleWorkspaceLifetime) {
+  const auto bytes = fixture("sd/.crosspoint/crossink-settings.json");
+  seed(bytes);
+  const auto before = card.files;
+  settings_memory_fixture::attempts = 0;
+  settings_memory_fixture::fail = true;
+  EXPECT_EQ(booksync_settings_import_link(Source::Native, backup, false), Status::IoError);
+  settings_memory_fixture::fail = false;
+  EXPECT_EQ(card.files, before);
+  EXPECT_EQ(settings_memory_fixture::attempts, 1u);
+  EXPECT_EQ(card.handles, 0);
+  EXPECT_EQ(booksync_settings_import_link(Source::Native, backup, false), Status::Ready);
+  const auto retained = card.files;
+  EXPECT_EQ(booksync_settings_import_link(Source::Native, backup, false), Status::Ready);
+  EXPECT_EQ(card.files, retained);
+  EXPECT_EQ(card.files[Settings::sourcePath(Source::Native)], bytes);
+  EXPECT_EQ(card.files[backup.current], bytes);
+  EXPECT_EQ(card.handles, 0);
 }

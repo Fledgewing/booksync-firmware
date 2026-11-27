@@ -20,7 +20,9 @@ PIPELINE = ('microlink_init', 'wolfSSL_connect', 'booksync::reader::Bridge::open
             'booksync::Account::removeLogin(', 'booksync::Account::useAccountLogin(',
             'booksync::defaultServerAdapter()', 'booksync::server::Auth::authenticate(',
             'booksync_update_trust_link', 'booksync::Feed::Feed(',
-            'booksync::ed25519::verify(', 'booksync_settings_import_link')
+            'booksync::ed25519::verify(', 'booksync_settings_import_link',
+            'booksync::import::Settings::Arena::allocate(',
+            'booksync::import::Settings::Arena::reallocate(')
 
 
 def require_pipeline(names):
