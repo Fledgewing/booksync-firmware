@@ -61,4 +61,5 @@ for scenario in ('reading', 'sleep', 'bookmarks', 'typography'):
         'simulator_commit': actual_pin}, indent=2) + '\n')
     if case.returncode:
         raise SystemExit(case.returncode)
+subprocess.run([sys.executable, 'test/simulator/file_publish.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

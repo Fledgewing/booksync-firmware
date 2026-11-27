@@ -1,6 +1,7 @@
 #ifdef SIMULATOR
 
 #include "SimulatorSmokeTest.h"
+#include "../../test/simulator/FilePublishScenario.h"
 
 #include <Epub.h>
 #include <Epub/WordSpacing.h>
@@ -12643,6 +12644,7 @@ bool simulatorInterceptNetworkRestart(const uint32_t target, const uint32_t payl
 
 // Every scenario except the release notes one starts with What's New already dismissed so it cannot cover Home.
 void prepareSimulatorSmokeState() {
+  runFilePublishScenario();
   // Smoke tests and scripted-input harnesses (scripts/test_*.py) expect to drive Home directly.
   const bool harness = std::getenv("CROSSINK_SIMULATOR_SMOKE_TEST") || std::getenv("CROSSPOINT_SIM_INPUT_SCRIPT");
   if (harness && !std::getenv("CROSSINK_SIMULATOR_SMOKE_RELEASE_NOTES"))

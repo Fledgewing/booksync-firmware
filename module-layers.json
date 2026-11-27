@@ -13166,8 +13166,9 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "Native simulator-only harness; F06 test header invokes bounded publication/restart scenarios after storage initialization, without reader or UI behavior changes.",
       "includes": [
+        "../../test/simulator/FilePublishScenario.h",
         "AppVersion.h",
         "ArduinoJson.h",
         "AssetDownloadSmokeTest.h",
@@ -14562,6 +14563,14 @@
       "role": "retained-resource",
       "rationale": "Native portal source; scanned alongside generated output for backend leakage.",
       "includes": []
+    },
+    "src/booksync/storage/FilePublish.cpp": {
+      "role": "storage",
+      "rationale": "F06 worker-only publication mechanics use HAL storage; no UI, adapter or reader dependency."
+    },
+    "src/booksync/storage/FilePublish.h": {
+      "role": "storage",
+      "rationale": "F06 worker-only publication mechanics use HAL storage; no UI, adapter or reader dependency."
     }
   },
   "generators": {
