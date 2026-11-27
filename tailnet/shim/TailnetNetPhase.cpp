@@ -16,6 +16,7 @@ extern "C" void tailnet_set_reading(bool reading) {
   uint32_t previous = state.load();
   uint32_t next;
   do {
+    if (((previous & kReading) != 0) == reading) return;
     // Entering reading revokes the lease; stale releases cannot revoke a new owner.
     next = reading ? ((previous & ~(kEpochStep - 1)) + kEpochStep) | kReading : previous & ~kReading;
   } while (!state.compare_exchange_weak(previous, next));
