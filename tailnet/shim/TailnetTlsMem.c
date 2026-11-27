@@ -1,20 +1,29 @@
-// mbedTLS allocations in PSRAM.
-//
-// The prebuilt framework has CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC, so every
-// mbedTLS buffer comes from internal RAM. MicroLink holds two TLS sessions
-// (control server and relay), and with its task stacks that took the X4 Pro
-// from ~180 KB of free internal RAM to ~33 KB, below what library sync
-// requires (it refused: "Insufficient heap for sync request"). The link wraps
-// esp_mbedtls_mem_calloc (tailnet_build.py) to prefer PSRAM for anything but
-// small allocations, as CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC would. Boards
-// without PSRAM fall back to internal RAM, as before.
+// SPDX-License-Identifier: GPL-3.0-or-later
+// TLS data prefers PSRAM on capable boards. Stacks always remain internal.
 #include <esp_heap_caps.h>
+#include <stdint.h>
 #include <stddef.h>
-
-#define TAILNET_TLS_PSRAM_MIN 512
-
+#include "Tailnet.h"
 void *__wrap_esp_mbedtls_mem_calloc(size_t n, size_t size) {
+    if (!n || !size) return NULL;
+    if (n > SIZE_MAX / size) {
+        tailnet_log_emit("E tailnet: TLS allocation size overflow\n");
+        return NULL;
+    }
     const unsigned internal = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
-    if (n * size < TAILNET_TLS_PSRAM_MIN) return heap_caps_calloc(n, size, internal);
-    return heap_caps_calloc_prefer(n, size, 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT, internal);
+#if FREEINK_FB_PSRAM
+    // TLS owns and frees these buffers with heap_caps_free. No PSRAM stack.
+    void *p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (p) return p;
+#endif
+    const size_t bytes = n * size;
+    if (bytes > SIZE_MAX - 12 * 1024 ||
+        heap_caps_get_free_size(internal) < bytes + 12 * 1024 ||
+        heap_caps_get_largest_free_block(internal) < bytes + 8 * 1024) {
+        tailnet_log_emit("E tailnet: TLS internal reserve refused %u bytes\n", (unsigned)bytes);
+        return NULL;
+    }
+    void *result = heap_caps_calloc(n, size, internal);
+    if (!result) tailnet_log_emit("E tailnet: TLS allocation failed: %u bytes\n", (unsigned)bytes);
+    return result;
 }

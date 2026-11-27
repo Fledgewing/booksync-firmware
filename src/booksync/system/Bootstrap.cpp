@@ -6,6 +6,7 @@
 #include <Memory.h>
 
 #include "CrossPointState.h"
+#include "NetworkPhase.h"
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
 #include "booksync/services/LocalLibrary.h"
@@ -28,6 +29,7 @@ class ShellActivity final : public Activity {
   void onEnter() override {
     Activity::onEnter();
     enterLocalLibrary();
+    setNetworkReading(!installNetworkMemory());
     bookPath = APP_STATE.openEpubPath;
     if (bookPath.empty()) {
       const auto& books = RECENT_BOOKS.getBooks();
@@ -38,12 +40,15 @@ class ShellActivity final : public Activity {
     requestUpdate();
   }
   void onExit() override {
+    setNetworkReading(true);
     leaveLocalLibrary();
     publishHomeBook(false);
     Activity::onExit();
   }
   void loop() override {
-    {
+    if (!networkDisplayReady()) return;
+    // Keep the local index's SD work outside the admitted network worker phase.
+    if (!networkAdmission().busy()) {
       RenderLock lock(RenderLock::Mode::Try);
       if (lock.ownsLock()) workLocalLibrary();
     }

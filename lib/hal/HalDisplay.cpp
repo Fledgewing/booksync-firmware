@@ -296,3 +296,29 @@ void HalDisplay::controllerIdle() {
   einkDisplay.controllerIdle();
 #endif
 }
+
+// C3 admission uses the pinned SDK's existing buffer lifecycle, never a second
+// framebuffer. A native simulator retains its stub buffer; faults use fake HAL.
+bool HalDisplay::releaseNetworkBuffers() {
+#ifndef SIMULATOR
+  HalSpiBus::Lock spiLock;
+  if (!einkDisplay.getFrameBuffer()) {
+    LOG_ERR("DISPLAY", "Network phase cannot claim an unavailable framebuffer");
+    return false;
+  }
+  einkDisplay.waitRefreshComplete();
+  einkDisplay.releaseBuffers();
+  return einkDisplay.getFrameBuffer() == nullptr;
+#else
+  return true;
+#endif
+}
+bool HalDisplay::restoreNetworkBuffers() {
+#ifndef SIMULATOR
+  HalSpiBus::Lock spiLock;
+  return einkDisplay.reallocBuffers();
+#else
+  clearScreen();
+  return true;
+#endif
+}

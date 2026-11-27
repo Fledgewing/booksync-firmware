@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <filesystem>
 
+#include "BookSyncAdmissionSmokeTest.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
 #include "activities/Activity.h"
@@ -103,6 +104,10 @@ bool runBookSyncHomeSmokeTestTick() {
     case 1:
       require(activityManager.isHomeActivity(), "Seeded Home was not entered");
       require(booksync::homeLibrary().snapshot().canOpenLastBook, "Saved local book unavailable offline");
+      if (!verifyBookSyncAdmissionHomeTick()) {
+        --step;
+        break;
+      }
       capture("home-local");
       mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
       break;
@@ -112,6 +117,7 @@ bool runBookSyncHomeSmokeTestTick() {
         break;
       }
       require(activityManager.getCurrentBookPath() == book, "Home opened a different book");
+      verifyBookSyncAdmissionReading();
       capture("home-reader");
       mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Back);
       break;
@@ -121,6 +127,7 @@ bool runBookSyncHomeSmokeTestTick() {
         break;
       }
       require(booksync::homeLibrary().snapshot().canOpenLastBook, "Back lost the local open action");
+      verifyBookSyncAdmissionReconnect();
       capture("home-back");
       if (mappedInputManager.hasTouch())
         touchAction(true);

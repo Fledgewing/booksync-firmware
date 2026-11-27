@@ -230,6 +230,12 @@ static int lower(int value, int cap) {
 esp_err_t __real_esp_wifi_init(const wifi_init_config_t* config);
 
 esp_err_t __wrap_esp_wifi_init(const wifi_init_config_t* config) {
+  // Wi-Fi and Tailnet share F10's active owner. A prepared/display-waiting
+  // lease or foreground reader never allocates driver buffers.
+  if (!tailnet_service_permitted()) {
+    tailnet_log_emit("E tailnet: WiFi init refused without active service lease\n");
+    return ESP_ERR_INVALID_STATE;
+  }
   if (config == NULL || config->magic != WIFI_INIT_CONFIG_MAGIC) return __real_esp_wifi_init(config);
   wifi_init_config_t cfg = *config;
   const tailnet_service_job_t job = tailnet_service_job();

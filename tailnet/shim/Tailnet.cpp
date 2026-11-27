@@ -147,8 +147,8 @@ bool loadEnabled();
 // Would a worker have anything to do with r? Without one, the state it would
 // track is rebuilt from s_link_up when one starts.
 bool workerWanted(Request r) {
-  if (r == REQ_LOGOUT) return true;
   if (!tailnet_service_permitted()) return false;
+  if (r == REQ_LOGOUT) return true;
 #if CONFIG_ML_LITE
   return s_link_up.load() && s_permit.load() && loadEnabled();
 #else
@@ -159,6 +159,17 @@ bool workerWanted(Request r) {
 void post(Request r) {
   if (!s_queue || !s_worker_lock) return;
   xSemaphoreTake(s_worker_lock, portMAX_DELAY);
+  // xTaskCreate uses ESP-IDF's internal-RAM stack allocator. Never replace it
+  // with an external-capability/static PSRAM stack: this worker writes NVS.
+  const size_t freeInternal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  const size_t largestInternal = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  if (!s_worker && workerWanted(r) &&
+      (freeInternal < TAILNET_WORKER_STACK + 12 * 1024 || largestInternal < TAILNET_WORKER_STACK + 8 * 1024)) {
+    xSemaphoreGive(s_worker_lock);
+    TLOGE("Worker deferred: internal free=%u largest=%u stack=%u", (unsigned)freeInternal,
+          (unsigned)largestInternal, (unsigned)TAILNET_WORKER_STACK);
+    return;
+  }
   if (!s_worker && workerWanted(r) &&
       xTaskCreate(workerTask, "tailnet", TAILNET_WORKER_STACK, nullptr, 3, &s_worker) != pdPASS) {
     s_worker = nullptr;
@@ -1211,5 +1222,26 @@ extern "C" void tailnet_wait_idle(uint32_t timeout_ms) {
       return;
     }
     vTaskDelay(pdMS_TO_TICKS(50));
+  }
+}
+
+extern "C" bool tailnet_service_stop_and_wait(uint32_t timeout_ms) {
+  if (!mayWaitForTailscale()) return false;
+  // Keep F10's owner token until teardown completes, but disable transport start.
+  s_link_up.store(false);
+  post(REQ_WIFI_DOWN);
+  const TickType_t start = xTaskGetTickCount();
+  for (;;) {
+    bool workerLive = false;
+#if TAILNET_LAZY_WORKER
+    if (s_worker_lock) {
+      xSemaphoreTake(s_worker_lock, portMAX_DELAY);
+      workerLive = s_worker != nullptr;
+      xSemaphoreGive(s_worker_lock);
+    }
+#endif
+    if (!workerLive && !s_ml_live.load()) return true;
+    if (elapsedMs(start) >= timeout_ms) return false;
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }

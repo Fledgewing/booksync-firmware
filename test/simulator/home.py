@@ -19,12 +19,12 @@ with tempfile.TemporaryDirectory(prefix='booksync-home-') as temp:
     temp = Path(temp)
     book = smoke.prepare_fs(temp, smoke.DEFAULT_BOOK)
     env = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy',
-               BOOKSYNC_HOME_BOOK=book, BOOKSYNC_HOME_CAPTURES=str(out / 'home-captures'))
+               BOOKSYNC_ADMISSION='1', BOOKSYNC_HOME_BOOK=book, BOOKSYNC_HOME_CAPTURES=str(out / 'home-captures'))
     result = subprocess.run([str(smoke.program_path(PROFILE))], cwd=temp, env=env,
                             text=True, capture_output=True, timeout=120)
     log = result.stdout + result.stderr
     (out / 'home.log').write_text(log)
     print(log)
-    if result.returncode or 'BookSync F04 PASS:' not in log:
+    if result.returncode or 'BookSync F04 PASS:' not in log or 'BookSync F11 PASS:' not in log:
         raise SystemExit(result.returncode or 1)
     assert len(list((out / 'home-captures').glob('*.pgm'))) == 4

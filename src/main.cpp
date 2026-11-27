@@ -1,3 +1,4 @@
+#include "booksync/system/NetworkPhase.h"
 #include <Arduino.h>
 #include <BoardConfig.h>
 #include <CrossInkHalFrontlight.h>
@@ -392,6 +393,9 @@ using BootResume = SleepWakePolicy::Resume;
 // device back up against the user's sleep gesture. Cleared only if a failed
 // storage shutdown cancels sleep before peripheral power is cut.
 static bool deepSleepInProgress = false;
+static bool sleepWaitingForNetwork = false;
+static bool sleepWaitingFromTimeout = false;
+static bool quickLockWaitingForNetwork = false;
 
 static void clearSilentRestartReaderPageBuild();
 static std::atomic<bool> storageTransitionAborted{false};
@@ -551,6 +555,13 @@ void notifyQuickLockChanged() {
   x4ProHomeKeyTapPending = false;
   mappedInputManager.clearInjectedReleases();
   LOG_DBG("MAIN", "Quick Lock %s", locked ? "enabled" : "disabled");
+  if (!booksync::networkDisplayReady()) {
+    // Lock input immediately, then draw the current lock state on the restored
+    // foreground frame. Never save/paint badge pixels in transport-owned storage.
+    quickLockWaitingForNetwork = true;
+    activityManager.notifyInputLockChanged(locked);
+    return;
+  }
   if (locked) {
     APP_STATE.quickLockRestoreFrontlight = Frontlight.isOn();
     Frontlight.setOn(false);
@@ -611,6 +622,7 @@ bool handleGlobalPowerButtonAction(const CrossPointSettings::SHORT_PWRBTN action
       notifyQuickLockChanged();
       return true;
     case CrossPointSettings::SHORT_PWRBTN::FORCE_REFRESH: {
+      if (!booksync::networkDisplayReady()) return true;
       // Reader redraws must replace overlays before the panel refreshes.
       if (activityManager.requestManualReaderRefresh()) {
         return true;
@@ -1187,6 +1199,14 @@ static bool holdSleepWhileUsbPowered(bool monochrome = false) {
 #endif
 
 void enterDeepSleep(bool fromTimeout) {
+  // Retain the sleep intent while callbacks close their files and transport
+  // returns C3 display storage. Never paint/suspend hardware under live workers.
+  if (booksync::networkAdmission().busy() && !booksync::networkAdmission().finish()) {
+    sleepWaitingForNetwork = true;
+    sleepWaitingFromTimeout = fromTimeout;
+    return;
+  }
+  sleepWaitingForNetwork = false;
 #ifndef SIMULATOR
   gpio.stopButtonCapture();
 #endif
@@ -1891,6 +1911,19 @@ static void idleDisplayWhileAwake() {
 }
 
 void loop() {
+  // Resource cleanup must run even when Quick Lock or another input path
+  // returns before the foreground activity loop.
+  booksync::networkAdmissionTick();
+  if (quickLockWaitingForNetwork && booksync::networkDisplayReady() && !sleepWaitingForNetwork) {
+    quickLockWaitingForNetwork = false;
+    quickLockBadgeBackdrop.valid = false;
+    (void)activityManager.requestUpdateAndWait();
+    notifyQuickLockChanged();
+  }
+  if (sleepWaitingForNetwork) {
+    enterDeepSleep(sleepWaitingFromTimeout);
+    return;
+  }
   static unsigned long maxLoopDuration = 0;
   const unsigned long loopStartTime = millis();
   static unsigned long lastMemPrint = 0;

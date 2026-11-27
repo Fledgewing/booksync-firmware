@@ -93,6 +93,10 @@ class HalDisplay {
   // Caller holds RenderLock; parks the controller without changing device sleep or frontlight.
   void controllerIdle();
 
+  // Network phase only, caller holds RenderLock and has excluded all renderers.
+  bool releaseNetworkBuffers();
+  bool restoreNetworkBuffers();
+
   // Access to frame buffer
   uint8_t* getFrameBuffer() const;
 

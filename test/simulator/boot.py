@@ -13,6 +13,7 @@ profile = sys.argv[1]
 if profile not in ('x4-pro-simulator', 'x4-classic-simulator', 'simulator-X3'):
     raise SystemExit('unrecognized simulator profile')
 subprocess.run([sys.executable, 'tools/ci/retired_writers.py', str(root / '.pio/build' / profile / 'program')], cwd=root, check=True)
+subprocess.run([sys.executable, 'test/simulator/admission.py', profile], cwd=root, check=True)
 # F10 probes run exactly once; a failing synthetic reconnect stops this profile.
 subprocess.run([sys.executable, 'test/simulator/tailnet.py', profile], cwd=root, check=True)
 out = root / 'reports' / profile

@@ -16,8 +16,8 @@ to active: no transport starts until runtime explicitly reports otherwise and
 acquires a lease. Entering reading revokes admission. Releases are idempotent;
 an old lease cannot release a newer job. No path in this module navigates,
 allocates/releases a framebuffer, parks a foreground reader, or restarts the CPU.
-F11 owns display teardown, admission serialization and internal-stack allocation.
-Until F11 attaches that runtime, device admission stays closed. UI uses Library.
+F11 supplies display teardown, admission serialization and internal-stack allocation.
+Runtime admission is open only at the owned Home. UI uses Library.
 
 The C3 worker additionally needs `tailnet_permit_start()` (pairing) or the cached
 reconnect API. The `display_released` lease bit is proof supplied by runtime that
@@ -44,5 +44,4 @@ allocations and native stack values cannot prove hardware memory acceptance.
 Hardware acceptance is maintainer-only: on X4 Pro, X4 Classic and C3, upgrade a
 paired reader, reconnect without re-pairing, verify route choice and private-name
 lookup, then open/read/close a book through Wi-Fi loss/reconnect. Pairing identity
-must remain unchanged and reading must never park, navigate or restart. F11 must
-be integrated before testing live C3 admission. No EPUB cache reset is needed.
+must remain unchanged and reading must never park, navigate or restart. C3 admission must retain its prepainted panel until teardown and framebuffer restoration complete. No EPUB cache reset is needed.
