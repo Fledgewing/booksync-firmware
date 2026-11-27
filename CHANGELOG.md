@@ -29,6 +29,10 @@
 - BookSync retires native account/sync settings, progress/stats/clipping uploads, plugin event delivery and sleep-time networking. Local reader saves and capture, Wi-Fi and ordinary USB file transfer remain available.
 - BookSync now owns cold boot and Home with a minimal offline shell that opens the last local book and receives reader Back. Native Home/catalog entry routes and Home theme renderers are removed from device builds; reader, list and sleep styling are retained. Widgets follow in a later slice.
 
+### Fixed
+
+- BookSync firmware CI reuses cached PlatformIO packages across configuration changes and retries package installation after transient release-download failures.
+
 ## [v2.0.0] - 2026-11-24
 
 ### Added
