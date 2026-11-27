@@ -3,6 +3,7 @@
 ### Added
 
 - BookSync durable lifecycle journal preserves offline work and phase checkpoints across restarts, blocks unsafe writes at capacity, and never evicts unacknowledged entries.
+- BookSync separates canonical book identities from account-scoped aliases and preserves native EPUB/XTC anchors across reflow and reopen.
 
 - BookSync atomic SD publication keeps a complete prior file available after interrupted writes, full cards and read-only recovery.
 - BookSync owned Tailnet transport with preserved pairing identity, DNS/core-lock protection, and service leases that refuse connection while reading.

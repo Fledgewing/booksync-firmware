@@ -13297,10 +13297,11 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F05 retires native network scenarios and verifies local reader capture; F06/F07 retain bounded publication and journal fault/restart hooks after storage initialization, with no product UI dependency.",
+      "rationale": "F05 retires native network scenarios and verifies local reader capture; F06/F07 retain bounded publication and journal fault/restart hooks after storage initialization, with no product UI dependency. F08 simulator-only reader-friend scenario verifies raw anchors with native reflow and reopen.",
       "includes": [
         "../../test/simulator/FilePublishScenario.h",
         "../../test/simulator/LifecycleJournalScenario.h",
+        "../../test/simulator/LocatorScenario.h",
         "AppVersion.h",
         "ArduinoJson.h",
         "AssetDownloadSmokeTest.h",
@@ -13402,6 +13403,7 @@
         "activities/util/KeyboardEntryActivity.h",
         "activities/util/OptionSelectionActivity.h",
         "algorithm",
+        "booksync/reader/Locator.h",
         "builtinFonts/bitter_12_regular.h",
         "chrono",
         "components/CompactHeader.h",
@@ -14878,6 +14880,22 @@
     "src/booksync/storage/LifecycleJournal.cpp": {
       "role": "storage",
       "rationale": "F07 worker-only bounded lifecycle envelopes, checkpoint/ack persistence and recovery over F06 HAL publication; no UI or transport edges."
+    },
+    "src/booksync/storage/Identity.h": {
+      "role": "storage",
+      "rationale": "F08 worker-only identity evidence and raw native locator inspection; allocation-free, no UI or transport. Locator delegates EPUB decoding to the retained pure ProgressRecord codec."
+    },
+    "src/booksync/storage/Identity.cpp": {
+      "role": "storage",
+      "rationale": "F08 worker-only identity evidence and raw native locator inspection; allocation-free, no UI or transport. Locator delegates EPUB decoding to the retained pure ProgressRecord codec."
+    },
+    "src/booksync/reader/Locator.h": {
+      "role": "reader",
+      "rationale": "F08 worker-only identity evidence and raw native locator inspection; allocation-free, no UI or transport. Locator delegates EPUB decoding to the retained pure ProgressRecord codec."
+    },
+    "src/booksync/reader/Locator.cpp": {
+      "role": "reader",
+      "rationale": "F08 worker-only identity evidence and raw native locator inspection; allocation-free, no UI or transport. Locator delegates EPUB decoding to the retained pure ProgressRecord codec."
     }
   },
   "generators": {

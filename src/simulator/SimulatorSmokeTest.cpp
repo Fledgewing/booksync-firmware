@@ -1,6 +1,7 @@
 #ifdef SIMULATOR
 
 #include "SimulatorSmokeTest.h"
+#include "booksync/reader/Locator.h"
 #include "../../test/simulator/FilePublishScenario.h"
 #include "../../test/simulator/LifecycleJournalScenario.h"
 
@@ -147,6 +148,7 @@ extern CrossPointSettings::SHORT_PWRBTN getPowerButtonAction();
 
 // Use a detached reader so these boundary checks cannot race its render task.
 struct EpubReaderCompletionSmokeTest {
+#include "../../test/simulator/LocatorScenario.h"
   static std::optional<uint32_t> statusAnchor;
   static bool fontBrowserReturn(EpubReaderActivity& reader, const char* family) {
     RenderLock lock;
@@ -12133,7 +12135,9 @@ SimulatorSmokeTest smokeTest;
 
 }  // namespace
 
-void runSimulatorSmokeTestTick() { smokeTest.tick(); }
+void runSimulatorSmokeTestTick() {
+  if (!EpubReaderCompletionSmokeTest::locatorScenarioTick()) smokeTest.tick();
+}
 
 bool simulatorInterceptNetworkRestart(const uint32_t target, const uint32_t payload) {
   if (!capturedNetworkRestart.armed) return false;

@@ -260,3 +260,5 @@ add_test(NAME NativeWritersRetired
 
 add_subdirectory(host/lifecycle_journal)
 add_subdirectory(host/tailnet)
+add_subdirectory(host/identity)
+add_subdirectory(host/locator)
