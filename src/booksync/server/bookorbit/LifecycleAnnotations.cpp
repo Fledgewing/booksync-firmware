@@ -192,5 +192,12 @@ bool LifecycleAnnotations::merge(AnnotationKind kind, AnnotationRow& slot, const
 
 // Keep the production phase reachable for early full-link size measurements.
 extern "C" {
-auto booksync_annotations_link_anchor = &booksync::server::LifecycleAnnotations::run;
+struct AnnotationLinkAnchor {
+  decltype(&booksync::server::LifecycleAnnotations::run) run;
+  decltype(&booksync::server::LifecycleAnnotations::matches) matches;
+  decltype(&booksync::server::LifecycleAnnotations::merge) merge;
+};
+extern const AnnotationLinkAnchor booksync_annotations_link_anchor = {&booksync::server::LifecycleAnnotations::run,
+                                                                      &booksync::server::LifecycleAnnotations::matches,
+                                                                      &booksync::server::LifecycleAnnotations::merge};
 }

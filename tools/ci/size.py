@@ -25,7 +25,10 @@ PIPELINE = ('booksync::legacy::Activation::boot(', '__wrap_nvs_flash_init', 'mic
             'booksync::legacy::Credentials::restore(', 'booksync::legacy::Credentials::restoreWifi(',
             'booksync::Account::restoreLogin(',
             'booksync_update_trust_link', 'booksync_update_pick_link', 'booksync::Feed::Feed(',
-            'booksync::ed25519::verify(')
+            'booksync::ed25519::verify(',
+            'booksync::server::LifecycleAnnotations::run(',
+            'booksync::server::LifecycleAnnotations::matches(',
+            'booksync::server::LifecycleAnnotations::merge(')
 
 
 def require_pipeline(names):
