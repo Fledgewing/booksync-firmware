@@ -135,7 +135,7 @@ TEST(LifecycleJournal, CorruptTailChecksumAndUnknownVersionNeverBecomeEmptySucce
   EXPECT_EQ(corrupt.recover(), JournalResult::RecoveryRequired);
   card.files[paths.backup] = valid;
   card.files[paths.current] = valid;
-  card.files[paths.current][4] = 2;
+  card.files[paths.current][4] = 99;
   LifecycleJournal unknown(paths);
   EXPECT_EQ(unknown.recover(), JournalResult::RecoveryRequired);
   EXPECT_EQ(unknown.enqueue(intent(), id), JournalResult::RecoveryRequired);
@@ -326,7 +326,7 @@ TEST(LifecycleJournal, BackupRecoveryIgnoresStagingAndUnsupportedBackupBlocksOld
   EXPECT_EQ(journal.recover(), JournalResult::Ok);
   EXPECT_EQ(journal.pending(), 1);
   ASSERT_EQ(journal.checkpoint(id, "restored"), JournalResult::Ok);
-  card.files[paths.backup][4] = 2;
+  card.files[paths.backup][4] = 99;
   EXPECT_EQ(journal.recover(), JournalResult::RecoveryRequired);
 }
 
@@ -402,4 +402,62 @@ TEST(LifecycleJournal, MediaDamageAfterRecoveryCannotBeResealedOrOverwritePendin
   EXPECT_EQ(journal.checkpoint(id, "new"), JournalResult::IoError);
   EXPECT_EQ(journal.checkpoint(id, "new"), JournalResult::RecoveryRequired);
   EXPECT_EQ(card.files[paths.current], damaged);
+}
+namespace {
+void reseal(std::string& bytes) {
+  uint32_t crc = ~0U;
+  for (size_t i = 0; i < bytes.size() - 4; ++i) {
+    crc ^= uint8_t(bytes[i]);
+    for (int bit = 0; bit < 8; ++bit) crc = (crc >> 1) ^ (0xedb88320U & (0U - (crc & 1)));
+  }
+  crc = ~crc;
+  for (int i = 0; i < 4; ++i) bytes[bytes.size() - 4 + i] = char(crc >> (8 * i));
+}
+}  // namespace
+TEST(LifecycleJournal, VersionOneUpgradePreservesCaptureAndReadsMixedRecoveryPair) {
+  seed();
+  LifecycleJournal journal(paths);
+  ASSERT_EQ(journal.recover(), JournalResult::Ok);
+  uint64_t id = 0;
+  ASSERT_EQ(journal.enqueue(intent(), id), JournalResult::Ok);
+  auto& bytes = card.files.at(paths.current);
+  bytes[4] = 1;  // Exact F07 envelope, no attempt field.
+  reseal(bytes);
+  card.disk = card.files;
+  ASSERT_EQ(journal.recover(), JournalResult::Ok);
+  ASSERT_EQ(journal.attempt(id, LifecyclePhase::Match), JournalResult::Ok);
+  EXPECT_EQ(card.files.at(paths.current)[4], 2);
+  EXPECT_EQ(card.files.at(paths.backup)[4], 1);
+  card.restart();
+  ASSERT_EQ(journal.recover(), JournalResult::Ok);
+  char buffer[256];
+  JournalEntry entry;
+  ASSERT_EQ(journal.read(id, entry, buffer, sizeof(buffer)), JournalResult::Ok);
+  EXPECT_EQ(entry.attempting, 1);
+  EXPECT_EQ(entry.acknowledged, 0);
+  EXPECT_EQ(entry.checkpoint, "pending-remote");
+  ASSERT_EQ(journal.checkpoint(id, "new-capture"), JournalResult::Ok);
+  ASSERT_EQ(journal.read(id, entry, buffer, sizeof(buffer)), JournalResult::Ok);
+  EXPECT_EQ(entry.attempting, 1);
+  ASSERT_EQ(journal.acknowledge(id, LifecyclePhase::Match, entry.checkpoint), JournalResult::Ok);
+  ASSERT_EQ(journal.read(id, entry, buffer, sizeof(buffer)), JournalResult::Ok);
+  EXPECT_EQ(entry.attempting, 0);
+  EXPECT_EQ(entry.acknowledged, 1);
+  EXPECT_EQ(entry.checkpoint, "new-capture");
+}
+TEST(LifecycleJournal, UnknownAttemptAndAttemptInV1ArePreservedAndBlocked) {
+  for (int version : {1, 2}) {
+    seed();
+    LifecycleJournal journal(paths);
+    ASSERT_EQ(journal.recover(), JournalResult::Ok);
+    uint64_t id = 0;
+    ASSERT_EQ(journal.enqueue(intent(), id), JournalResult::Ok);
+    auto& bytes = card.files.at(paths.current);
+    bytes[4] = char(version);
+    bytes[24 + 19] = version == 1 ? 1 : 6;
+    reseal(bytes);
+    const auto original = bytes;
+    EXPECT_EQ(journal.recover(), JournalResult::RecoveryRequired);
+    EXPECT_EQ(card.files.at(paths.current), original);
+  }
 }

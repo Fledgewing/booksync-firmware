@@ -2331,7 +2331,7 @@ Mixed-case selectors now use the same comparison when merging and matching
 rules. Revision 24 rebuilds the rules and chapter layouts on book reopen so
 cached pages pick up the corrected styling. The binary format is unchanged.
 
-## BookSync lifecycle journal (F07, version 1)
+## BookSync lifecycle journal (F07/F17, versions 1–2)
 
 This is a worker-private SD format, separate from EPUB caches. The owner supplies
 three sibling paths (`current`, `current.tmp`, `current.bak`) to `LifecycleJournal`.
@@ -2346,14 +2346,14 @@ increasing ID order, and a four-byte IEEE CRC32 of every preceding byte:
 | Header offset | Bytes | Meaning |
 |---|---:|---|
 | 0 | 4 | ASCII `BSLJ` |
-| 4 | 4 | Version, currently 1 |
+| 4 | 4 | Version, currently 2 (reads 1 and 2) |
 | 8 | 8 | Next monotonically increasing local entry ID; survives an empty queue |
 | 16 | 4 | Entry count |
 | 20 | 4 | Complete file size including CRC |
 
 Each record begins with a 24-byte envelope: ID (8 bytes), five two-byte lengths
 (adapter, account owner, document, payload, checkpoint), a one-byte acknowledgement
-bitmask, then five reserved zero bytes. The variable bytes follow in that order.
+bitmask, then an attempt byte (v2) and four reserved zero bytes. In v1 all five bytes are zero. The variable bytes follow in that order.
 The checkpoint occupies a reserved 1,024-byte region, padded with zeros after its
 actual bytes. Identities are opaque byte strings, each 1–128 bytes; payloads are
 opaque 0–4,096-byte strings. The adapter alone interprets payload/checkpoint bytes,
@@ -2363,7 +2363,34 @@ Enqueue may supply already-completed phases; later acknowledgements only add bit
 
 `checkpoint()` replaces checkpoint bytes without acknowledging a phase.
 `acknowledge()` publishes its checkpoint and phase bit in the same transaction.
-A deferred/uncertain remote write must use checkpoint only. `finish()` requires all
+F17 writes envelope version 2 and reads versions 1 and 2, including mixed recovery
+pairs. Version 1 readers fail closed on v2. Record offset 19 stores 0 (no attempt)
+or phase + 1 (1–5). `attempt()` atomically records this byte before sending while
+preserving payload, native capture checkpoint and acknowledgement bits. A phase
+acknowledgement atomically clears it. Unknown attempt values/versions block recovery.
+An uncertain remote result retains the attempt and never adds an acknowledgement.
+The owner retries with the same scoped entry ID and phase and requires the adapter
+to reconcile or deduplicate; an unsupported adapter leaves work pending. The first
+unacknowledged phase is selected in match/stats/annotations/state/progress order;
+out-of-order masks/attempts block delivery. No account or adapter transition rewrites
+or removes queued work. The durable scope is independent of worker lifetime.
+
+Only a live serial owner can mint the borrowed write token. Activation uses a
+process-wide atomic lease, rejects even a second owner with a different journal,
+and recovers storage before delivery. Reentrant/concurrent operations return Busy;
+deactivation waits for callers to retry after the current phase returns. Worker
+shutdown must precede owner destruction. All journal users still require external
+storage serialization. Owner scope strings and 5,504-byte scratch are caller-owned;
+no owner heap allocation or large task-stack buffer is introduced. This slice does
+not bind unbound native captures to accounts or enable real delivery.
+
+`test/simulator/sync_owner.py` injects 17 abrupt process exits per profile: activation,
+three boundaries for each of five phases, and removal. Separate host faults cut
+every storage operation around all five phases. Native capture bytes remain intact.
+Maintainer hardware verification (future toy harness only): on each device, queue
+offline, transition owners, reboot before/after attempt/send/ack, and verify one
+remote toy commit per scoped phase and unchanged native EPUB position/stats. Record
+internal heap/largest block and worker stack high-water; no cache reset is required. `finish()` requires all
 five bits; the serial sync owner must additionally prove adapter reconciliation
 before calling it. Completed imported records/provenance require a separate retained
 import proof/archive before any future retirement flow; F07 does not import them.

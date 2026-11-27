@@ -270,3 +270,5 @@ add_subdirectory(host/reader_capture)
 add_subdirectory(host/delivery)
 add_subdirectory(host/device_index)
 add_subdirectory(host/admission)
+
+add_subdirectory(host/sync_owner)

@@ -2,6 +2,8 @@
 
 ### Added
 
+- BookSync allows one sync owner at a time, preserves offline work across owner changes, and checkpoints uncertain phase delivery for safe reconciliation; validated with a toy adapter only.
+
 - BookSync CI records per-device image, static-memory, partition and symbol baselines with informational deltas, and gates offline reader capture/restart plus network admission in every simulator.
 
 - BookSync streams the local SD catalog into recoverable generations and publishes bounded offline Library windows, with native reading capture provenance and invalidation.

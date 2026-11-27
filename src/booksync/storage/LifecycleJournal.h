@@ -14,6 +14,7 @@ struct JournalEntry {
   uint64_t id = 0;
   std::string_view adapter, owner, document, payload, checkpoint;
   uint8_t acknowledged = 0;
+  uint8_t attempting = 0;  // 0 or phase + 1; durable uncertainty, independent of capture bytes.
 };
 // Worker-only, externally serialized with readers excluded during mutations.
 // Paths and entry views are caller-owned. No payload allocations or UI dependency.
@@ -26,8 +27,10 @@ class LifecycleJournal {
   static constexpr uint8_t AllPhases = 31;
   explicit LifecycleJournal(PublishPaths paths, JournalLimits limits = {});
   JournalResult recover();  // Read-only; unknown formats block mutation; staging is never replayed.
+  JournalResult verify();   // Read-only validation of the selected generation before retrying remote work.
   JournalResult enqueue(const JournalEntry& entry, uint64_t& id);
   JournalResult checkpoint(uint64_t id, std::string_view bytes);
+  JournalResult attempt(uint64_t id, LifecyclePhase phase);
   JournalResult acknowledge(uint64_t id, LifecyclePhase phase, std::string_view checkpoint);
   JournalResult finish(uint64_t id);  // Caller also proves adapter reconciliation before removal.
   // Returned views expire when the caller-owned bounded buffer is reused.
@@ -45,7 +48,7 @@ class LifecycleJournal {
   uint32_t bytes_ = 28;
   uint16_t count_ = 0;
   bool ready_ = false;
-  enum class Change { Append, Checkpoint, Acknowledge, Finish };
+  enum class Change { Append, Checkpoint, Attempt, Acknowledge, Finish };
   JournalResult change(Change kind, uint64_t id, const JournalEntry& entry, uint8_t bit);
   static bool validate(FsFile& file, void*);
 };

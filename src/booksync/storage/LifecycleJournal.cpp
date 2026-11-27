@@ -12,7 +12,8 @@ namespace {
 constexpr uint32_t Header = 24, Record = 24, Trailer = 4;
 constexpr uint32_t MaxBytes = 256 * 1024;
 constexpr uint16_t MaxEntries = 64;
-constexpr uint32_t Version = 1;
+constexpr uint32_t Version = 2;
+bool supported(uint64_t version) { return version == 1 || version == Version; }
 uint64_t get(const uint8_t* p, size_t n) {
   uint64_t value = 0;
   for (size_t i = 0; i < n; ++i) value |= uint64_t(p[i]) << (8 * i);
@@ -32,7 +33,7 @@ uint32_t crc(uint32_t value, const void* data, size_t n) {
 struct RecordInfo {
   uint64_t id;
   uint16_t lengths[5];
-  uint8_t ack;
+  uint8_t ack, attempting;
   uint32_t prefix() const { return lengths[0] + lengths[1] + lengths[2] + lengths[3]; }
   uint32_t size() const { return Record + prefix() + LifecycleJournal::MaxCheckpoint; }
 };
@@ -42,10 +43,12 @@ bool record(FsFile& file, RecordInfo& out) {
   out.id = get(h, 8);
   for (int i = 0; i < 5; ++i) out.lengths[i] = get(h + 8 + 2 * i, 2);
   out.ack = h[18];
+  out.attempting = h[19];
+  if (out.attempting > 5) return false;
   if (!out.id || out.ack > LifecycleJournal::AllPhases) return false;
   for (int i = 0; i < 3; ++i)
     if (!out.lengths[i] || out.lengths[i] > LifecycleJournal::MaxIdentity) return false;
-  for (int i = 19; i < 24; ++i)
+  for (int i = 20; i < 24; ++i)
     if (h[i]) return false;
   return out.lengths[3] <= LifecycleJournal::MaxPayload && out.lengths[4] <= LifecycleJournal::MaxCheckpoint;
 }
@@ -53,13 +56,15 @@ RecordInfo info(const JournalEntry& entry, uint64_t id) {
   return {id,
           {uint16_t(entry.adapter.size()), uint16_t(entry.owner.size()), uint16_t(entry.document.size()),
            uint16_t(entry.payload.size()), uint16_t(entry.checkpoint.size())},
-          entry.acknowledged};
+          entry.acknowledged,
+          entry.attempting};
 }
 void encode(const RecordInfo& r, uint8_t* h) {
   memset(h, 0, Record);
   put(h, r.id, 8);
   for (int i = 0; i < 5; ++i) put(h + 8 + 2 * i, r.lengths[i], 2);
   h[18] = r.ack;
+  h[19] = r.attempting;
 }
 bool close(FsFile& file) { return !file || file.close(); }
 JournalResult error(JournalResult result) {
@@ -106,7 +111,8 @@ bool validEntry(const JournalEntry& e) {
   return !e.adapter.empty() && e.adapter.size() <= LifecycleJournal::MaxIdentity && !e.owner.empty() &&
          e.owner.size() <= LifecycleJournal::MaxIdentity && !e.document.empty() &&
          e.document.size() <= LifecycleJournal::MaxIdentity && e.payload.size() <= LifecycleJournal::MaxPayload &&
-         e.checkpoint.size() <= LifecycleJournal::MaxCheckpoint && e.acknowledged <= LifecycleJournal::AllPhases;
+         e.checkpoint.size() <= LifecycleJournal::MaxCheckpoint && e.acknowledged <= LifecycleJournal::AllPhases &&
+         e.attempting <= 5;
 }
 }  // namespace
 LifecycleJournal::LifecycleJournal(PublishPaths paths, JournalLimits limits) : paths_(paths), limits_(limits) {}
@@ -114,15 +120,15 @@ bool LifecycleJournal::validate(FsFile& file, void*) {
   const auto size = file.fileSize();
   uint8_t h[Header];
   if (size < Header + Trailer || size > MaxBytes || file.read(h, sizeof(h)) != sizeof(h) || memcmp(h, "BSLJ", 4) ||
-      get(h + 4, 4) != Version || get(h + 20, 4) != size || !get(h + 8, 8) || get(h + 16, 4) > MaxEntries)
+      !supported(get(h + 4, 4)) || get(h + 20, 4) != size || !get(h + 8, 8) || get(h + 16, 4) > MaxEntries)
     return false;
-  const auto next = get(h + 8, 8), count = get(h + 16, 4);
+  const auto next = get(h + 8, 8), count = get(h + 16, 4), version = get(h + 4, 4);
   uint32_t offset = Header;
   uint64_t prior = 0;
   for (uint32_t i = 0; i < count; ++i) {
     RecordInfo r;
     if (offset > size - Trailer || !file.seekSet(offset) || !record(file, r) || r.id <= prior || r.id >= next ||
-        r.size() > size - Trailer - offset)
+        (version == 1 && r.attempting) || r.size() > size - Trailer - offset)
       return false;
     prior = r.id;
     offset += r.size();
@@ -157,7 +163,7 @@ JournalResult LifecycleJournal::recover() {
     const auto n = file.read(h, sizeof(h));
     const bool closed = close(file);
     if (n < 0 || !closed) return error(JournalResult::IoError);
-    if (n == sizeof(h) && memcmp(h, "BSLJ", 4) == 0 && get(h + 4, 4) != Version)
+    if (n == sizeof(h) && memcmp(h, "BSLJ", 4) == 0 && !supported(get(h + 4, 4)))
       return error(JournalResult::RecoveryRequired);
   }
   if (Storage.exists(paths_.current)) {
@@ -193,6 +199,10 @@ JournalResult LifecycleJournal::checkpoint(uint64_t id, std::string_view bytes) 
   e.checkpoint = bytes;
   return change(Change::Checkpoint, id, e, 0);
 }
+JournalResult LifecycleJournal::attempt(uint64_t id, LifecyclePhase phase) {
+  if (unsigned(phase) > 4) return error(JournalResult::Invalid);
+  return change(Change::Attempt, id, {}, uint8_t(unsigned(phase) + 1));
+}
 JournalResult LifecycleJournal::acknowledge(uint64_t id, LifecyclePhase phase, std::string_view bytes) {
   if (unsigned(phase) > 4) return error(JournalResult::Invalid);
   JournalEntry e;
@@ -200,9 +210,8 @@ JournalResult LifecycleJournal::acknowledge(uint64_t id, LifecyclePhase phase, s
   return change(Change::Acknowledge, id, e, uint8_t(1U << unsigned(phase)));
 }
 JournalResult LifecycleJournal::finish(uint64_t id) { return change(Change::Finish, id, {}, 0); }
-JournalResult LifecycleJournal::change(Change kind, uint64_t id, const JournalEntry& entry, uint8_t bit) {
+JournalResult LifecycleJournal::verify() {
   if (!ready_) return error(JournalResult::RecoveryRequired);
-  if (entry.checkpoint.size() > MaxCheckpoint) return error(JournalResult::Invalid);
   // Do not recompute a fresh CRC over damaged bytes or silently use a different
   // generation if media errors occurred since recover().
   const auto expected = !selected_                    ? PublishedFile::Missing
@@ -212,6 +221,12 @@ JournalResult LifecycleJournal::change(Change kind, uint64_t id, const JournalEn
     ready_ = false;
     return error(JournalResult::IoError);
   }
+  return JournalResult::Ok;
+}
+JournalResult LifecycleJournal::change(Change kind, uint64_t id, const JournalEntry& entry, uint8_t bit) {
+  if (!ready_) return error(JournalResult::RecoveryRequired);
+  if (entry.checkpoint.size() > MaxCheckpoint) return error(JournalResult::Invalid);
+  if (verify() != JournalResult::Ok) return error(JournalResult::IoError);
   uint32_t target = 0, targetSize = 0;
   uint16_t newCount = count_;
   uint32_t newBytes = bytes_;
@@ -280,12 +295,19 @@ JournalResult LifecycleJournal::change(Change kind, uint64_t id, const JournalEn
     if (kind != Change::Finish) {
       RecordInfo r{};
       ok = ok && record(source, r);
-      r.lengths[4] = entry.checkpoint.size();
-      r.ack |= bit;
+      if (kind != Change::Attempt) r.lengths[4] = entry.checkpoint.size();
+      if (kind == Change::Attempt) r.attempting = bit;
+      if (kind == Change::Acknowledge) {
+        r.ack |= bit;
+        r.attempting = 0;
+      }
       encode(r, h);
-      ok = ok && output.write(h, Record) && output.copy(source, r.prefix()) &&
-           output.write(entry.checkpoint.data(), entry.checkpoint.size()) &&
-           output.zeros(MaxCheckpoint - entry.checkpoint.size());
+      ok = ok && output.write(h, Record) && output.copy(source, r.prefix());
+      if (kind == Change::Attempt)
+        ok = ok && output.copy(source, MaxCheckpoint);
+      else
+        ok = ok && output.write(entry.checkpoint.data(), entry.checkpoint.size()) &&
+             output.zeros(MaxCheckpoint - entry.checkpoint.size());
     }
     ok = ok && source.seekSet(target + targetSize) && output.copy(source, bytes_ - Trailer - target - targetSize);
   }
@@ -319,6 +341,7 @@ JournalResult LifecycleJournal::read(uint64_t id, JournalEntry& entry, char* buf
         JournalEntry out;
         out.id = r.id;
         out.acknowledged = r.ack;
+        out.attempting = r.attempting;
         std::string_view* parts[] = {&out.adapter, &out.owner, &out.document, &out.payload, &out.checkpoint};
         size_t start = 0;
         for (int j = 0; j < 5; ++j) {
