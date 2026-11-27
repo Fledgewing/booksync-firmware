@@ -1,5 +1,7 @@
 #include "ActivityManager.h"
 
+#include "booksync/system/NetworkPhase.h"
+
 #if FREEINK_DEVICE_PICCO && CROSSINK_BATTERY_DIAG_LOG
 #include "util/BatteryDiagnosticLog.h"
 #endif
@@ -498,7 +500,7 @@ void ActivityManager::renderTaskLoop() {
     entryRenderRequested = false;
     TouchRegistry::getInstance().setEnabled(mappedInput.hasTouch());
     TouchRegistry::getInstance().beginFrame();
-    if (currentActivity) {
+    if (currentActivity && booksync::networkDisplayReady()) {
       HalPowerManager::Lock powerLock;  // Ensure we don't go into low-power mode while rendering
       // Apply Night Mode to each activity's normal-polarity frame. SleepActivity
       // preserves it for retained pages and clears it for generated sleep screens.
@@ -533,6 +535,7 @@ void ActivityManager::renderTaskLoop() {
 }
 
 void ActivityManager::loop() {
+  booksync::networkAdmissionTick();
   if (currentActivity && currentActivity->requiresExclusiveStorageLoop()) {
     currentActivity->loop();
     // USB Drive normally restarts the device rather than replacing itself. The
@@ -627,6 +630,10 @@ void ActivityManager::loop() {
 }
 
 void ActivityManager::processPendingActivities() {
+  // Navigation cannot enter a reader or paint a new activity while C3 storage
+  // belongs to transport. Cancel/drain first, retaining the pending navigation.
+  if ((pendingAction != PendingAction::None || (afterReturnActivity && afterReturnOwnerExited)) &&
+      booksync::networkAdmission().busy() && !booksync::networkAdmission().finish()) return;
   // A deferred full-stack replace waits until its requester has popped and every
   // result handler has settled, then runs as an ordinary Replace.
   while (pendingAction != PendingAction::None || (afterReturnActivity && afterReturnOwnerExited)) {

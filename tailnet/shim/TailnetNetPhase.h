@@ -14,20 +14,31 @@ typedef enum {
   TAILNET_JOB_CATALOG,
   TAILNET_JOB_UPDATE
 } tailnet_service_job_t;
-typedef struct { uint32_t epoch; } tailnet_service_lease_t;
+typedef struct {
+  uint32_t epoch;
+} tailnet_service_lease_t;
 // Fail closed until runtime explicitly reports that reading is inactive.
 void tailnet_set_reading(bool reading);
 // One owner; display_released is the runtime's proof of C3 framebuffer ownership.
 tailnet_service_lease_t tailnet_service_acquire(tailnet_service_job_t job, bool display_released);
 void tailnet_service_release(tailnet_service_lease_t lease);
+// Runtime publishes C3 display proof after the HAL release succeeds.
+tailnet_service_lease_t tailnet_service_prepare(tailnet_service_job_t job);
+bool tailnet_service_activate(tailnet_service_lease_t lease, bool display_released);
+void tailnet_service_deactivate(tailnet_service_lease_t lease);
 bool tailnet_service_permitted(void);
 bool tailnet_display_park(void);
 void tailnet_display_unpark(void);
 tailnet_service_job_t tailnet_service_job(void);
 // Cached-start decision retained from the transport shim; never restarts.
 enum { TAILNET_CATALOG_NONE = 0, TAILNET_CATALOG_ALLOW_CONTROL = 1, TAILNET_CATALOG_CACHED_ONLY = 2 };
-enum { TAILNET_CATALOG_PENDING = 0, TAILNET_CATALOG_CACHED = 1, TAILNET_CATALOG_CONTROL = 2,
-       TAILNET_CATALOG_REFUSED = 3, TAILNET_CATALOG_FAILED = 4 };
+enum {
+  TAILNET_CATALOG_PENDING = 0,
+  TAILNET_CATALOG_CACHED = 1,
+  TAILNET_CATALOG_CONTROL = 2,
+  TAILNET_CATALOG_REFUSED = 3,
+  TAILNET_CATALOG_FAILED = 4
+};
 void tailnet_catalog_connect(bool allow_control);
 int tailnet_catalog_result(void);
 #ifdef __cplusplus

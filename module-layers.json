@@ -5424,7 +5424,7 @@
     },
     "lib/hal/HalDisplay.cpp": {
       "role": "hal-wrapper",
-      "rationale": "Hardware abstraction wrapper around pinned SDK; product UI cannot depend on storage/device internals.",
+      "rationale": "Hardware abstraction wrapper around pinned SDK; product UI cannot depend on storage/device internals. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission.",
       "includes": [
         "HalDisplay.h",
         "HalGPIO.h",
@@ -5435,7 +5435,7 @@
     },
     "lib/hal/HalDisplay.h": {
       "role": "hal-wrapper",
-      "rationale": "Hardware abstraction wrapper around pinned SDK; product UI cannot depend on storage/device internals.",
+      "rationale": "Hardware abstraction wrapper around pinned SDK; product UI cannot depend on storage/device internals. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission.",
       "includes": [
         "Arduino.h",
         "EInkDisplay.h",
@@ -5802,7 +5802,7 @@
     },
     "platformio.ini": {
       "role": "retained-build-input",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F11: S3 simulator profiles mirror the hardware PSRAM framebuffer ownership capability; native heap is still not ESP32 memory.",
       "includes": []
     },
     "scripts/app_only_upload.py": {
@@ -7060,7 +7060,7 @@
     },
     "src/activities/ActivityManager.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owns boot/Home routing and offline Home regression coverage; F05 retires native writers while retaining local capture; F06 retains isolated publication probes.",
+      "rationale": "F04 owns boot/Home routing and offline Home regression coverage; F05 retires native writers while retaining local capture; F06 retains isolated publication probes. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission.",
       "includes": [
         "ActivityManager.h",
         "CrossInkHalFrontlight.h",
@@ -7085,6 +7085,7 @@
         "Xtc.h",
         "algorithm",
         "booksync/system/Bootstrap.h",
+        "booksync/system/NetworkPhase.h",
         "boot_sleep/SleepActivity.h",
         "components/TouchRegistry.h",
         "components/UITheme.h",
@@ -12272,7 +12273,7 @@
     },
     "src/main.cpp": {
       "role": "retained-runtime",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F11: retain sleep intent until admitted workers drain and display storage is restored.",
       "includes": [
         "AppCapabilities.h",
         "AppVersion.h",
@@ -12328,6 +12329,7 @@
         "activities/settings/SdFirmwareUpdateActivity.h",
         "algorithm",
         "array",
+        "booksync/system/NetworkPhase.h",
         "builtinFonts/all.h",
         "components/UITheme.h",
         "components/icons/tablerFilledIcons.h",
@@ -14600,7 +14602,7 @@
     },
     "tailnet/shim/Tailnet.cpp": {
       "role": "transport",
-      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission.",
       "includes": [
         "Tailnet.h",
         "TailnetNetPhase.h",
@@ -14625,7 +14627,7 @@
     },
     "tailnet/shim/Tailnet.h": {
       "role": "transport",
-      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission.",
       "includes": [
         "stdbool.h",
         "stddef.h",
@@ -14659,7 +14661,7 @@
     },
     "tailnet/shim/TailnetNetPhase.cpp": {
       "role": "transport",
-      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission.",
       "includes": [
         "TailnetNetPhase.h",
         "atomic"
@@ -14667,7 +14669,7 @@
     },
     "tailnet/shim/TailnetNetPhase.h": {
       "role": "transport",
-      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission.",
       "includes": [
         "stdbool.h",
         "stdint.h"
@@ -14715,15 +14717,17 @@
     },
     "tailnet/shim/TailnetTlsMem.c": {
       "role": "transport",
-      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission. Allocation rejection/failure reports use the existing redacted Tailnet logger.",
       "includes": [
+        "Tailnet.h",
         "esp_heap_caps.h",
-        "stddef.h"
+        "stddef.h",
+        "stdint.h"
       ]
     },
     "tailnet/shim/TailnetWifiMem.c": {
       "role": "transport",
-      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink.",
+      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink. F11: refuse Wi-Fi initialization without an active F10 lease.",
       "includes": [
         "TailnetNetPhase.h",
         "TailnetSysSwitches.h",
@@ -14914,9 +14918,10 @@
     },
     "src/simulator/BookSyncHomeSmokeTest.cpp": {
       "role": "retained-simulator",
-      "rationale": "F04 isolated synthetic offline owned Home/open/Back scenario; calls production Library and mapped input, no real transport or device.",
+      "rationale": "F04 isolated synthetic offline owned Home/open/Back scenario; calls production Library and mapped input, no real transport or device. F11: admission probes around native Home/read/Back.",
       "includes": [
         "ArduinoJson.h",
+        "BookSyncAdmissionSmokeTest.h",
         "BookSyncHomeSmokeTest.h",
         "CrossPointState.h",
         "Logging.h",
@@ -15021,6 +15026,56 @@
     "src/booksync/storage/Index.h": {
       "role": "storage",
       "rationale": "F13 worker-only checked data-slot codec and F06 manifest publication; public value types, F08 identity validation and HAL I/O off paint."
+    },
+    "src/booksync/system/Admission.h": {
+      "role": "system",
+      "rationale": "F11 worker-only bounded resource admission and PSRAM-first data allocation; main-loop display ownership uses HAL and F10 leases, never UI or backend protocol."
+    },
+    "src/booksync/system/Admission.cpp": {
+      "role": "system",
+      "rationale": "F11 worker-only bounded resource admission and PSRAM-first data allocation; main-loop display ownership uses HAL and F10 leases, never UI or backend protocol."
+    },
+    "src/booksync/system/Memory.h": {
+      "role": "system",
+      "rationale": "F11 worker-only bounded resource admission and PSRAM-first data allocation; main-loop display ownership uses HAL and F10 leases, never UI or backend protocol."
+    },
+    "src/booksync/system/Memory.cpp": {
+      "role": "system",
+      "rationale": "F11 worker-only bounded resource admission and PSRAM-first data allocation; main-loop display ownership uses HAL and F10 leases, never UI or backend protocol."
+    },
+    "src/booksync/system/NetworkPhase.h": {
+      "role": "system",
+      "rationale": "F11 worker-only bounded resource admission and PSRAM-first data allocation; main-loop display ownership uses HAL and F10 leases, never UI or backend protocol."
+    },
+    "src/booksync/system/NetworkPhase.cpp": {
+      "role": "system",
+      "rationale": "F11 worker-only bounded resource admission and PSRAM-first data allocation; main-loop display ownership uses HAL and F10 leases, never UI or backend protocol."
+    },
+    "src/booksync/system/Worker.h": {
+      "role": "system",
+      "rationale": "F11 single joined worker with explicitly internal RAM stack, bounded task lifetime and high-water reporting; callbacks never present UI."
+    },
+    "src/booksync/system/Worker.cpp": {
+      "role": "system",
+      "rationale": "F11 single joined worker with explicitly internal RAM stack, bounded task lifetime and high-water reporting; callbacks never present UI."
+    },
+    "src/simulator/BookSyncAdmissionSmokeTest.h": {
+      "role": "retained-simulator",
+      "rationale": "F11 synthetic Home/worker cancellation/join and reader-refusal probes; no live transport or physical device.",
+      "includes": []
+    },
+    "src/simulator/BookSyncAdmissionSmokeTest.cpp": {
+      "role": "retained-simulator",
+      "rationale": "F11 synthetic Home/worker cancellation/join and reader-refusal probes; no live transport or physical device.",
+      "includes": [
+        "BookSyncAdmissionSmokeTest.h",
+        "Logging.h",
+        "atomic",
+        "booksync/system/NetworkPhase.h",
+        "booksync/system/Worker.h",
+        "cstdlib",
+        "thread"
+      ]
     }
   },
   "generators": {
