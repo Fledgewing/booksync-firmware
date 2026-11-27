@@ -24,6 +24,7 @@ class Feed {
     char firmwareUrl[512];
     char firmwareSha256[65];
     size_t firmwareSize;
+    bool booksyncVersionFound;
     bool tagFound;
     bool firmwareFound;
     bool prerelease;
