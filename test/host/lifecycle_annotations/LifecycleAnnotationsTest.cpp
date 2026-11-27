@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cstring>
 
 #include "booksync/server/bookorbit/Auth.h"
 #include "booksync/server/bookorbit/LifecycleAnnotations.h"
