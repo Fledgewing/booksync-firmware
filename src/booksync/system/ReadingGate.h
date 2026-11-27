@@ -32,10 +32,13 @@ struct PositionContext {
   uint64_t document = 0;
   uint64_t path = 0;
   uint64_t run = 0;
+  bool automatic = true;  // Captured mode must still match, including manual/custom runs.
 };
+enum class PositionMoment { Reading, Close, Sleep };
 class PositionPresentation {
  public:
-  PositionPresentation(DeliveryTicket owner, PositionContext context) : owner(owner), context(context) {}
+  PositionPresentation(DeliveryTicket owner, PositionContext context, PositionMoment moment = PositionMoment::Reading)
+      : owner(owner), context(context), live(moment == PositionMoment::Reading) {}
   PositionPresentation(const PositionPresentation&) = delete;
   PositionPresentation& operator=(const PositionPresentation&) = delete;
   bool eligible(DeliveryTicket current, PositionContext currentContext);

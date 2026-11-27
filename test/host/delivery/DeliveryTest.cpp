@@ -220,3 +220,16 @@ TEST(ReadingGate, ClosedAndSwitchedConsumersNeverRepaint) {
   EXPECT_EQ(view.adopted, 1);
   EXPECT_EQ(view.paints, 0);
 }
+TEST(ReadingGate, ConsentRejectsChangedModePermanently) {
+  PositionPresentation consent({1, 1}, {10, 20, 30, true});
+  EXPECT_FALSE(consent.claim({1, 1}, {10, 20, 30, false}, {true, true, false}));
+  EXPECT_FALSE(consent.claim({1, 1}, {10, 20, 30, true}, {true, true, false}));
+}
+TEST(ReadingGate, CloseAndSleepRunsCannotPromptAfterWake) {
+  for (auto moment : {PositionMoment::Close, PositionMoment::Sleep}) {
+    PositionPresentation consent({1, 1}, {10, 20, 30}, moment);
+    EXPECT_FALSE(consent.claim({1, 1}, {10, 20, 30}, {true, true, false}));
+  }
+  PositionPresentation manual({1, 1}, {10, 20, 30, false});
+  EXPECT_TRUE(manual.claim({1, 1}, {10, 20, 30, false}, {true, true, false}));
+}

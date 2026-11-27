@@ -47,7 +47,9 @@ Position caller completion and position presentation are separate lifetimes. A c
 timeout does not retire `PositionPresentation`. The reader supplies non-reused exact
 native-document and path identity tokens, plus a run generation advanced at invocation
 (before activation); these are not path hashes. Changed document/path/run or owner/epoch
-permanently invalidates consent. Close/sleep retirement belongs to the reader lifecycle.
+permanently invalidates consent. The captured automatic/custom mode must still match;
+close- and sleep-initiated runs can never prompt, including after wake. Closing an
+existing reader retires its presentation through the reader lifecycle.
 `claim()` admits one approved live "sync to this position" prompt while reading,
 including after caller timeout, and consumes that draw. Sleeping/hidden state refuses
 a draw. Answer-token validation and durable decisions remain F19's responsibility.
