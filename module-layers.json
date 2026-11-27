@@ -13310,6 +13310,7 @@
         "../../test/simulator/LifecycleMatchScenario.h",
         "../../test/simulator/LocatorScenario.h",
         "../../test/simulator/ReaderCaptureScenario.h",
+        "../../test/simulator/ReadingPositionsScenario.h",
         "../../test/simulator/SyncOwnerScenario.h",
         "../../test/simulator/UpdateScenario.h",
         "../../test/simulator/WidgetScenario.h",
@@ -15247,6 +15248,14 @@
     "src/booksync/ui/widgets/Continue.h": {
       "role": "ui",
       "rationale": "F34 bounded public Home placement values and Library-only immutable widget views; no storage, protocol, jobs or paint I/O."
+    },
+    "src/booksync/import/ReadingPositions.h": {
+      "role": "import",
+      "rationale": "F27a read-only bounded legacy evidence into isolated F07 journal; F08 locator and F09 sample inspection only; no transport or activation."
+    },
+    "src/booksync/import/ReadingPositions.cpp": {
+      "role": "import",
+      "rationale": "F27a read-only bounded legacy evidence into isolated F07 journal; F08 locator and F09 sample inspection only; no transport or activation."
     }
   },
   "generators": {
