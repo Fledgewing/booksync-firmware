@@ -7,6 +7,13 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#ifdef __APPLE__
+#define connect booksync_connect
+#define sendto booksync_sendto
+#define sendmsg booksync_sendmsg
+#define getaddrinfo booksync_getaddrinfo
+#endif
+
 static void attempted(void) {
   const char* path = getenv("BOOKSYNC_NETWORK_AUDIT");
   if (path) {
@@ -52,3 +59,17 @@ int getaddrinfo(const char* node, const char* service, const struct addrinfo* hi
   attempted();
   return EAI_FAIL;
 }
+
+#ifdef __APPLE__
+#undef connect
+#undef sendto
+#undef sendmsg
+#undef getaddrinfo
+// Mach-O dyld interposition pairs; ELF uses the exported function names above.
+__attribute__((used, section("__DATA,__interpose,interposing"))) static const void* booksync_interpose[][2] = {
+    {(const void*)booksync_connect, (const void*)connect},
+    {(const void*)booksync_sendto, (const void*)sendto},
+    {(const void*)booksync_sendmsg, (const void*)sendmsg},
+    {(const void*)booksync_getaddrinfo, (const void*)getaddrinfo},
+};
+#endif

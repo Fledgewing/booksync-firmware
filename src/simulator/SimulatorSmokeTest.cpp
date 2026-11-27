@@ -3010,6 +3010,7 @@ enum class SmokeStep : uint8_t {
   Sleep,
   Reader,
   ReaderInput,
+  NativeReaderSleep,
   CompletionReturnedHome,
   CompletionReaderRestored,
   StatusBarReaderSettings,
@@ -10715,6 +10716,12 @@ class SimulatorSmokeTest {
         break;
       }
 
+      case SmokeStep::NativeReaderSleep:
+        if (!activityManager.isCurrentActivityNamed("EpubReader")) fail("F05 must sleep from the reader");
+        activityManager.goToSleep();
+        LOG_INF("SMOKE", "Simulator smoke test passed: local reader close and sleep capture");
+        std::_Exit(0);
+
       case SmokeStep::ReaderInput:
         runReaderInputScript();
         break;
@@ -10887,6 +10894,11 @@ class SimulatorSmokeTest {
       }
 
       case SmokeStep::Done:
+        if (std::getenv("BOOKSYNC_NATIVE_WRITER_PROOF")) {
+          activityManager.goToReader(std::getenv("CROSSINK_SIMULATOR_SMOKE_BOOK"), true);
+          queueStep("F05 reader reopen before sleep", SmokeStep::NativeReaderSleep, 12);
+          break;
+        }
         if (std::getenv("CROSSINK_SIMULATOR_SMOKE_APP_NOTES")) {
           RenderLock lock;
           captureStatusBarScreen("short-note-popup");
