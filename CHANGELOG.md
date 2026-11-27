@@ -2,6 +2,7 @@
 
 ### Added
 
+- BookSync preserves shared Home layouts and device-class overrides across interrupted saves, retaining unknown widgets and damaged layouts while falling back safely.
 - BookSync allows one sync owner at a time, preserves offline work across owner changes, and checkpoints uncertain phase delivery for safe reconciliation; validated with a toy adapter only.
 
 - BookSync CI records per-device image, static-memory, partition and symbol baselines with informational deltas, and gates offline reader capture/restart plus network admission in every simulator.

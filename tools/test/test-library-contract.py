@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory(prefix='booksync-contract-') as temp:
                    str(ROOT / 'src/booksync/services/Library.cpp'),
                    *[str(ROOT / ('src/booksync/' + source)) for source in (
                        'services/DeviceIndex.cpp','services/ReadModel.cpp','services/SdIndexSource.cpp',
-                       'services/NativeHistory.cpp','storage/Index.cpp','storage/FilePublish.cpp',
+                       'services/NativeHistory.cpp','services/Layout.cpp','storage/LayoutStore.cpp','storage/Index.cpp','storage/FilePublish.cpp',
                        'storage/Identity.cpp','storage/LifecycleJournal.cpp','reader/Capture.cpp','reader/Locator.cpp')],
                    str(ROOT / 'src/booksync/server/bookorbit/Factory.cpp'), str(obj), '-o', str(app)], check=True)
     for boot in range(2):

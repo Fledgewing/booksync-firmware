@@ -272,3 +272,4 @@ add_subdirectory(host/device_index)
 add_subdirectory(host/admission)
 
 add_subdirectory(host/sync_owner)
+add_subdirectory(host/layout)
