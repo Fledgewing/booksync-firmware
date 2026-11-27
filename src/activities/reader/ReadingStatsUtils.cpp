@@ -1,6 +1,7 @@
 #include "ReadingStatsUtils.h"
 
 #include <HalClock.h>
+#include <cstdio>
 #ifdef SIMULATOR
 #include <ctime>
 #endif
