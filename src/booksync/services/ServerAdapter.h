@@ -3,6 +3,7 @@
 #include "booksync/interface/Capabilities.h"
 #include "booksync/interface/Commands.h"
 #include "booksync/interface/Models.h"
+#include "booksync/services/AuthAdapter.h"
 #include "booksync/storage/LifecycleJournal.h"
 
 namespace booksync {
@@ -24,10 +25,11 @@ struct PhaseRequest {
   storage::LifecyclePhase phase;
   bool reconcile;  // Prior attempt may have committed. Never blindly replay.
 };
-// Worker-only contract. No protocol DTO, credential or transport escapes here.
+// Worker-only contract. No protocol DTO, session or transport escapes here.
+// Neutral credential captures enter only through the private auth boundary.
 // Phase adapters must deduplicate by (adapter, owner, entry.id, phase), or reconcile
 // an uncertain attempt before writing. Confirmed means a durable remote commit.
-class ServerAdapter {
+class ServerAdapter : public AuthAdapter {
  public:
   virtual ~ServerAdapter() = default;
   virtual Capabilities capabilities() const = 0;
