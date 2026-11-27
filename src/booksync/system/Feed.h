@@ -10,7 +10,8 @@
 namespace booksync {
 
 // Bounded streaming decoder. Visitor values are provisional until complete() and
-// the transport reports success. Reset the parser AND the caller's selection on retry.
+// transport and detached-feed trust checks succeed. Reset the parser AND the
+// caller's selection on retry.
 class Feed {
  public:
   using AssetMatcher = bool (*)(const char* assetName);
@@ -33,7 +34,7 @@ class Feed {
 
   // GitHub's GET /releases answers with an array of releases rather than one. The parser
   // reports them one at a time: the visitor runs as each release object closes, for those
-  // with a tag and a matching firmware asset, newest first in GitHub's order.
+  // with a tag and a matching firmware asset, in input order. The caller owns selection.
   using ReleaseVisitor = void (*)(void* ctx, const Release& release);
 
   explicit Feed(AssetMatcher assetMatcher = nullptr, ReleaseVisitor releaseVisitor = nullptr,
