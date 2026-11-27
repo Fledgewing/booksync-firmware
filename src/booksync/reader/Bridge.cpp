@@ -42,6 +42,10 @@ void Bridge::open(std::string_view path, uint16_t format) {
 }
 void Bridge::observeSession(const ReadingSessionJournal::Record& record) {
   if (!capture_.id()) return;
+  // Native finalization may release its own stats lock before calling us.
+  // Borrow the record only while paint and its deferred native interval are excluded.
+  std::optional<RenderLock> lock;
+  if (!RenderLock::heldByCurrentTask()) lock.emplace();
   SessionObservation observation;
   memcpy(observation.id.data(), record.id, 32);
   memcpy(observation.document.data(), record.document, 32);
