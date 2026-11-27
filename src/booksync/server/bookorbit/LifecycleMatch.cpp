@@ -9,6 +9,8 @@
 #include <cstring>
 #include <limits>
 
+#include "LifecycleStats.h"
+
 namespace booksync::server {
 namespace {
 bool digest(std::string_view value) {
@@ -99,6 +101,15 @@ PhaseOutcome LifecycleMatch::run(const SyncWriterToken& token, const PhaseReques
   return PhaseOutcome::Confirmed;
 }
 bool LifecycleMatch::decode(std::string_view bytes, MatchCheckpoint& out) {
+  // Later phases still read the original verified match and raw native bytes.
+  // Only one known stats envelope is allowed; unknown/nested versions stay unresolved.
+  if (bytes.substr(0, 4) == "BST1") {
+    constexpr size_t header = LifecycleStats::HeaderBytes;
+    if (bytes.size() < header || bytes.size() > storage::LifecycleJournal::MaxCheckpoint ||
+        get(bytes.data() + 32, 4) != bytes.size() - header)
+      return false;
+    bytes = bytes.substr(header);
+  }
   if (bytes.size() < HeaderBytes || bytes.size() > storage::LifecycleJournal::MaxCheckpoint ||
       bytes.substr(0, 4) != "BSM1" || static_cast<uint8_t>(bytes[84]) > 1 ||
       get(bytes.data() + 117, 2) != bytes.size() - HeaderBytes || !digest(bytes.substr(85, 32)))

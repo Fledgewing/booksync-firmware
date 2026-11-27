@@ -16,6 +16,8 @@ namespace {
 constexpr storage::PublishPaths Paths{"/.booksync/reader.journal", "/.booksync/reader.journal.tmp",
                                       "/.booksync/reader.journal.bak"};
 storage::LifecycleJournal journal(Paths);
+storage::PageJournal pageHistory("/.booksync/pages");
+bool pagesReady = false;
 bool ready = false;
 bool prepare() {
   if (ready) return true;
@@ -40,6 +42,22 @@ void Bridge::open(std::string_view path, uint16_t format) {
   const auto result = capture_.open(path, format);
   if (result != storage::JournalResult::Ok) LOG_ERR("BSC", "Local book capture unavailable: %u", unsigned(result));
 }
+namespace {
+uint64_t pageEpoch(const ReadingStatsDateTime& local, uint8_t offset) {
+  if (!local.isValid() || offset > 104) return 0;
+  const int64_t epoch = 946684800LL + int64_t(readingStatsDayIndex(local.date)) * 86400 + local.hour * 3600 +
+                        local.minute * 60 + local.second - (int(offset) - 48) * 900;
+  return epoch >= 946684800LL ? uint64_t(epoch) : 0;
+}
+}  // namespace
+void Bridge::startPage(const ReadingStatsDateTime& local, uint8_t offset, uint32_t spine, uint32_t page, uint32_t pages,
+                       uint32_t fraction, uint32_t scale) {
+  pageOffset_ = offset;
+  pages_.start({capture_.id(), pageEpoch(local, offset), 0, 0, spine, page, pages, 0, fraction, scale, 0});
+}
+void Bridge::acceptPage(const ReadingStatsDateTime& end, uint8_t offset, uint32_t seconds) {
+  pages_.accept(offset == pageOffset_ ? pageEpoch(end, offset) : 0, seconds);
+}
 void Bridge::observeSession(const ReadingSessionJournal::Record& record) {
   if (!capture_.id()) return;
   // Native finalization may release its own stats lock before calling us.
@@ -56,9 +74,12 @@ void Bridge::observeSession(const ReadingSessionJournal::Record& record) {
   capture_.session(observation);
 }
 void Bridge::observe(Sample sample, const std::string& cache, bool closed) {
-  if (!capture_.id()) return;
   // Most loops do no work. Read raw slots only when live page/stats change or
   // closing, after the caller has excluded paint with RenderLock.
+  if (!pagesReady) pagesReady = pageHistory.recover() == storage::JournalResult::Ok;
+  if (pagesReady && pages_.flush(pageHistory) != storage::JournalResult::Ok)
+    LOG_ERR("BSC", "Page history pending; native saves continue independently");
+  if (!capture_.id()) return;
   sample.openingTotalSeconds = capture_.lastSample().openingTotalSeconds;
   sample.openingCounter = capture_.lastSample().openingCounter;
   sample.rawProgress = capture_.lastSample().rawProgress;

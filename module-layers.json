@@ -6218,7 +6218,7 @@
     },
     "scripts/test_reader_stats_latency.py": {
       "role": "retained-build-input",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F18b extends the extracted-method fixture with a value-only capture observer and asserts accepted page seconds preserve the existing slow-storage timing contract.",
       "includes": [
         "CrossPointSettings.h",
         "HalClock.h",
@@ -8775,7 +8775,7 @@
     },
     "src/activities/reader/EpubReaderActivity.cpp": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog.",
       "includes": [
         "../settings/DictionarySelectActivity.h",
         "Arduino.h",
@@ -9917,7 +9917,7 @@
     },
     "src/activities/reader/XtcReaderActivity.cpp": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog.",
       "includes": [
         "BookStatsActivity.h",
         "BookStatsTracking.h",
@@ -13298,7 +13298,7 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog.",
       "includes": [
         "../../test/simulator/AccountScenario.h",
         "../../test/simulator/CatalogJobsScenario.h",
@@ -13310,6 +13310,7 @@
         "../../test/simulator/LayoutScenario.h",
         "../../test/simulator/LifecycleJournalScenario.h",
         "../../test/simulator/LifecycleMatchScenario.h",
+        "../../test/simulator/LifecycleStatsScenario.h",
         "../../test/simulator/LocatorScenario.h",
         "../../test/simulator/ReaderCaptureScenario.h",
         "../../test/simulator/SyncOwnerScenario.h",
@@ -15332,6 +15333,30 @@
       "role": "build-tool",
       "rationale": "F31: shared product/source identity and pure update selection; no network, writer, UI or installer.",
       "includes": []
+    },
+    "src/booksync/storage/PageJournal.h": {
+      "role": "storage",
+      "rationale": "F18b bounded append-only page history; F06 complete segment publication, F07 version/CRC/recovery and non-eviction rules. No transport or UI. Fixed 50k-row cap reserves a durable gap marker."
+    },
+    "src/booksync/storage/PageJournal.cpp": {
+      "role": "storage",
+      "rationale": "F18b bounded append-only page history; F06 complete segment publication, F07 version/CRC/recovery and non-eviction rules. No transport or UI. Fixed 50k-row cap reserves a durable gap marker."
+    },
+    "src/booksync/reader/PageCapture.h": {
+      "role": "reader",
+      "rationale": "F09 extension queues fixed accepted native page intervals without paint I/O; main loop flushes through bounded page history. No timer or native-store changes."
+    },
+    "src/booksync/reader/PageCapture.cpp": {
+      "role": "reader",
+      "rationale": "F09 extension queues fixed accepted native page intervals without paint I/O; main loop flushes through bounded page history. No timer or native-store changes."
+    },
+    "src/booksync/server/bookorbit/LifecycleStats.h": {
+      "role": "server",
+      "rationale": "F18b private companion-compatible page-stats mapping, scoped F18a evidence and F15 auth/epoch gates; only F17 token can call transport. Fixed batch and checkpoint output, no UI or writer activation."
+    },
+    "src/booksync/server/bookorbit/LifecycleStats.cpp": {
+      "role": "server",
+      "rationale": "F18b private companion-compatible page-stats mapping, scoped F18a evidence and F15 auth/epoch gates; only F17 token can call transport. Fixed batch and checkpoint output, no UI or writer activation."
     }
   },
   "generators": {

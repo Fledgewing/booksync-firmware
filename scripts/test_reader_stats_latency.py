@@ -62,7 +62,7 @@ struct IntervalSink {
     storage();checkpointed=accepted;++rev;return true;
   }
 };
-struct Book {std::string getPath()const{return "/book";}std::string getCachePath()const{return "/cache";}};
+struct Book {uint32_t getPageCount()const{return 100;}std::string getPath()const{return "/book";}std::string getCachePath()const{return "/cache";}};
 bool statsLocked=false;
 int statsLockAcquires=0;
 namespace DailyReadingStats {bool checkpointIfDue(){assert(statsLocked);return true;}}
@@ -77,7 +77,16 @@ struct RenderLock {
   ~RenderLock(){if(owns)statsLocked=false;}
   static bool heldByCurrentTask(){return statsLocked;}
 };
+struct PageCaptureObserver {
+  uint32_t accepted=0;
+  void startPage(const ReadingStatsDateTime&,uint8_t,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t){assert(statsLocked);}
+  void acceptPage(const ReadingStatsDateTime&,uint8_t,uint32_t seconds){assert(statsLocked);accepted+=seconds;}
+};
+struct Section {uint32_t pageCount=100,currentPage=0;};
 struct Reader {
+  Section sectionValue;Section* section=&sectionValue;
+  uint32_t currentSpineIndex=0,currentPage=0;
+  PageCaptureObserver booksyncCapture;
   Book book;Book* epub=&book;Book* xtc=&book;
   BookReadingStats stats;GlobalReadingStats globalStats;
   ReadingSessionDates readingSessionDates;
@@ -118,7 +127,7 @@ int main(){
   assert(storageCalls==0);
   // A second accepted turn coalesces without storage, preserving all seconds.
   nowMs=14000;halClock.second=13;r.recordCurrentPageReadingTime("side",true);r.render();
-  assert(storageCalls==0 && r.dailyReadingSession.accepted==13);
+  assert(storageCalls==0 && r.dailyReadingSession.accepted==13 && r.booksyncCapture.accepted==13);
   r.pendingManualPageTurns.pending=true;r.shortcutPageTurnPending=true;
   nowMs=16000;r.checkpointReadingStatsWhenIdle();assert(storageCalls==0);
   r.pendingManualPageTurns.pending=false;r.shortcutPageTurnPending=false;
