@@ -26,11 +26,14 @@ class Account final {
   Account& operator=(const Account&) = delete;
   AccountSnapshot snapshot() const;
   AuthError signIn(CredentialCapture& input, DeliveryTicket expected);
+  AuthError restoreLogin(CredentialCapture& input, DeliveryTicket expected, LoginAuthorization authorization = {});
   AuthError signOut(DeliveryTicket expected);
   AuthError removeLogin(LoginKind kind, DeliveryTicket expected);
   AuthError useAccountLogin(LoginKind kind, DeliveryTicket expected);
 
  private:
+  AuthError acceptLogin(CredentialCapture& input, DeliveryTicket expected, bool restore,
+                        LoginAuthorization authorization = {});
   bool current(DeliveryTicket expected) const;
   void publishOwner();
   void setConnector(LoginKind kind, uint32_t owner, LoginOrigin origin);

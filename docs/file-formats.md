@@ -2497,3 +2497,24 @@ identity merge or cross-edition locator conversion follows from this record.
 Unknown/truncated records fail decoding. Inputs leaving insufficient checkpoint
 capacity are retained without sending a request. Uncertain attempts keep the
 original checkpoint until reconciliation confirms the same scoped association.
+
+## BookSync private credential import snapshot (BSI1)
+
+F26b writes owned snapshots only below `/.booksync/`; the legacy source and its
+backups are read-only. Activation belongs to F29. Do not include these private
+files in diagnostic exports or artifacts. The payload preserves legacy CPV1
+obfuscation, not encryption.
+
+All integers are little-endian. The 16-byte header contains ASCII `BSI1` (4 bytes),
+family (u8: 0 library sync, 1 native sync, 2 acquisition, 3 Wi-Fi), three zero
+reserved bytes, original JSON length (u32, 1–8192), and IEEE CRC32 of the original
+JSON (u32). Exactly that many unmodified JSON bytes follow; trailing bytes are
+invalid. The magic's `1` is the format version. Readers reject unknown versions,
+family mismatches, nonzero reserved bytes and checksum/length/parse failures.
+
+The entire original payload is the exact-byte import fingerprint/proof. Repeated
+staging compares all source bytes, including unknown fields and whitespace;
+changed or unreadable owned copies are retained as conflicts. FilePublish's
+`.tmp` and `.bak` siblings are owned publication candidates; a complete current or
+backup is selected read-only. Incomplete staging is never selected. No import
+operation deletes or renames a legacy original/backup.

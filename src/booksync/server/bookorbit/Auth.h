@@ -23,6 +23,12 @@ class AuthTransport {
                                  std::string_view secret, bool derived) = 0;
   // authenticate stages private candidates. Only accept=true commits; false
   // erases staged secrets and preserves the previous account. No plaintext store.
+  // Local verified credentials only; no HTTP, probing, or remote validation.
+  virtual AuthReply restoreLogin(LoginKind, std::string_view, std::string_view, std::string_view, bool) { return {}; }
+  virtual AuthReply restoreAuthorizedLogin(LoginKind, std::string_view, std::string_view, std::string_view, bool,
+                                           std::string_view, std::string_view) {
+    return {};
+  }
   virtual void finishAuth(bool accept) = 0;
   // Account sign-out erases its session and derived slots; user slots survive.
   virtual void clearAuth() = 0;
@@ -34,11 +40,14 @@ class Auth final : public AuthAdapter {
   explicit Auth(AuthTransport& transport) : transport(transport) {}
   AuthCapabilities authCapabilities() const override { return transport.capabilities(); }
   AuthResult authenticate(const CredentialCapture& input) override;
+  AuthResult restoreLogin(const CredentialCapture& input) override;
+  AuthResult restoreLogin(const CredentialCapture& input, LoginAuthorization authorization) override;
   void clearAuth() override { transport.clearAuth(); }
   AuthResult useAccountLogin(LoginKind kind) override;
   AuthError removeLogin(LoginKind kind) override;
 
  private:
+  AuthResult accept(const CredentialCapture& input, bool restore, LoginAuthorization authorization = {});
   AuthResult complete(AuthReply reply);
   AuthTransport& transport;
 };

@@ -25,6 +25,7 @@ struct AuthCapabilities {
   bool account = false;
   bool sync = false;
   bool acquisition = false;
+  bool additionalAuthorization = false;
 };
 struct AuthResult {
   AuthError error = AuthError::Unsupported;
@@ -33,6 +34,12 @@ struct AuthResult {
   // Optional account-derived connectors; never replace explicit user logins.
   uint32_t syncOwner = 0;
   uint32_t acquisitionOwner = 0;
+};
+// Private, borrowed restore-only authorization. The caller erases both buffers
+// after the synchronous call; adapters may not retain these views.
+struct LoginAuthorization {
+  std::string_view identity{}, secret{};
+  bool empty() const { return identity.empty() && secret.empty(); }
 };
 void eraseSecret(void* data, size_t bytes);
 // Worker-owned, bounded storage. No heap, persistence, logging or copy/move.
@@ -77,6 +84,11 @@ class AuthAdapter {
   // Borrowed input must not be retained. Implementations commit only fully
   // validated sessions; failed attempts leave the previous session untouched.
   virtual AuthResult authenticate(const CredentialCapture&) { return {}; }
+  // Offline import/boot restore only. Must not issue authentication requests.
+  virtual AuthResult restoreLogin(const CredentialCapture&) { return {}; }
+  virtual AuthResult restoreLogin(const CredentialCapture& input, LoginAuthorization authorization) {
+    return authorization.empty() ? restoreLogin(input) : AuthResult{};
+  }
   virtual AuthResult useAccountLogin(LoginKind) { return {}; }
   virtual AuthError removeLogin(LoginKind) { return AuthError::Unsupported; }
   // Local revocation is mandatory, synchronous and cannot depend on connectivity.

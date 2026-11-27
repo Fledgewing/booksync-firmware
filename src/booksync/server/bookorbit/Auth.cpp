@@ -72,7 +72,14 @@ bool syncKey(std::string_view input, bool derived, char (&key)[32]) {
   return true;
 }
 }  // namespace
-AuthResult Auth::authenticate(const CredentialCapture& input) {
+AuthResult Auth::authenticate(const CredentialCapture& input) { return accept(input, false); }
+AuthResult Auth::restoreLogin(const CredentialCapture& input) { return restoreLogin(input, {}); }
+AuthResult Auth::restoreLogin(const CredentialCapture& input, LoginAuthorization authorization) {
+  if (input.kind() == LoginKind::Account) return {AuthError::Unsupported};
+  if (!authorization.empty() && !authCapabilities().additionalAuthorization) return {AuthError::Unsupported};
+  return accept(input, true, authorization);
+}
+AuthResult Auth::accept(const CredentialCapture& input, bool restore, LoginAuthorization authorization) {
   if (!input.ready()) return {AuthError::Invalid};
   const auto capabilities = authCapabilities();
   if ((input.kind() == LoginKind::Account && !capabilities.account) ||
@@ -85,8 +92,12 @@ AuthResult Auth::authenticate(const CredentialCapture& input) {
     eraseSecret(key, sizeof(key));
     return {AuthError::Invalid};
   }
-  const auto reply = transport.authenticate(input.kind(), input.origin(), input.user(),
-                                            sync ? std::string_view(key, sizeof(key)) : input.secret(), sync);
+  const auto secret = sync ? std::string_view(key, sizeof(key)) : input.secret();
+  const auto reply = !restore ? transport.authenticate(input.kind(), input.origin(), input.user(), secret, sync)
+                     : authorization.empty()
+                         ? transport.restoreLogin(input.kind(), input.origin(), input.user(), secret, sync)
+                         : transport.restoreAuthorizedLogin(input.kind(), input.origin(), input.user(), secret, sync,
+                                                            authorization.identity, authorization.secret);
   eraseSecret(key, sizeof(key));
   return complete(reply);
 }
