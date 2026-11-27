@@ -12,6 +12,7 @@
 #include "../../test/simulator/DeviceIndexScenario.h"
 #include "../../test/simulator/LayoutScenario.h"
 #include "../../test/simulator/UpdateScenario.h"
+#include "../../test/simulator/WidgetScenario.h"
 
 #include <Epub.h>
 #include <Epub/WordSpacing.h>
@@ -12151,7 +12152,7 @@ SimulatorSmokeTest smokeTest;
 }  // namespace
 
 void runSimulatorSmokeTestTick() {
-  if (!runBookSyncHomeSmokeTestTick() && !EpubReaderCompletionSmokeTest::readerCaptureScenarioTick() &&
+  if (!widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() && !EpubReaderCompletionSmokeTest::readerCaptureScenarioTick() &&
       !EpubReaderCompletionSmokeTest::locatorScenarioTick()) smokeTest.tick();
 }
 

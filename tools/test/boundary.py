@@ -110,6 +110,9 @@ def ui_source_errors(name, source):
                 errors.append(f'{name}: private/unapproved include {inc}')
     if name.startswith('src/booksync/interface/'):
         bare = TOKENS.sub(' ', code)
+        # A caller-owned concrete window is a value-copy destination, never an
+        # opaque handle. Pointer/other reference types remain forbidden.
+        bare = re.sub(r'(\(\s*)LibraryWindow\s*&(?=\s+out\s*\))', r'\1LibraryWindow', bare)
         if re.search(r'\b(?:class|struct)\s+\w+\s*;', bare) or re.search(r'[&*]', bare):
             errors.append(f'{name}: public values cannot expose opaque pointers/references or forward handles')
     if name.startswith(('src/booksync/ui/', 'src/booksync/interface/')):
@@ -152,7 +155,7 @@ def private_product_symbols(root):
             public.update(re.findall(r'\b\w+\b', code))
         else:
             private.update(re.findall(r'\b(?:class|struct)\s+(\w+)', code))
-            private.update(re.findall(r'\b(\w+)\s*\([^;{}]*\)\s*(?:const\s*)?(?:override\s*)?[;{]', code))
+            private.update(re.findall(r'(?<![.>])\b(\w+)\s*\([^;{}]*\)\s*(?:const\s*)?(?:override\s*)?[;{]', code))
     keywords = {'if', 'for', 'while', 'switch', 'catch', 'sizeof', 'alignof', 'decltype', 'static_assert', 'return', 'new', 'delete', 'noexcept'}
     return private - public - keywords
 

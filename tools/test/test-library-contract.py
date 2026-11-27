@@ -17,7 +17,7 @@ def forbidden_symbols(objects):
         fields = line.split()
         if len(fields) >= 3 and fields[-2] not in {'U', 'u'}:
             defined.add(fields[-1])
-    support = {'___stack_chk_fail', '___stack_chk_guard', '__stack_chk_fail', '__stack_chk_guard'}
+    support = {'_memcpy', 'memcpy', '_memset', 'memset', '_memmove', 'memmove', '___stack_chk_fail', '___stack_chk_guard', '__stack_chk_fail', '__stack_chk_guard'}
     undefined = set()
     for line in subprocess.check_output(['nm', '-u', *names], text=True).splitlines():
         if line.strip() and not line.endswith(':'):

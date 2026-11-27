@@ -73,3 +73,22 @@ bool LayoutStore::save(LayoutInput input) {
   return true;
 }
 }  // namespace booksync::storage
+
+namespace booksync::storage {
+bool LayoutStore::project(uint8_t page, HomePage& output) {
+  if (!selected_) return validator_.project(Layout::defaults(), device_, page, output);
+  FsFile file = Storage.open(selected_, O_RDONLY);
+  if (!file) {
+    LOG_ERR("BSL", "Cannot open selected layout projection");
+    return false;
+  }
+  LayoutInput input{[](void* context, size_t offset, void* bytes, size_t count) {
+                      auto& source = *static_cast<FsFile*>(context);
+                      return source.seekSet(offset) && source.read(bytes, count) == static_cast<int>(count);
+                    },
+                    &file, static_cast<size_t>(file.fileSize())};
+  const bool ok = validator_.project(input, device_, page, output);
+  file.close();
+  return ok;
+}
+}  // namespace booksync::storage

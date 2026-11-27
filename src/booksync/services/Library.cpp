@@ -17,6 +17,8 @@ struct LocalState {
       {"/.booksync/home-layout.json", "/.booksync/home-layout.json.tmp", "/.booksync/home-layout.json.bak"},
       Layout::deviceClass()};
   bool layoutPending = true;
+  HomePage page{};
+  uint8_t wantedPage = 0;
   ReadModel model{index};
   DeviceIndex worker{index, model};
   SdIndexSource source;
@@ -24,7 +26,7 @@ struct LocalState {
   WindowBatchRequest pending{};
   storage::IndexRecord openRecord{};
   BookKey openKey{};
-  bool requested = true, rescan = false, resolveOpen = false, openReady = false;
+  bool requested = false, rescan = false, resolveOpen = false, openReady = false;
 };
 static_assert(sizeof(LocalState) <= 24 * 1024);
 // One fallible allocation per Home lifetime, <=24 KiB. These codec/window/history
@@ -35,6 +37,7 @@ class OfflineLibrary final : public Library {
  public:
   bool available = false;
   bool openRequested = false;
+  BookRow lastBook{};
   Capabilities capabilities() const override { return {true, true, false}; }
   Snapshot snapshot() const override {
     Snapshot value;
@@ -68,6 +71,19 @@ class OfflineLibrary final : public Library {
     local->openReady = false;
     return CommandStatus::Accepted;
   }
+  HomePage homePage() const override { return local ? local->page : HomePage{}; }
+  bool requestHomePage(uint8_t page) override {
+    if (!local) return false;
+    local->wantedPage = page;
+    local->layoutPending = true;
+    return true;
+  }
+  void readWindow(LibraryWindow& out) const override {
+    if (local)
+      local->model.copyWindow(out);
+    else
+      out = {};
+  }
   LibraryWindow window() const override { return local ? local->model.window() : LibraryWindow{}; }
   Subscription subscribe() const override { return local ? local->model.subscribe() : Subscription{}; }
   bool changed(Subscription value) const override { return local && local->model.changed(value); }
@@ -87,7 +103,16 @@ OfflineLibrary& shellLibrary() {
 }
 }  // namespace
 Library& offlineLibrary() { return shellLibrary(); }
-void publishHomeBook(bool available) {
+void publishHomeBook(bool available, const char* title) {
+  shellLibrary().lastBook = {};
+  if (title) {
+    auto& text = shellLibrary().lastBook.title;
+    size_t i = 0;
+    while (i + 1 < text.size() && title[i]) {
+      text[i] = title[i];
+      ++i;
+    }
+  }
   shellLibrary().available = available;
   shellLibrary().openRequested = false;
 }
@@ -112,8 +137,6 @@ void enterLocalLibrary() {
     local.reset();
     return;
   }
-  local->pending.windows[0] = {};
-  local->pending.count = 1;
   LOG_INF("BSI", "Local worker bounded allocation: %u bytes", unsigned(sizeof(LocalState)));
   // Warm entry reads a saved manifest/window only. Cold scans yield to input
   // after sixteen entries and stop before any reader/storage handoff.
@@ -131,7 +154,12 @@ void workLocalLibrary() {
   auto& state = *local;
   if (state.layoutPending) {
     state.layoutPending = false;
-    state.layout.load();  // Read-only recovery before F34 consumes a Library projection.
+    state.layout.load();
+    if (!state.layout.project(state.wantedPage, state.page)) {
+      LOG_ERR("BSL", "Cannot project selected Home page; retaining source and using default");
+      state.wantedPage = 0;
+      state.layout.projectDefault(state.page);
+    }
   }
   if (state.rescan) {
     state.rescan = false;
@@ -147,10 +175,11 @@ void workLocalLibrary() {
   if (scanning && !state.worker.tick()) state.source.close();
   if (scanning && !state.worker.busy()) {
     state.source.close();
-    state.requested = true;
+    state.requested = state.pending.count != 0;
   }
   if (state.requested) {
     state.requested = false;
+    state.model.setContinue(shellLibrary().lastBook, shellLibrary().available);
     if (state.model.materializeBatch(state.pending) && state.model.availability() == Availability::Ready &&
         state.history.start())
       state.model.beginHistory(state.history.source());
@@ -168,7 +197,7 @@ bool takeIndexedOpenRequest(std::string& path) {
 void invalidateLocalCapture() {
   if (local) {
     local->model.invalidate(Invalidation::Capture);
-    local->requested = true;
+    local->requested = local->pending.count != 0;
   }
 }
 }  // namespace booksync

@@ -327,3 +327,63 @@ TEST(Layout, SharedContractRetainsLongFiniteNumericTokens) {
   raw.replace(raw.find("\"revision\":1"), 12, "\"revision\":1." + std::string(2048, '0'));
   EXPECT_TRUE(valid(raw));
 }
+
+TEST(LayoutProjection, DefaultMatchesApprovedStarterAndDeviceOverrides) {
+  Layout parser;
+  HomePage page;
+  for (const char* device : {"x4", "x3"}) {
+    ASSERT_TRUE(parser.project(Layout::defaults(), device, 0, page));
+    ASSERT_EQ(page.count, 3);
+    EXPECT_EQ(page.widgets[0].kind, WidgetKind::Continue);
+    EXPECT_EQ(page.widgets[0].w, 2);
+    EXPECT_EQ(page.widgets[0].h, 2);
+    EXPECT_EQ(page.widgets[1].kind, WidgetKind::Shelf);
+    EXPECT_EQ(page.widgets[1].y, 2);
+    EXPECT_EQ(page.widgets[1].source, WindowSource::Recent);
+    EXPECT_EQ(page.widgets[2].kind, WidgetKind::Browse);
+    EXPECT_EQ(page.widgets[2].y, 4);
+    EXPECT_EQ(page.textOnly, std::string(device) == "x3");
+  }
+  EXPECT_FALSE(parser.project(Layout::defaults(), "x4", 1, page));
+}
+TEST(LayoutProjection, UnknownAndHiddenInstancesDoNotBecomeQueries) {
+  Layout parser;
+  HomePage page;
+  const auto raw = document();
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
+  EXPECT_EQ(page.count, 0);
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x3", 0, page));
+  EXPECT_EQ(page.count, 0);
+}
+TEST(LayoutProjection, ShelfSourcesRemainDistinctAndUnknownBytesRemainUnchanged) {
+  const char* sources[] = {"up-next", "want-to-read",       "recently-added", "unopened",
+                           "random",  "finished-this-year", "pick-back-up"};
+  const WindowSource expected[] = {WindowSource::UpNext,    WindowSource::WantToRead, WindowSource::Recent,
+                                   WindowSource::Unopened,  WindowSource::Random,     WindowSource::FinishedYear,
+                                   WindowSource::PickBackUp};
+  Layout parser;
+  HomePage page;
+  const auto defaults = Layout::defaults();
+  for (unsigned i = 0; i < 7; ++i) {
+    std::string raw(defaults.bytes, '\0');
+    ASSERT_TRUE(defaults.read(defaults.context, 0, raw.data(), raw.size()));
+    raw.replace(raw.find("\"src\":\"recent\""), 14, std::string("\"src\":\"") + sources[i] + "\"");
+    const auto before = raw;
+    ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page)) << raw;
+    EXPECT_EQ(page.widgets[1].source, expected[i]);
+    EXPECT_EQ(raw, before);
+  }
+}
+TEST(LayoutProjection, KeepsPageNameAndShelfPresentationOverride) {
+  const auto input = Layout::defaults();
+  std::string raw(input.bytes, '\0');
+  ASSERT_TRUE(input.read(input.context, 0, raw.data(), raw.size()));
+  raw.replace(raw.find("\"id\":\"home\""), 11, "\"id\":\"home\",\"name\":\"Reading\"");
+  raw.replace(raw.find("\"recent\":{\"y\":2}"), 16, "\"recent\":{\"y\":2,\"settings\":{\"style\":1}}");
+  Layout parser;
+  HomePage page;
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
+  EXPECT_STREQ(page.title.data(), "Reading");
+  EXPECT_EQ(page.widgets[1].style, 1);
+  EXPECT_EQ(page.widgets[1].source, WindowSource::Recent);
+}

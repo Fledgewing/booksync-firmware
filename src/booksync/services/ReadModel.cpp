@@ -19,7 +19,8 @@ bool ReadModel::accepts(const WindowBatchRequest& batch) {
   return rows <= batch.rows && Metadata + rows * sizeof(BookRow) <= batch.bytes;
 }
 bool ReadModel::materialize(WindowRequest request) {
-  WindowBatchRequest batch;  // Bounded descriptor below 256 bytes; no payload allocation.
+  WindowBatchRequest
+      batch;  // Bounded 264-byte metadata descriptor; avoids a heap allocation and carries no row payload.
   batch.windows[0] = request;
   batch.bytes = request.bytes;
   batch.count = 1;
@@ -47,6 +48,23 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
     span.total = index_.count();
     span.bytes = sizeof(WindowSpan);
     span.availability = window_.availability;
+    if (span.request.source == WindowSource::Continue) {
+      span.availability = Availability::Ready;
+      span.total = continueAvailable_ ? 1 : 0;
+      if (continueAvailable_) {
+        window_.rows[window_.count++] = continue_;
+        span.count = 1;
+        span.bytes += sizeof(BookRow);
+        window_.bytes += sizeof(BookRow);
+      }
+      continue;
+    }
+    if (span.request.source != WindowSource::OnDevice) {
+      span.availability =
+          span.request.source == WindowSource::Unknown ? Availability::Unsupported : Availability::NotSaved;
+      span.total = 0;
+      continue;
+    }
     for (uint32_t i = span.request.offset; i < index_.count() && span.count < span.request.limit; ++i) {
       window_.bytes += sizeof(BookRow);
       span.bytes += sizeof(BookRow);  // Failed decodes are charged too.
@@ -96,8 +114,19 @@ bool ReadModel::beginHistory(HistorySource source) {
   historyRevision_ = 0;
   reading_.fill({});
   for (unsigned i = 0; i < window_.count; ++i) {
-    if (!index_.read(window_.rows[i].key, record_)) return false;
     auto& value = reading_[i];
+    const auto& row = window_.rows[i];
+    if (row.key.provenance != index_.provenance()) {
+      // Continue may carry native state without an indexed identity. Preserve
+      // that published value; this index's history cannot replace its meaning.
+      value.page = row.page;
+      value.pages = row.pages;
+      value.seconds = row.seconds;
+      value.known = row.readingKnown;
+      value.statsKnown = row.statsKnown;
+      continue;
+    }
+    if (!index_.read(row.key, record_)) return false;
     value.hash = pathHash(record_.path.data());
     value.page = record_.page;
     value.pages = record_.pages;
@@ -153,6 +182,7 @@ bool ReadModel::historyTick(uint16_t allowance) {
     const auto hash = pathHash(visit.path);
     if (visit.revision > historyRevision_) historyRevision_ = visit.revision;
     for (unsigned i = 0; i < window_.count; ++i) {
+      if (window_.rows[i].key.provenance != historyProvenance_) continue;
       auto& value = reading_[i];
       if (value.hash != hash || (value.known && value.revision >= visit.revision)) continue;
       const auto& row = window_.rows[i];
