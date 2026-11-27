@@ -2,6 +2,8 @@
 
 ### Added
 
+- BookSync streams server catalog and manifest records with fixed memory bounds, rejects incomplete or revoked responses, and preserves the prior offline index after interrupted refreshes.
+
 - BookSync preserves shared Home layouts and device-class overrides across interrupted saves, retaining unknown widgets and damaged layouts while falling back safely.
 - BookSync allows one sync owner at a time, preserves offline work across owner changes, and checkpoints uncertain phase delivery for safe reconciliation; validated with a toy adapter only.
 - BookSync account workers isolate account, sync and acquisition logins, reject stale account epochs, erase captured secrets and clear account sessions locally on sign-out while preserving independently configured connector logins; adapters report unavailable permissions and attestation requirements explicitly.

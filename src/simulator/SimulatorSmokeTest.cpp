@@ -7,6 +7,7 @@
 #include "../../test/simulator/SyncOwnerScenario.h"
 #include "../../test/simulator/DeliveryScenario.h"
 #include "../../test/simulator/AccountScenario.h"
+#include "../../test/simulator/CatalogScenario.h"
 #include "../../test/simulator/DeviceIndexScenario.h"
 #include "../../test/simulator/LayoutScenario.h"
 #include "../../test/simulator/UpdateScenario.h"
@@ -12169,6 +12170,7 @@ void prepareSimulatorSmokeState() {
   runLifecycleJournalScenario();
   runDeliveryScenario();
   runAccountScenario();
+  runCatalogScenario();
   runDeviceIndexScenario();
   runLayoutScenario();
   runUpdateScenario();

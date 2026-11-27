@@ -13298,9 +13298,10 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication.",
       "includes": [
         "../../test/simulator/AccountScenario.h",
+        "../../test/simulator/CatalogScenario.h",
         "../../test/simulator/DeliveryScenario.h",
         "../../test/simulator/DeviceIndexScenario.h",
         "../../test/simulator/FilePublishScenario.h",
@@ -15184,6 +15185,22 @@
         "cstddef",
         "cstdint"
       ]
+    },
+    "src/booksync/server/bookorbit/Catalog.h": {
+      "role": "server",
+      "rationale": "F16 private streaming protocol translation with fixed parser scratch, no response tree; only neutral worker records leave the adapter."
+    },
+    "src/booksync/server/bookorbit/Catalog.cpp": {
+      "role": "server",
+      "rationale": "F16 private streaming protocol translation with fixed parser scratch, no response tree; only neutral worker records leave the adapter."
+    },
+    "src/booksync/services/CatalogSource.h": {
+      "role": "services",
+      "rationale": "F16 neutral bounded catalog cursor and explicit scoped binding bridge into F13; no protocol, transport, UI or invented file identity."
+    },
+    "src/booksync/services/CatalogSource.cpp": {
+      "role": "services",
+      "rationale": "F16 neutral bounded catalog cursor and explicit scoped binding bridge into F13; no protocol, transport, UI or invented file identity."
     }
   },
   "generators": {
