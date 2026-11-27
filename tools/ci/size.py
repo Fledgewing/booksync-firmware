@@ -12,7 +12,8 @@ import struct
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = Path(__file__).with_name('size.baseline.json')
-PIPELINE = ('microlink_init', 'wolfSSL_connect', 'booksync::reader::Bridge::open(',
+PIPELINE = ('booksync_positions_import_link',
+            'booksync::importer::ReadingPositions::retain(', 'microlink_init', 'wolfSSL_connect', 'booksync::reader::Bridge::open(',
             'booksync::reader::Capture::update(', 'booksync::storage::LifecycleJournal::recover(',
             'booksync::SyncOwner::activate()', 'booksync::SyncOwner::deactivate()', 'booksync::SyncOwner::step()',
             'booksync::CredentialCapture::capture(', 'booksync::Account::signIn(',

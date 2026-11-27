@@ -58,6 +58,10 @@ the proof even when they cannot fit F09's 20-byte native slot fields.
 
 ## Resource and verification contract
 
+The early full-link budget root keeps the dormant import graph in hardware
+images without invoking it or allocating its workspace. The size gate requires
+that root and the production retain method in every hardware ELF.
+
 One caller-owned workspace uses 8192 bytes plus one journal reference; allocate
 once outside the task stack. The importer owns no dynamic payload allocations, starts no tasks,
 and adds no resident workspace before F29 instantiates it. Existing HAL file

@@ -172,3 +172,16 @@ bool ReadingPositions::select(const PositionEvidence* primary, const PositionEvi
   return true;
 }
 }  // namespace booksync::importer
+
+// Budget-only root, deliberately absent from the runtime API and never called
+// by boot. Keep the complete read-only import graph in the early reserve gate.
+// All scratch/output storage is borrowed: linking this adds no resident buffer.
+extern "C" __attribute__((used, retain)) bool booksync_positions_import_link(
+    booksync::importer::ReadingPositions& worker, const char* path, booksync::importer::PositionFormat format,
+    const booksync::storage::SourceIdentity& source, booksync::importer::PositionStatus& status, uint64_t& id,
+    std::string_view envelope, booksync::importer::PositionEvidence& evidence, booksync::reader::LocatorView& locator,
+    booksync::reader::Sample& sample) {
+  using booksync::importer::ReadingPositions;
+  return worker.retain(path, format, source, status, id) == booksync::storage::JournalResult::Ok &&
+         ReadingPositions::decode(envelope, evidence) && ReadingPositions::select(&evidence, nullptr, locator, sample);
+}
