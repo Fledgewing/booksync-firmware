@@ -39,8 +39,8 @@ for name, files, expected in cases:
                                     capture_output=True, text=True, timeout=30)
             logs.append(f'{name}/{phase}\n{result.stdout}{result.stderr}')
             (out / 'file-publish.log').write_text('\n'.join(logs))
-            if result.returncode or 'BookSync publication scenario PASS' not in result.stdout:
-                raise SystemExit(f'publication scenario failed: {name}/{phase}')
+            if result.returncode or 'BookSync publication scenario PASS' not in result.stdout + result.stderr:
+                raise SystemExit(f'publication scenario failed: {name}/{phase} (exit {result.returncode}); see reports/{profile}/file-publish.log')
 (out / 'file-publish.json').write_text(json.dumps({'profile': profile, 'scenarios': len(cases),
     'boots': len(cases) * 4, 'result': 'PASS',
     'runtime_memory': '12-byte validation buffer; HAL handle allocation, no payload allocation; host metrics do not qualify hardware'}, indent=2) + '\n')
