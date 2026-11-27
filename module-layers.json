@@ -13146,9 +13146,10 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F05 retires native network scenarios and verifies local reader capture; F06 retains bounded publication/restart hooks after storage initialization, with no product UI dependency.",
+      "rationale": "F05 retires native network scenarios and verifies local reader capture; F06/F07 retain bounded publication and journal fault/restart hooks after storage initialization, with no product UI dependency.",
       "includes": [
         "../../test/simulator/FilePublishScenario.h",
+        "../../test/simulator/LifecycleJournalScenario.h",
         "AppVersion.h",
         "ArduinoJson.h",
         "AssetDownloadSmokeTest.h",
@@ -14554,6 +14555,14 @@
       "includes": [
         "cstddef"
       ]
+    },
+    "src/booksync/storage/LifecycleJournal.h": {
+      "role": "storage",
+      "rationale": "F07 worker-only bounded lifecycle envelopes, checkpoint/ack persistence and recovery over F06 HAL publication; no UI or transport edges."
+    },
+    "src/booksync/storage/LifecycleJournal.cpp": {
+      "role": "storage",
+      "rationale": "F07 worker-only bounded lifecycle envelopes, checkpoint/ack persistence and recovery over F06 HAL publication; no UI or transport edges."
     }
   },
   "generators": {

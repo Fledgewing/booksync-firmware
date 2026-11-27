@@ -257,3 +257,5 @@ add_subdirectory(host/reader_baseline)
 add_subdirectory(host/file_publish)
 add_test(NAME NativeWritersRetired
   COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/host/test_native_writers_retired.py)
+
+add_subdirectory(host/lifecycle_journal)

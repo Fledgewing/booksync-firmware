@@ -90,6 +90,11 @@ class HalFile {
     offset += size;
     return static_cast<int>(size);
   }
+  bool seekSet(size_t position) {
+    if (!card.event("seek") || position > fileSize()) return false;
+    offset = position;
+    return true;
+  }
   size_t fileSize() const { return card.files.at(path).size(); }
 };
 using FsFile = HalFile;
