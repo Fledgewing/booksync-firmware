@@ -2471,3 +2471,29 @@ data length without a full directory/catalog scan; individual reads validate
 record integrity before exposing values. Missing/truncated current data falls
 back to the complete backup. An interrupted inactive slot is never selected.
 Only the two data slots and the two complete manifests are retained.
+
+## BookSync match checkpoint (F18a)
+
+The lifecycle journal envelope remains version 2. Its opaque checkpoint gains
+an adapter-private `BSM1` format, published atomically with the Match phase ack.
+It does not change EPUB caches or native reader files. All integers below are
+unsigned little-endian; the complete checkpoint is at most 1024 bytes.
+
+| Offset | Bytes | Value |
+| --- | ---: | --- |
+| 0 | 4 | `BSM1` magic/version |
+| 4 | 16 | F08 canonical book UUID |
+| 20 | 16 | F08 edition UUID |
+| 36 | 32 | Exact captured file SHA-256 revision |
+| 68 | 8 | Private remote book identifier, positive signed-64-bit range |
+| 76 | 8 | Private remote file identifier, positive signed-64-bit range |
+| 84 | 1 | Position compatibility, 0 or 1 |
+| 85 | 32 | ASCII protocol partial-MD5 digest, never an F08 UUID/revision |
+| 117 | 2 | Length of preserved native checkpoint |
+| 119 | variable | Original native checkpoint bytes, unchanged |
+
+Adapter/account scope is inherited from the containing journal entry. No global
+identity merge or cross-edition locator conversion follows from this record.
+Unknown/truncated records fail decoding. Inputs leaving insufficient checkpoint
+capacity are retained without sending a request. Uncertain attempts keep the
+original checkpoint until reconciliation confirms the same scoped association.

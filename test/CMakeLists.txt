@@ -276,3 +276,5 @@ add_subdirectory(host/layout)
 add_subdirectory(host/account)
 add_subdirectory(host/update_verify)
 add_subdirectory(host/catalog)
+
+add_subdirectory(host/lifecycle_match)
