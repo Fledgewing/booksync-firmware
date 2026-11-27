@@ -12273,7 +12273,7 @@
     },
     "src/main.cpp": {
       "role": "retained-runtime",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F11: retain sleep intent until admitted workers drain and display storage is restored.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F11: retain sleep intent until admitted workers drain and display storage is restored. F26a invokes a simulator-only pre-loader import probe after mounting synthetic storage, before native settings/session migration can touch its fixtures.",
       "includes": [
         "AppCapabilities.h",
         "AppVersion.h",
@@ -13448,7 +13448,7 @@
     },
     "src/simulator/SimulatorSmokeTest.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover. F26a declares the simulator-only pre-loader import probe; normal runtime behavior is unchanged.",
       "includes": [
         "cstdint"
       ]

@@ -1576,6 +1576,9 @@ void setup() {
     activityManager.goToFullScreenMessage(StrId::STR_SD_START_ERROR, description);
     return;
   }
+#ifdef SIMULATOR
+  prepareSimulatorImportState();
+#endif
   if (!FilePublication::recoverAtBoot()) LOG_ERR("MAIN", "Interrupted SD transfer needs recovery");
   logBootHeap("storage ready");
   display.startBegin();

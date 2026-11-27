@@ -12166,6 +12166,8 @@ bool simulatorInterceptNetworkRestart(const uint32_t target, const uint32_t payl
   return true;
 }
 
+void prepareSimulatorImportState() { runSettingsImportScenario(); }
+
 // Every scenario except the release notes one starts with What's New already dismissed so it cannot cover Home.
 void prepareSimulatorSmokeState() {
   runFilePublishScenario();
@@ -12177,7 +12179,6 @@ void prepareSimulatorSmokeState() {
   runCatalogScenario();
   runDeviceIndexScenario();
   runLayoutScenario();
-  runSettingsImportScenario();
   runUpdateScenario();
   // Smoke tests and scripted-input harnesses (scripts/test_*.py) expect to drive Home directly.
   const bool harness = std::getenv("CROSSINK_SIMULATOR_SMOKE_TEST") || std::getenv("CROSSPOINT_SIM_INPUT_SCRIPT");
