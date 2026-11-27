@@ -268,3 +268,4 @@ add_test(NAME BookSyncHomeMapGuard COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/to
 
 add_subdirectory(host/reader_capture)
 add_subdirectory(host/delivery)
+add_subdirectory(host/device_index)

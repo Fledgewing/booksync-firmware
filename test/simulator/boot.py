@@ -72,4 +72,5 @@ subprocess.run([sys.executable, 'test/simulator/home.py', profile], cwd=root, en
 
 subprocess.run([sys.executable, "test/simulator/reader_capture.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/delivery.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/device_index.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

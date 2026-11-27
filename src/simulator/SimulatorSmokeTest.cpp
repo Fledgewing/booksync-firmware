@@ -5,6 +5,7 @@
 #include "../../test/simulator/FilePublishScenario.h"
 #include "../../test/simulator/LifecycleJournalScenario.h"
 #include "../../test/simulator/DeliveryScenario.h"
+#include "../../test/simulator/DeviceIndexScenario.h"
 
 #include <Epub.h>
 #include <Epub/WordSpacing.h>
@@ -12161,6 +12162,7 @@ void prepareSimulatorSmokeState() {
   runFilePublishScenario();
   runLifecycleJournalScenario();
   runDeliveryScenario();
+  runDeviceIndexScenario();
   // Smoke tests and scripted-input harnesses (scripts/test_*.py) expect to drive Home directly.
   const bool harness = std::getenv("CROSSINK_SIMULATOR_SMOKE_TEST") || std::getenv("CROSSPOINT_SIM_INPUT_SCRIPT");
   if (harness && !std::getenv("CROSSINK_SIMULATOR_SMOKE_RELEASE_NOTES"))

@@ -8,6 +8,7 @@
 #include "CrossPointState.h"
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
+#include "booksync/services/LocalLibrary.h"
 #include "booksync/services/OfflineLibrary.h"
 #include "booksync/ui/Home.h"
 #include "components/UITheme.h"
@@ -26,6 +27,7 @@ class ShellActivity final : public Activity {
   bool isHomeActivity() const override { return true; }
   void onEnter() override {
     Activity::onEnter();
+    enterLocalLibrary();
     bookPath = APP_STATE.openEpubPath;
     if (bookPath.empty()) {
       const auto& books = RECENT_BOOKS.getBooks();
@@ -36,10 +38,15 @@ class ShellActivity final : public Activity {
     requestUpdate();
   }
   void onExit() override {
+    leaveLocalLibrary();
     publishHomeBook(false);
     Activity::onExit();
   }
   void loop() override {
+    {
+      RenderLock lock(RenderLock::Mode::Try);
+      if (lock.ownsLock()) workLocalLibrary();
+    }
     int x = 0, y = 0;
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
@@ -47,6 +54,8 @@ class ShellActivity final : public Activity {
     const bool tapped = mappedInput.wasScreenTapped(x, y) && x >= safe.x && x < safe.x + safe.width && y >= rowTop &&
                         y < rowTop + renderer.getLineHeight(UI_12_FONT_ID) + 24;
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) || tapped) home.submit();
+    std::string indexedPath;
+    if (takeIndexedOpenRequest(indexedPath)) activityManager.goToReader(indexedPath);
     if (takeHomeOpenRequest()) activityManager.goToReader(bookPath);
   }
   void render(RenderLock&&) override {

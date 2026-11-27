@@ -2,6 +2,8 @@
 
 ### Added
 
+- BookSync streams the local SD catalog into recoverable generations and publishes bounded offline Library windows, with native reading capture provenance and invalidation.
+
 - BookSync locally journals reader opens, page/source anchors, native reading time and sessions, highlights and bookmarks without changing native saves or sending network requests.
 - BookSync presentation tickets settle once, reject stale account epochs, and retire without canceling durable work; reading stays quiet except for approved live position consent.
 

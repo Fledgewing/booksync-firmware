@@ -90,6 +90,11 @@ class HalFile {
     offset += size;
     return static_cast<int>(size);
   }
+  bool isDirectory() const { return false; }
+  HalFile openNextFile() { return {}; }
+  bool allocationFailed() const { return false; }
+  bool iterationFailed() const { return false; }
+  size_t getName(char*, size_t) { return 0; }
   bool seekSet(size_t position) {
     if (!card.event("seek") || position > fileSize()) return false;
     offset = position;
@@ -100,6 +105,7 @@ class HalFile {
 using FsFile = HalFile;
 class HalStorage {
  public:
+  bool mkdir(const char*) { return true; }
   bool exists(const char* path) { return card.files.count(path); }
   FsFile open(const char* path, int flags = O_RDONLY) {
     if (!card.event("open")) return {};

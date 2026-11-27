@@ -55,8 +55,13 @@ with tempfile.TemporaryDirectory(prefix='booksync-contract-') as temp:
     if not any('legacyNativeSync' in symbol for symbol in forbidden_symbols([hidden_obj])):
         raise SystemExit('Hidden writer rejection fixture did not expose a forbidden symbol')
     app = temp / 'offline-boot'
-    subprocess.run(common + ['-I' + str(ROOT / 'src'), str(ROOT / 'test/host/booksync_contract.cpp'),
+    # Service HAL fault stub throws on simulated power cuts; UI above retains -fno-exceptions.
+    subprocess.run(common + ['-fexceptions', '-Wno-unused-parameter', '-I' + str(ROOT / 'src'), '-I' + str(ROOT / 'test/host/file_publish/stubs'), '-I' + str(ROOT / 'lib/Memory'), str(ROOT / 'test/host/booksync_contract.cpp'),
                    str(ROOT / 'src/booksync/services/Library.cpp'),
+                   *[str(ROOT / ('src/booksync/' + source)) for source in (
+                       'services/DeviceIndex.cpp','services/ReadModel.cpp','services/SdIndexSource.cpp',
+                       'services/NativeHistory.cpp','storage/Index.cpp','storage/FilePublish.cpp',
+                       'storage/Identity.cpp','storage/LifecycleJournal.cpp','reader/Capture.cpp','reader/Locator.cpp')],
                    str(ROOT / 'src/booksync/server/bookorbit/Factory.cpp'), str(obj), '-o', str(app)], check=True)
     for boot in range(2):
         subprocess.run([str(app)], check=True)
