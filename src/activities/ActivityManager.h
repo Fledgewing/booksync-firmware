@@ -166,7 +166,6 @@ class ActivityManager {
   void goToHotspotFileTransfer(const std::string& returnBookPath = {});
   void goToUsbDrive();
   bool resumeFileTransferFromNetworkBoot(uint32_t payload);
-  void goToNearbyStatsSync();
   bool goToNearbyBookSend(std::string path, bool returnToReader);
   void goToNearbyBookReceive();
   void goToSettings(bool dismissOnUpSwipe = false, bool openLanguageDownloads = false,

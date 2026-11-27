@@ -55,9 +55,6 @@ class BookStatsActivity final : public Activity {
   bool showPreviousStatsPage();
   bool showNextStatsPage();
   bool selectEditFieldFromTouchTarget(int touchTarget);
-  // "This Device" totals sync from here; needs a configured sync account.
-  bool canSyncReadingStats() const;
-  void startSyncReadingStats();
 
  public:
   // The book these stats belong to, so date edits are queued for the next sync.

@@ -374,10 +374,6 @@ bool BookStatsActivity::selectEditFieldFromTouchTarget(const int touchTarget) {
   return true;
 }
 
-bool BookStatsActivity::canSyncReadingStats() const { return false; }
-
-void BookStatsActivity::startSyncReadingStats() {}
-
 void BookStatsActivity::loop() {
   if (InputReleaseGuard::consumeInitialRelease(mappedInput, MappedInputManager::Button::Back,
                                                ignoreInitialBackRelease) ||
@@ -396,13 +392,6 @@ void BookStatsActivity::loop() {
     }
     return;
   }
-  int syncTarget = -1;
-  const bool syncPage = usesNoRtcSingleScreenLayout() || page == Page::ThisDevice;
-  if (syncPage && canSyncReadingStats() && mappedInput.wasItemTapped(syncTarget) &&
-      syncTarget == BookStatsTouchTarget::SyncAll) {
-    startSyncReadingStats();
-    return;
-  }
 
   if (usesNoRtcSingleScreenLayout()) {
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
@@ -412,10 +401,7 @@ void BookStatsActivity::loop() {
     }
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
       mappedInput.suppressNextConfirmRelease();
-      if (canSyncReadingStats()) {
-        startSyncReadingStats();
-        return;
-      }
+
       exitStatsActivity();
       return;
     }
@@ -488,10 +474,7 @@ void BookStatsActivity::loop() {
       beginDateEditing();
       return;
     }
-    if (page == Page::ThisDevice && canSyncReadingStats()) {
-      startSyncReadingStats();
-      return;
-    }
+
     exitStatsActivity();
     return;
   }
@@ -539,7 +522,7 @@ void BookStatsActivity::render(RenderLock&&) {
   if (usesNoRtcSingleScreenLayout()) {
     renderNoRtcCombinedStatsPage(renderer, &mappedInput, bookTitle, stats, progressPercent, hasEstimatedTimeLeft,
                                  estimatedTimeLeftSeconds, globalStats,
-                                 showAllDevicesStats ? &allDevicesStats : nullptr, true, canSyncReadingStats());
+                                 showAllDevicesStats ? &allDevicesStats : nullptr, true, false);
     renderer.displayBuffer();
     return;
   }
@@ -551,7 +534,7 @@ void BookStatsActivity::render(RenderLock&&) {
       break;
     case Page::ThisDevice:
       renderGlobalStatsPage(renderer, &mappedInput, tr(STR_STATS_THIS_DEVICE_SCREEN), globalStats, true,
-                            showAllDevicesStats, &dailySummary, canSyncReadingStats());
+                            showAllDevicesStats, &dailySummary, false);
       break;
     case Page::AllDevices:
       renderGlobalStatsPage(renderer, &mappedInput, tr(STR_STATS_ALL_DEVICES_SCREEN), allDevicesStats, true, false);

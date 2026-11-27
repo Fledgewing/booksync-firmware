@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/test'))
 from boundary import code_only
 
-RETIRED = re.compile(r'\b(?:PluginCatalogActivity|KOReaderSyncClient|UsbProgressSync|KOReaderSyncActivity|KOReaderAuthActivity|KOReaderSettingsActivity|StatsUploadActivity|StatsUploadClient|ReadingSyncUpload|ClippingsUpload|NearbyStatsSyncActivity|NearbyBookPositionSyncActivity|startGlobalSyncProgress)\b|(?:pluginhttp::(?:request(?:ToFile)?|mintPasswordToken)|CrossPointWebServer::handleRelay)\b|pluginevents::(?:drain|pollOnline|deliverSleepEvents|wantsConnectAny)\b')
+RETIRED = re.compile(r'\b(?:goToNearbyStatsSync|canSyncReadingStats|startSyncReadingStats|PluginCatalogActivity|KOReaderSyncClient|UsbProgressSync|KOReaderSyncActivity|KOReaderAuthActivity|KOReaderSettingsActivity|StatsUploadActivity|StatsUploadClient|ReadingSyncUpload|ClippingsUpload|NearbyStatsSyncActivity|NearbyBookPositionSyncActivity|startGlobalSyncProgress)\b|(?:pluginhttp::(?:request(?:ToFile)?|mintPasswordToken)|CrossPointWebServer::handleRelay)\b|pluginevents::(?:drain|pollOnline|deliverSleepEvents|wantsConnectAny)\b')
 # Archived implementations stay inventoried for provenance and read-only format
 # extraction. They are excluded from EVERY firmware/simulator build, not macro gated.
 ARCHIVED = {

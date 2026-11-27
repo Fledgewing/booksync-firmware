@@ -1053,8 +1053,6 @@ bool ActivityManager::resumeFileTransferFromNetworkBoot(const uint32_t payload) 
   return true;
 }
 
-void ActivityManager::goToNearbyStatsSync() {}
-
 void ActivityManager::goToSettings(const bool dismissOnUpSwipe, const bool openLanguageDownloads,
                                    const bool touchscreenRecovery) {
   preferredHomeBookPath.clear();

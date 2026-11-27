@@ -193,7 +193,7 @@ void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) 
   isApMode = (mode == NetworkMode::CREATE_HOTSPOT);
 
   if (mode == NetworkMode::NEARBY_STATS_SYNC) {
-    activityManager.goToNearbyStatsSync();
+    exitToOrigin();
     return;
   }
   if (mode == NetworkMode::NEARBY_BOOK_RECEIVE) {
