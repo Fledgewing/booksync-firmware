@@ -3,6 +3,7 @@
 ### Added
 
 - BookSync locally journals reader opens, page/source anchors, native reading time and sessions, highlights and bookmarks without changing native saves or sending network requests.
+- BookSync presentation tickets settle once, reject stale account epochs, and retire without canceling durable work; reading stays quiet except for approved live position consent.
 
 - BookSync durable lifecycle journal preserves offline work and phase checkpoints across restarts, blocks unsafe writes at capacity, and never evicts unacknowledged entries.
 - BookSync separates canonical book identities from account-scoped aliases and preserves native EPUB/XTC anchors across reflow and reopen.

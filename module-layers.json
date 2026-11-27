@@ -13296,8 +13296,9 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior.",
       "includes": [
+        "../../test/simulator/DeliveryScenario.h",
         "../../test/simulator/FilePublishScenario.h",
         "../../test/simulator/LifecycleJournalScenario.h",
         "../../test/simulator/LocatorScenario.h",
@@ -14955,6 +14956,22 @@
         "string_view"
       ],
       "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk."
+    },
+    "src/booksync/services/Delivery.h": {
+      "role": "services",
+      "rationale": "F12 main-loop presentation policy and allocation-free one-shot delivery; public immutable ticket only, no UI, stores, protocol or transport."
+    },
+    "src/booksync/services/Delivery.cpp": {
+      "role": "services",
+      "rationale": "F12 main-loop presentation policy and allocation-free one-shot delivery; public immutable ticket only, no UI, stores, protocol or transport."
+    },
+    "src/booksync/system/ReadingGate.h": {
+      "role": "system",
+      "rationale": "F12 main-loop presentation policy and allocation-free one-shot delivery; public immutable ticket only, no UI, stores, protocol or transport."
+    },
+    "src/booksync/system/ReadingGate.cpp": {
+      "role": "system",
+      "rationale": "F12 main-loop presentation policy and allocation-free one-shot delivery; public immutable ticket only, no UI, stores, protocol or transport."
     }
   },
   "generators": {

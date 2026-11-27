@@ -4,6 +4,7 @@
 #include "booksync/reader/Locator.h"
 #include "../../test/simulator/FilePublishScenario.h"
 #include "../../test/simulator/LifecycleJournalScenario.h"
+#include "../../test/simulator/DeliveryScenario.h"
 
 #include <Epub.h>
 #include <Epub/WordSpacing.h>
@@ -12159,6 +12160,7 @@ bool simulatorInterceptNetworkRestart(const uint32_t target, const uint32_t payl
 void prepareSimulatorSmokeState() {
   runFilePublishScenario();
   runLifecycleJournalScenario();
+  runDeliveryScenario();
   // Smoke tests and scripted-input harnesses (scripts/test_*.py) expect to drive Home directly.
   const bool harness = std::getenv("CROSSINK_SIMULATOR_SMOKE_TEST") || std::getenv("CROSSPOINT_SIM_INPUT_SCRIPT");
   if (harness && !std::getenv("CROSSINK_SIMULATOR_SMOKE_RELEASE_NOTES"))
