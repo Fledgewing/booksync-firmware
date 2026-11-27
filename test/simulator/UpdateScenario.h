@@ -3,6 +3,7 @@
 #include <Logging.h>
 #include <openssl/sha.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -75,5 +76,6 @@ inline void runUpdateScenario() {
   expect(parser.complete() && !parser.release().firmwareSigned && !parser.release().booksyncVersion[0]);
   LOG_INF("SMOKE", "BookSync update scenario %s checks=%u parser=%u release=%u", ok ? "PASS" : "FAIL", checks,
           static_cast<unsigned>(sizeof(parser)), static_cast<unsigned>(sizeof(picked)));
-  std::exit(ok ? 0 : 1);
+  std::fflush(nullptr);
+  std::_Exit(ok ? 0 : 1);
 }
