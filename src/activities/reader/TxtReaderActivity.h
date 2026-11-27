@@ -12,12 +12,16 @@
 #include "ReaderButtonShortcuts.h"
 #include "ReaderProgressSaveDebouncer.h"
 #include "activities/Activity.h"
+#include "booksync/reader/Bridge.h"
 #include "components/OptionPopup.h"
 #if CROSSINK_APP_CAP_TOUCH
 #include "activities/reader/ReaderPinchGesture.h"
 #endif
 
 class TxtReaderActivity final : public Activity {
+  booksync::reader::Bridge booksyncCapture;
+  void observeBookSync(bool closed = false);
+
   PluginReaderEvents pluginEvents;
   ReaderUtils::DeferredGrayscalePlanes deferredGrayscalePlanes;
 #ifdef SIMULATOR

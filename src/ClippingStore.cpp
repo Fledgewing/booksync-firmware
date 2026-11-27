@@ -16,6 +16,7 @@
 #include <functional>
 #include <string_view>
 
+#include "activities/reader/NativeReaderObserver.h"
 #include "activities/reader/ReadingStatsUtils.h"
 #include "clippings/ClippingIdentity.h"
 #include "clippings/ClippingPreview.h"
@@ -983,6 +984,7 @@ bool ClippingStore::writeToFile(const Rewrite& rewrite) {
     if (rewrite.binding && needsSyncKey(clippings[i])) clippings[i].scoped = clippings[i].uploaded = true;
     clippings[i].syncKeyLength = newKeyLengths[i];
   }
+  native_reader_observer::published("highlights", bookFilePath, storeFilePath.c_str());
   return true;
 }
 

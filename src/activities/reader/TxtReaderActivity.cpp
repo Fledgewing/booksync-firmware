@@ -155,6 +155,7 @@ void TxtReaderActivity::onEnter() {
   mappedInput.setReaderMode(true);
 
   txt->setupCacheDir();
+  booksyncCapture.open(txt->getPath(), 3);
 
   // Save current txt as last opened file and add to recent books
   auto filePath = txt->getPath();
@@ -191,10 +192,13 @@ void TxtReaderActivity::onExit() {
   // Reset orientation back to portrait for the rest of the UI
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
+  observeBookSync(true);
+
   pageOffsets.clear();
   currentPageLines.clear();
   APP_STATE.readerActivityLoadCount = 0;
   APP_STATE.saveToFile();
+
   txt.reset();
 }
 
@@ -205,6 +209,7 @@ bool TxtReaderActivity::handleFrontlightPanelResult(const FrontlightPanelResult&
 }
 
 void TxtReaderActivity::loop() {
+  observeBookSync();
   pluginEvents.pollWhenIdle(getCurrentBookPath());
   if (quickActionsPopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
 #if CROSSINK_APP_CAP_TOUCH
@@ -1391,4 +1396,19 @@ void TxtReaderActivity::saveProgressBeforeRestart() {
   if (!(flushQueuedProgress())) {
     LOG_ERR("READER", "Failed to save progress before restart");
   }
+}
+
+void TxtReaderActivity::observeBookSync(bool closed) {
+  std::optional<RenderLock> lock;
+  if (!RenderLock::heldByCurrentTask()) {
+    lock.emplace(closed ? RenderLock::Mode::Blocking : RenderLock::Mode::Try);
+    if (!lock->ownsLock()) return;
+  }
+  if (!txt) return;
+  booksync::reader::Sample sample;
+  sample.page = currentPage;
+  sample.pages = pageOffsets.size();
+  sample.hasSourceOffset = currentPage >= 0 && static_cast<size_t>(currentPage) < pageOffsets.size();
+  if (sample.hasSourceOffset) sample.sourceOffset = pageOffsets[currentPage];
+  booksyncCapture.observe(sample, txt->getCachePath(), closed);
 }
