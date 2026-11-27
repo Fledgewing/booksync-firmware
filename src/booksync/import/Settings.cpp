@@ -371,7 +371,9 @@ Status Settings::readFile(Source source, storage::PublishPaths rawBackup) {
     return Status::IoError;
   }
   const auto input = fileInput(file);
-  auto result = retain(input, rawBackup);
+  // fileBytes uses SIZE_MAX as a sentinel when a 32-bit HAL cannot represent
+  // the full source length. Never fingerprint/copy a truncated length.
+  auto result = input.bytes == SIZE_MAX ? Status::Unsupported : retain(input, rawBackup);
   if (result == Status::Ready) result = decode(input);
   if (!file.close()) result = Status::IoError;
   if (result != Status::Ready && result != Status::Unresolved) candidate_ = false;
