@@ -3,7 +3,7 @@
 This is BookSync's owned firmware for Xteink e-readers, starting from CrossInk
 stable v2.0.0. This initial import changes no product behavior. BookSync's 0.12
 reader integration and product layer will be built here; the main BookSync
-repository pins this tree at `xteink/firmware` and owns CI and release coordination.
+repository pins this tree at `xteink/firmware` and owns release coordination.
 This repository has no independent product version or release clock.
 
 ## Provenance and updates
@@ -23,9 +23,14 @@ moving build input. Review dependencies and device budgets before updating the
 main BookSync repository's firmware pin. Do not open upstream PRs or issues or
 send patches upstream; own fixes here.
 
-Inherited GitHub workflows have been removed. Actions is disabled on this
-repository; CI runs in the main BookSync repository. This seed does not authorize
-releases or device installation.
+Inherited GitHub workflows have been removed. The sole workflow,
+[BookSync firmware checks](.github/workflows/check.yml), runs host tests, all six
+build profiles, isolated simulator smoke scenarios and the shared application
+reserve gate. Actions uses read-only tokens and a SHA-pinned action allowlist;
+there are no release, publish, schedule or tag triggers. The main BookSync
+repository rebuilds its immutable firmware pin and verifies the same size
+contract. See [the local harness](tools/ci/README.md). Test artifacts do not
+authorize releases or device installation.
 
 ## Licensing
 

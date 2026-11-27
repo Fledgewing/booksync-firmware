@@ -95,6 +95,10 @@ jobs:
             .pio/build/${{ matrix.environment }}/partitions.bin
             .pio/build/${{ matrix.environment }}/program
             reports/
+            BOOKSYNC.md
+            LICENSE
+            freeink-sdk/LICENSE
+            freeink-sdk/NOTICE
 
   check:
     name: BookSync firmware check
