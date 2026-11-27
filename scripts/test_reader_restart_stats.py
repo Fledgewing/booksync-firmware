@@ -38,7 +38,7 @@ bool BookReadingStats::save(const std::string&)const {
 bool saveToFile(const GlobalReadingStats& stats,const char*,const char*) {
   ++globalWrites; if(globalFails)return false; savedGlobal=stats; return true;
 }
-bool GlobalReadingStats::loadForUpload(GlobalReadingStats& out){out=savedGlobal;return true;}
+bool GlobalReadingStats::loadStored(GlobalReadingStats& out){out=savedGlobal;return true;}
 GlobalReadingStats GlobalReadingStats::load(){return savedGlobal;}
 uint32_t GlobalReadingStats::localResetRevision(){return 0;}
 struct RenderLock {

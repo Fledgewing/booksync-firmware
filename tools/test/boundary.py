@@ -80,8 +80,9 @@ def server_errors(name, source):
     errors = []
     if VENDOR.search(code) or VENDOR.search(name):
         errors.append(f'{name}: backend identifier or literal outside adapter/import')
-    # Retained native sync remains operational until F05; it is not the product
-    # adapter. Product code cannot call it or reuse its wire fields/routes.
+    # Archived native sync sources remain inventoried for format extraction.
+    # F05 excludes their writers from every build; product code cannot call them
+    # or reuse their wire fields/routes.
     if name.startswith('src/booksync/') and WIRE.search(code):
         errors.append(f'{name}: wire protocol outside adapter/import')
     return errors

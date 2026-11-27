@@ -19,7 +19,12 @@ boot = (ROOT / "src/main.cpp").read_text()
 
 def function(source, signature):
     start = source.index(signature)
-    return source[start:source.index("\n}", start) + 2]
+    brace = source.index('{', start)
+    depth, end = 1, brace + 1
+    while depth:
+        depth += (source[end] == '{') - (source[end] == '}')
+        end += 1
+    return source[start:end]
 
 
 route = function(manager, "bool ActivityManager::goToPlugins(")
@@ -37,7 +42,7 @@ harness = r'''
 #include "SilentRestart.h"
 #define LOG_ERR(...) ((void)0)
 std::vector<std::string> events;
-struct {} renderer;
+[[maybe_unused]] struct {} renderer;
 struct {
   void setReaderTouchscreenOverride(bool enabled) {
     assert(!enabled);
@@ -130,30 +135,11 @@ int main() {
   assert(!isNetworkBootTargetValue(0));
   assert(!isNetworkBootTargetValue(10));
   assert(!isNetworkBootTargetValue(UINT32_MAX));
-  assert(activityManager.goToPlugins());
-#ifndef SIMULATOR
-  // The outgoing Home/reader state must not coexist with catalog allocation.
-  assert(restarts == 1 && destination == NetworkBootTarget::PLUGINS);
-  assert(allocations == 0 && !activityManager.pending);
-#else
-  assert(restarts == 0 && allocations == 1 && activityManager.pending);
-#endif
-  allocations = restarts = 0;
-  activityManager.pending.reset();
-  // Execute main.cpp's actual resume case: it must bypass the restart guard.
-  assert(resume(NetworkBootTarget::PLUGINS));
-  assert(restarts == 0 && allocations == 1 && activityManager.pending);
-  activityManager.pending->onExit();
-#ifndef SIMULATOR
-  assert((events == std::vector<std::string>{"rows", "tls", "temp", "wifi", "home"}));
-#else
-  assert((events == std::vector<std::string>{"rows", "tls", "temp", "wifi", "fonts"}));
-#endif
-  activityManager.pending.reset();
-  failAllocation = true;
-  // Let setup's existing failure path return Home rather than retry forever.
+  // BookSync retires this product route for both fresh and resumed calls.
+  assert(!activityManager.goToPlugins());
+  assert(!activityManager.goToPlugins(true));
   assert(!resume(NetworkBootTarget::PLUGINS));
-  assert(restarts == 0 && !activityManager.pending);
+  assert(restarts == 0 && allocations == 0 && !activityManager.pending);
 
   // Asset downloads must restore normal boot even if Wi-Fi was cancelled or
   // setup failed before the catalog selection was ready.
@@ -184,4 +170,4 @@ with tempfile.TemporaryDirectory(prefix="crossink-plugin-boot-") as directory:
         subprocess.run(["c++", "-std=c++20", "-Wall", "-Wextra", "-Werror", *defines,
                         "-I", str(ROOT / "src"), str(source), "-o", str(executable)], check=True)
         subprocess.run([str(executable)], check=True)
-print("Plugins and asset-download boot resource restoration passed (hardware and simulator paths).")
+print("Retired plugin route and retained asset-download resource restoration passed (hardware and simulator paths).")

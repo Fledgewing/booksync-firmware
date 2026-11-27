@@ -34,7 +34,6 @@
 #endif
 #include "AssetDownloadActivity.h"
 #include "FrontlightTimePickerActivity.h"
-#include "KOReaderSettingsActivity.h"
 #include "KeyboardLayoutsActivity.h"
 #include "MappedInputManager.h"
 #include "OpdsServerListActivity.h"
@@ -48,7 +47,6 @@
 #include "SilentRestart.h"
 #include "StatusBarSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
-#include "activities/plugins/PluginCatalogActivity.h"
 #include "activities/reader/GlobalReadingStats.h"
 #include "activities/util/ConfirmationActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
@@ -1572,23 +1570,12 @@ void SettingsActivity::toggleCurrentSetting() {
         startActivityForResult(std::make_unique<StatusBarSettingsActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::KOReaderSync:
-        startActivityForResult(std::make_unique<KOReaderSettingsActivity>(renderer, mappedInput), resultHandler);
+
         break;
-      case SettingAction::Plugins: {
-        static constexpr StrId OPTIONS[] = {StrId::STR_ENABLED, StrId::STR_DISABLED, StrId::STR_CANCEL};
-        optionPopup.show(StrId::STR_PLUGINS, OPTIONS, 3, SETTINGS.pluginsEnabled ? 0 : 1, [this](const int idx) {
-          if (idx == 2) return;
-          SETTINGS.pluginsEnabled = idx == 0 ? 1 : 0;
-          pluginevents::refreshSubscriptions();
-          if (SETTINGS.pluginsEnabled) SETTINGS.pluginHubPromptHidden = 0;
-          SETTINGS.saveToFile();
-          rebuildSettingsLists();
-        });
-        requestUpdate();
-        return;
-      }
+      case SettingAction::Plugins:
+        break;
       case SettingAction::OPDSBrowser:
-        startActivityForResult(std::make_unique<OpdsServerListActivity>(renderer, mappedInput), resultHandler);
+
         break;
       case SettingAction::Network:
         startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput, false),

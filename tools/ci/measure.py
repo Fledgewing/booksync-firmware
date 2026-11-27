@@ -66,6 +66,9 @@ def main():
         result = subprocess.run([str(candidates[0]), *flags, str(build / 'firmware.elf')],
                                 check=True, capture_output=True, text=True)
         (out / name).write_text(result.stdout)
+    from retired_writers import check
+    nm = sorted((core / 'packages').glob(f'*/bin/{prefix}-nm'))[0]
+    check(build / 'firmware.elf', nm, build / 'firmware.map')
     receipt = {'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
                'submodules': subprocess.check_output(['git', 'submodule', 'status', '--recursive'], text=True).splitlines(),
                'inputs': {p: hashlib.sha256((root / p).read_bytes()).hexdigest() for p in

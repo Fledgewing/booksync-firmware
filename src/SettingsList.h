@@ -562,9 +562,11 @@ inline void appendShortcutOptions(SettingInfo& setting, const ShortcutOptionCata
     if (catalog == ShortcutOptionCatalog::HomeButton &&
         (action == CrossPointSettings::HOME_READER || action == CrossPointSettings::BACK_HOME))
       continue;
-    // Persist a saved stats shortcut even while tracking is disabled. The UI
-    // removes it in getSettingsList(); availability must not invalidate storage.
-    if (action != CrossPointSettings::READING_STATS && !QuickActions::isActionAvailable(static_cast<uint8_t>(action)))
+    // Keep saved stats and retired sync IDs readable. Presentation availability
+    // must not invalidate stored preferences; getSettingsList() hides them.
+    if (action != CrossPointSettings::READING_STATS && action != CrossPointSettings::SYNC_PROGRESS &&
+        action != CrossPointSettings::NEARBY_POSITION_SYNC &&
+        !QuickActions::isActionAvailable(static_cast<uint8_t>(action)))
       continue;
     const uint8_t rawValue = shortcutRawValue(catalog, action);
     if (rawValue == SHORTCUT_OPTION_UNAVAILABLE) continue;
@@ -616,9 +618,9 @@ inline SettingInfo buildSideButtonActionSetting(const StrId nameId, uint8_t Cros
 // UI consumers own their descriptors; persistence visits and releases each entry.
 // Counts include conditional publisher-font, touch and slide-switch entries.
 #if CROSSINK_SCALABLE_FONTS
-inline constexpr size_t BASE_SETTINGS_CAPACITY = 113 + (CROSSINK_APP_CAP_TOUCH ? 5 : 0);
+inline constexpr size_t BASE_SETTINGS_CAPACITY = 104 + (CROSSINK_APP_CAP_TOUCH ? 5 : 0);
 #else
-inline constexpr size_t BASE_SETTINGS_CAPACITY = 112 + (CROSSINK_APP_CAP_TOUCH ? 5 : 0);
+inline constexpr size_t BASE_SETTINGS_CAPACITY = 103 + (CROSSINK_APP_CAP_TOUCH ? 5 : 0);
 #endif
 
 #if FREEINK_DEVICE_PICCO
@@ -648,6 +650,23 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                                 const DictionaryRegistry* dictRegistry = nullptr) {
   std::vector<SettingInfo> v = getBaseSettingsList();
   // Availability controls the UI, never whether preferences survive a save.
+  for (auto& setting : v) {
+    ShortcutOptionCatalog catalog;
+    if (settingKeyIs(setting, "powerChordAction") || settingKeyIs(setting, "sideButtonChordAction")) {
+      catalog = ShortcutOptionCatalog::ButtonChord;
+    } else if (settingKeyIs(setting, "longPressMenuAction") || settingKeyIs(setting, "longPressBackAction")) {
+      catalog = ShortcutOptionCatalog::LongPress;
+    } else if (settingKeyIs(setting, "shortPwrBtn") || settingKeyIs(setting, "longPwrBtn") ||
+               settingKeyIs(setting, "homeButtonTapAction") || settingKeyIs(setting, "homeButtonDoubleTapAction") ||
+               settingKeyIs(setting, "homeButtonLongPressAction") || isSideButtonActionSetting(setting) ||
+               isFrontButtonActionSetting(setting)) {
+      catalog = ShortcutOptionCatalog::PowerButton;
+    } else {
+      continue;
+    }
+    removeEnumRawValue(setting, shortcutRawValue(catalog, CrossPointSettings::SYNC_PROGRESS));
+    removeEnumRawValue(setting, shortcutRawValue(catalog, CrossPointSettings::NEARBY_POSITION_SYNC));
+  }
   if (!QuickActions::supportsTiltPageTurn()) {
     v.erase(std::remove_if(v.begin(), v.end(), isTiltPageTurnSetting), v.end());
     for (auto& setting : v) {
@@ -1137,9 +1156,6 @@ inline std::vector<SettingInfo> buildSystemSettingsParentList(const std::vector<
   systemSettings.push_back(SettingInfo::Submenu(StrId::STR_READING_STATS, SettingAction::SystemReadingStats));
   systemSettings.push_back(SettingInfo::Submenu(StrId::STR_SYSTEM_ADVANCED, SettingAction::SystemAdvanced));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
-  systemSettings.push_back(SettingInfo::Action(StrId::STR_SYNC_SERVER, SettingAction::KOReaderSync));
-  systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_SERVERS, SettingAction::OPDSBrowser));
-  systemSettings.push_back(SettingInfo::Action(StrId::STR_PLUGINS, SettingAction::Plugins));
 #if !FREEINK_DEVICE_PICCO
   // Picco retains the vendor recovery slot and has no spare application slot.
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CHECK_UPDATES, SettingAction::CheckForUpdates));

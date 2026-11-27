@@ -40,7 +40,7 @@ bool BookReadingStats::save(const std::string&)const {
   storage(); if(failCheckpoint)return false; savedBook=*this;return true;
 }
 bool GlobalReadingStats::save()const {storage();savedGlobal=*this;return true;}
-bool GlobalReadingStats::loadForUpload(GlobalReadingStats& s){s=savedGlobal;return true;}
+bool GlobalReadingStats::loadStored(GlobalReadingStats& s){s=savedGlobal;return true;}
 GlobalReadingStats GlobalReadingStats::load(){return savedGlobal;}
 uint32_t GlobalReadingStats::localResetRevision(){return 0;}
 struct IntervalSink {

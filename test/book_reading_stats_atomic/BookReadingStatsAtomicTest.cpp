@@ -113,7 +113,7 @@ TEST_F(BookReadingStatsAtomicTest, ResetPublishesEmptySnapshotAndClearsTemporary
 
   EXPECT_TRUE(BookReadingStats::remove(CACHE_PATH));
   BookReadingStats reset;
-  EXPECT_TRUE(BookReadingStats::loadForUpload(CACHE_PATH, reset));
+  EXPECT_TRUE(BookReadingStats::loadStored(CACHE_PATH, reset));
   EXPECT_EQ(reset.totalReadingSeconds, 0u);
   EXPECT_FALSE(Storage.exists((statsPath + ".tmp").c_str()));
 }
@@ -148,14 +148,14 @@ TEST_F(BookReadingStatsAtomicTest, FailedFallbackRemovalKeepsCanonicalStats) {
 
 TEST_F(BookReadingStatsAtomicTest, UploadRejectsMissingTruncatedAndNewerSnapshots) {
   BookReadingStats snapshot;
-  EXPECT_FALSE(BookReadingStats::loadForUpload(CACHE_PATH, snapshot));
+  EXPECT_FALSE(BookReadingStats::loadStored(CACHE_PATH, snapshot));
   FsFile file;
   ASSERT_TRUE(Storage.openFileForWrite("TEST", statsPath, file));
   ASSERT_EQ(file.write(static_cast<uint8_t>(5)), 1U);
   file.close();
-  EXPECT_FALSE(BookReadingStats::loadForUpload(CACHE_PATH, snapshot));
+  EXPECT_FALSE(BookReadingStats::loadStored(CACHE_PATH, snapshot));
   ASSERT_TRUE(statsWithSeconds(123).save(CACHE_PATH));
-  ASSERT_TRUE(BookReadingStats::loadForUpload(CACHE_PATH, snapshot));
+  ASSERT_TRUE(BookReadingStats::loadStored(CACHE_PATH, snapshot));
   EXPECT_EQ(snapshot.totalReadingSeconds, 123U);
   // Oversized future payload must not be accepted merely because its first
   // 75 bytes look like the current format.
@@ -164,13 +164,13 @@ TEST_F(BookReadingStatsAtomicTest, UploadRejectsMissingTruncatedAndNewerSnapshot
   oversized[0] = 7;
   file.write(oversized, sizeof(oversized));
   file.close();
-  EXPECT_FALSE(BookReadingStats::loadForUpload(CACHE_PATH, snapshot));
+  EXPECT_FALSE(BookReadingStats::loadStored(CACHE_PATH, snapshot));
 }
 
 TEST_F(BookReadingStatsAtomicTest, UploadAcceptsAnExplicitlySavedEmptySnapshot) {
   ASSERT_TRUE(BookReadingStats{}.save(CACHE_PATH));
   BookReadingStats snapshot;
-  EXPECT_TRUE(BookReadingStats::loadForUpload(CACHE_PATH, snapshot));
+  EXPECT_TRUE(BookReadingStats::loadStored(CACHE_PATH, snapshot));
   EXPECT_EQ(snapshot.totalReadingSeconds, 0U);
 }
 
@@ -329,7 +329,7 @@ TEST_F(BookReadingStatsAtomicTest, ResetRemovesAllSupportedFallbacksAndTransacti
   }
   EXPECT_TRUE(BookReadingStats::remove(CACHE_PATH));
   BookReadingStats stats;
-  EXPECT_TRUE(BookReadingStats::loadForUpload(CACHE_PATH, stats));
+  EXPECT_TRUE(BookReadingStats::loadStored(CACHE_PATH, stats));
   EXPECT_EQ(stats.totalReadingSeconds, 0u);
   EXPECT_FALSE(BookReadingStats::peekCompleted(CACHE_PATH));
 }
@@ -338,7 +338,7 @@ TEST_F(BookReadingStatsAtomicTest, RejectsInvalidFraction) {
   BookReadingStats stats;
   stats.paceFractionMillis = 1000;
   ASSERT_TRUE(stats.save(CACHE_PATH));
-  EXPECT_FALSE(BookReadingStats::loadForUpload(CACHE_PATH, stats));
+  EXPECT_FALSE(BookReadingStats::loadStored(CACHE_PATH, stats));
   EXPECT_FALSE(BookReadingStats::peekCompleted(CACHE_PATH));
 }
 

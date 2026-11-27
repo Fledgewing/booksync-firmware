@@ -35,7 +35,7 @@ struct BookReadingStats {
   static bool peekCompleted(const std::string& cachePath);
 
   // Checked export: false for missing, malformed, or unsupported snapshots.
-  static bool loadForUpload(const std::string& cachePath, BookReadingStats& stats);
+  static bool loadStored(const std::string& cachePath, BookReadingStats& stats);
 
   // Alternates checksum-checked device-qualified stats_v7 files and .bak snapshots in place.
   // Returns false if the new snapshot could not be saved.

@@ -166,7 +166,6 @@ class CrossPointWebServer {
   bool rejectIfPluginsDisabled() const;
   void handlePluginList() const;  // GET  /api/plugins   -> discovered plugins
   void handlePluginFile() const;  // GET  /plugin?name&file -> serve SD file
-  void handleRelay();             // POST /api/relay     -> device makes an HTTP(S) call
   void handleCrypto();            // POST /api/crypto    -> generic crypto primitive (base64 I/O)
   void handleFetch();             // POST /api/fetch     -> device downloads a URL to SD
   void handleBookKey();           // POST /api/book-key  -> store a protected book's wrapped content key

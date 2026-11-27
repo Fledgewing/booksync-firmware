@@ -12,6 +12,7 @@ root = Path(__file__).resolve().parents[2]
 profile = sys.argv[1]
 if profile not in ('x4-pro-simulator', 'x4-classic-simulator', 'simulator-X3'):
     raise SystemExit('unrecognized simulator profile')
+subprocess.run([sys.executable, 'tools/ci/retired_writers.py', str(root / '.pio/build' / profile / 'program')], cwd=root, check=True)
 out = root / 'reports' / profile
 out.mkdir(parents=True, exist_ok=True)
 env = os.environ.copy()
@@ -62,4 +63,5 @@ for scenario in ('reading', 'sleep', 'bookmarks', 'typography'):
     if case.returncode:
         raise SystemExit(case.returncode)
 subprocess.run([sys.executable, 'test/simulator/file_publish.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/native_writers_retired.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

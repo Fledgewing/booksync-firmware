@@ -519,15 +519,21 @@ def run_smoke(args: argparse.Namespace) -> int:
             env.setdefault("SDL_VIDEODRIVER", "dummy")
 
         print(f"Running simulator smoke test with isolated fs_: {temp_root / 'fs_'}", flush=True)
-        proc = subprocess.run(
-            [str(program)],
-            cwd=temp_root,
-            env=env,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            timeout=args.timeout if args.timeout is not None else (300 if args.asset_downloads or args.frontlight_layout else 180 if args.about or args.support_export or args.filename_font_family else 120),
-        )
+        try:
+            proc = subprocess.run(
+                [str(program)],
+                cwd=temp_root,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=args.timeout if args.timeout is not None else (300 if args.asset_downloads or args.frontlight_layout else 180 if args.about or args.support_export or args.filename_font_family else 120),
+            )
+        except subprocess.TimeoutExpired as error:
+            partial = error.stdout or b""
+            print(partial.decode(errors="replace") if isinstance(partial, bytes) else partial, end="", flush=True)
+            print("Simulator smoke test timed out", file=sys.stderr)
+            return 2
 
         if factory_flash and factory_flash.read_bytes() != b"\xa5" * 0x14000:
             raise AssertionError("Factory partition was modified")

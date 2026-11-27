@@ -6,11 +6,9 @@
 #include "EpubReaderMenuModel.h"
 #include "FilenameFontSystem.h"
 #include "MappedInputManager.h"
-#include "activities/network/StatsUploadActivity.h"
 #include "activities/util/ConfirmationActivity.h"
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
-#include "network/ReadingSyncUpload.h"
 #include "sync/BookSyncFile.h"
 #include "sync/SyncPending.h"
 #include "util/InputReleaseGuard.h"
@@ -376,40 +374,6 @@ bool BookStatsActivity::selectEditFieldFromTouchTarget(const int touchTarget) {
   return true;
 }
 
-bool BookStatsActivity::canSyncReadingStats() const { return ReadingSyncUpload::canSyncReadingStats(); }
-
-void BookStatsActivity::startSyncReadingStats() {
-  // Ask here so Cancel returns to these stats instead of an already-closed reader.
-  auto confirm = makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_SYNC_READING_STATS),
-                                                         tr(STR_SYNC_READING_STATS_CONFIRM), true);
-  if (!confirm) {
-    LOG_ERR("BookStats", "Cannot allocate Sync Reading Stats confirmation");
-    return;
-  }
-  startActivityForResult(std::move(confirm), [this](const ActivityResult& result) {
-    if (result.isCancelled) {
-      requestUpdate();
-      return;
-    }
-    auto sync = makeUniqueNoThrow<StatsUploadActivity>(renderer, mappedInput, std::string{},
-                                                       StatsUploadActivity::Scope::ReadingStats, true);
-    if (!sync) {
-      LOG_ERR("BookStats", "Cannot allocate Sync Reading Stats activity");
-      requestUpdate();
-      return;
-    }
-    // Only a reader underneath is a screen to come back to; Home is the default anyway.
-    if (activityManager.isReaderActivity())
-      sync->setReturnToBook(activityManager.getCurrentBookPath(),
-                            static_cast<uint8_t>(EpubReaderMenuAction::READING_STATS));
-    saveStats();
-    // Close normally first: the parent (often the reader) imports these stats
-    // edits in its result handler before the sync replaces the stack.
-    activityManager.replaceAfterReturn(std::move(sync));
-    finish();
-  });
-}
-
 void BookStatsActivity::loop() {
   if (InputReleaseGuard::consumeInitialRelease(mappedInput, MappedInputManager::Button::Back,
                                                ignoreInitialBackRelease) ||
@@ -428,13 +392,6 @@ void BookStatsActivity::loop() {
     }
     return;
   }
-  int syncTarget = -1;
-  const bool syncPage = usesNoRtcSingleScreenLayout() || page == Page::ThisDevice;
-  if (syncPage && canSyncReadingStats() && mappedInput.wasItemTapped(syncTarget) &&
-      syncTarget == BookStatsTouchTarget::SyncAll) {
-    startSyncReadingStats();
-    return;
-  }
 
   if (usesNoRtcSingleScreenLayout()) {
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
@@ -444,10 +401,7 @@ void BookStatsActivity::loop() {
     }
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
       mappedInput.suppressNextConfirmRelease();
-      if (canSyncReadingStats()) {
-        startSyncReadingStats();
-        return;
-      }
+
       exitStatsActivity();
       return;
     }
@@ -520,10 +474,7 @@ void BookStatsActivity::loop() {
       beginDateEditing();
       return;
     }
-    if (page == Page::ThisDevice && canSyncReadingStats()) {
-      startSyncReadingStats();
-      return;
-    }
+
     exitStatsActivity();
     return;
   }
@@ -571,7 +522,7 @@ void BookStatsActivity::render(RenderLock&&) {
   if (usesNoRtcSingleScreenLayout()) {
     renderNoRtcCombinedStatsPage(renderer, &mappedInput, bookTitle, stats, progressPercent, hasEstimatedTimeLeft,
                                  estimatedTimeLeftSeconds, globalStats,
-                                 showAllDevicesStats ? &allDevicesStats : nullptr, true, canSyncReadingStats());
+                                 showAllDevicesStats ? &allDevicesStats : nullptr, true, false);
     renderer.displayBuffer();
     return;
   }
@@ -583,7 +534,7 @@ void BookStatsActivity::render(RenderLock&&) {
       break;
     case Page::ThisDevice:
       renderGlobalStatsPage(renderer, &mappedInput, tr(STR_STATS_THIS_DEVICE_SCREEN), globalStats, true,
-                            showAllDevicesStats, &dailySummary, canSyncReadingStats());
+                            showAllDevicesStats, &dailySummary, false);
       break;
     case Page::AllDevices:
       renderGlobalStatsPage(renderer, &mappedInput, tr(STR_STATS_ALL_DEVICES_SCREEN), allDevicesStats, true, false);

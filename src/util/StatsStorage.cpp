@@ -2,8 +2,8 @@
 
 #include <FsHelpers.h>
 #include <HalStorage.h>
-#include <KOReaderSyncClient.h>
 #include <Logging.h>
+#include <StatsIdentity.h>
 #include <strings.h>
 
 #include <algorithm>
@@ -104,7 +104,7 @@ static bool familyExists(const std::string& path, bool directory) {
 
 static std::string resolvePath(const std::string& legacyPath, bool directory, bool readOnly, bool* splitRecovery) {
   char id[32]{};
-  if (!KOReaderSyncClient::readerId(id, sizeof(id)) || !validId(id)) {
+  if (!StatsIdentity::readerId(id, sizeof(id)) || !validId(id)) {
     LOG_ERR("StatsOrigin", "Cannot read device identity");
     return {};
   }

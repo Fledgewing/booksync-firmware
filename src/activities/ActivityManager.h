@@ -84,7 +84,7 @@ class ActivityManager {
   void exitActivity(const RenderLock& lock);
   // Apply navigation and render requests without polling the outgoing activity.
   void processPendingActivities();
-  bool prepareSleepPlugins(bool quickResume, bool fromReaderOrHome);
+  void captureSleepEvents();
 
   // Pending activity to be launched on next loop iteration
   std::unique_ptr<Activity> pendingActivity;
@@ -166,7 +166,6 @@ class ActivityManager {
   void goToHotspotFileTransfer(const std::string& returnBookPath = {});
   void goToUsbDrive();
   bool resumeFileTransferFromNetworkBoot(uint32_t payload);
-  void goToNearbyStatsSync();
   bool goToNearbyBookSend(std::string path, bool returnToReader);
   void goToNearbyBookReceive();
   void goToSettings(bool dismissOnUpSwipe = false, bool openLanguageDownloads = false,

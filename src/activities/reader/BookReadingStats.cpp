@@ -261,11 +261,11 @@ bool BookReadingStats::peekCompleted(const std::string& cachePath) {
 
 BookReadingStats BookReadingStats::load(const std::string& cachePath) {
   BookReadingStats stats;
-  if (!loadForUpload(cachePath, stats)) stats.counterId = StatsCounterId::create();
+  if (!loadStored(cachePath, stats)) stats.counterId = StatsCounterId::create();
   return stats;
 }
 
-bool BookReadingStats::loadForUpload(const std::string& cachePath, BookReadingStats& stats) {
+bool BookReadingStats::loadStored(const std::string& cachePath, BookReadingStats& stats) {
   stats = {};
   FsFile f;
   if (!openStatsFileForRead(cachePath, f)) {

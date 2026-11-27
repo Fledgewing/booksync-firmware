@@ -43,3 +43,10 @@ On hardware, the maintainer should sideload the matching test image on X4 Pro,
 X4 Classic and X3/C3 X4, open a local EPUB offline, turn pages, return Home and
 resume. Expect unchanged native reading and saved position. F02 changes no cache
 format and needs no cache reset. No release or device acceptance is implied.
+
+F05 adds `retired_writers.py` to hardware measurements and simulator startup.
+It rejects native writer symbols and archived map objects. The simulator suite
+also runs `native_writers_retired.py` with an audited fake socket/DNS transport,
+legacy account flags and delivery subscriptions enabled. Four positive probes
+prove interception; the reader must save progress, stats and local event capture
+with zero requests. See `docs/booksync/F05.md` for scope and hardware verification.

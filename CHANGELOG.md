@@ -8,6 +8,10 @@
 - BookSync synthetic legacy SD/NVS fixtures and preserved-reader host/simulator regression baselines for migration work.
 - BookSync firmware boundary guards, a complete source-role inventory, and offline Library/adapter contracts for the upcoming owned interface. Reader behavior remains unchanged.
 
+### Changed
+
+- BookSync retires native account/sync settings, progress/stats/clipping uploads, plugin event delivery and sleep-time networking. Local reader saves and capture, Wi-Fi and ordinary USB file transfer remain available.
+
 ## [v2.0.0] - 2026-11-24
 
 ### Added

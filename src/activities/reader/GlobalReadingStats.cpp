@@ -297,7 +297,7 @@ static StatsLoadOutcome loadFromFile(const char* path, GlobalReadingStats& out, 
   return outcome;
 }
 
-bool GlobalReadingStats::loadForUpload(GlobalReadingStats& stats) {
+bool GlobalReadingStats::loadStored(GlobalReadingStats& stats) {
   stats = {};
   if (s_blockDestructiveSave) return false;
   const std::string path = StatsStorage::localPath(GLOBAL_STATS_PATH);
@@ -315,7 +315,7 @@ bool GlobalReadingStats::loadForUpload(GlobalReadingStats& stats) {
 
 bool GlobalReadingStats::exportLocal(uint8_t* data, size_t capacity) {
   GlobalReadingStats stats;
-  if (!data || capacity < CURRENT_FILE_SIZE || !loadForUpload(stats)) return false;
+  if (!data || capacity < CURRENT_FILE_SIZE || !loadStored(stats)) return false;
   serializeStats(stats, data);
   return true;
 }
