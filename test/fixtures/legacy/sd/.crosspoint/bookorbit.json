@@ -1,0 +1,12 @@
+{
+  "cfClientId": "synthetic-access",
+  "cfClientSecret_obf": "QVBWMU9QNUBzeW51amV0aWMsY2NjZXNyL3NlY3Jkdg==",
+  "downloadFolder": "/Books",
+  "homeShelfBottom": "1::",
+  "homeShelfTop": "0::",
+  "password_obf": "QVBWMaRjngFzeW51amV0aWMscXluYy1yZ2NyZXQ=",
+  "serverUrl": "",
+  "syncBehavior": 1,
+  "syncOnSleep": true,
+  "username": "synthetic-account"
+}

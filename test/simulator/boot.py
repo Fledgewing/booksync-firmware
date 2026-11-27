@@ -42,4 +42,23 @@ print(result.stderr, end='', file=sys.stderr)
     'runtime_heap': 'native host values are not hardware acceptance'}, indent=2) + '\n')
 if result.returncode == 0 and not list((out / 'captures').glob('*.pgm')):
     raise SystemExit('simulator did not retain baseline frames')
-raise SystemExit(result.returncode)
+if result.returncode:
+    raise SystemExit(result.returncode)
+
+# F03 retains the cold-start contract above, then checks private legacy sidecars
+# alongside the reader's own fixtures. Each scenario runs once; failures stop CI.
+for scenario in ('reading', 'sleep', 'bookmarks', 'typography'):
+    started = time.monotonic()
+    case = subprocess.run([sys.executable, 'test/simulator/reader_baseline.py',
+                           '--env', profile, '--scenario', scenario, '--no-build'],
+                          cwd=root, env=env, capture_output=True, text=True, timeout=180)
+    (out / f'legacy-{scenario}.log').write_text(case.stdout + case.stderr)
+    print(case.stdout, end='')
+    print(case.stderr, end='', file=sys.stderr)
+    (out / f'legacy-{scenario}.json').write_text(json.dumps({
+        'profile': profile, 'scenario': scenario, 'exit_code': case.returncode,
+        'seconds': round(time.monotonic() - started, 3),
+        'simulator_commit': actual_pin}, indent=2) + '\n')
+    if case.returncode:
+        raise SystemExit(case.returncode)
+raise SystemExit(0)

@@ -1,0 +1,12 @@
+{
+  "battery": true,
+  "corner": 2,
+  "from": "up_next",
+  "hours": 6,
+  "leaveScopes": "scope:17",
+  "leaveTags": "synthetic-tag",
+  "pick": true,
+  "style": 1,
+  "text": "Synthetic sleep",
+  "textPos": 0
+}

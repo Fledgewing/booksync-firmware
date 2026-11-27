@@ -1,0 +1,35 @@
+{
+  "absent": [
+    {
+      "key": "ctl_cache",
+      "namespace": "microlink",
+      "reason": "control cache intentionally absent; includes peer addressing",
+      "type": "blob"
+    },
+    {
+      "key": "tbl",
+      "namespace": "ml_peers",
+      "reason": "peer table intentionally absent; includes peer addressing",
+      "type": "blob"
+    },
+    {
+      "key": "settings",
+      "namespace": "ml_config",
+      "reason": "not used by Tailnet shim",
+      "type": "blob"
+    },
+    {
+      "key": "peers",
+      "namespace": "ml_config",
+      "reason": "not used by Tailnet shim",
+      "type": "blob"
+    },
+    {
+      "key": "wifi_list",
+      "namespace": "ml_config",
+      "reason": "not used by Tailnet shim",
+      "type": "blob"
+    }
+  ],
+  "schema": 1
+}

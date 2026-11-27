@@ -250,3 +250,6 @@ add_subdirectory(xtc_parser)
 
 add_test(NAME EegoPanelIdleRegression
   COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/scripts/test_eego_panel_idle.py)
+
+# BookSync synthetic legacy corpus and retained production reader baseline.
+add_subdirectory(host/reader_baseline)

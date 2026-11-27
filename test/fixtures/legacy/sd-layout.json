@@ -1,0 +1,17 @@
+{
+  "absent_book": "payload intentionally absent: synthetic identity, not an EPUB content hash",
+  "book_path": "/Books/Synthetic.epub",
+  "content_id": "0123456789abcdef0123456789abcdef",
+  "path_cache": "/.crosspoint/epub_305419896/",
+  "reader_id": "crossink-020000000001",
+  "required_directories": [
+    "/Books",
+    "/Read",
+    "/fonts",
+    "/sleep",
+    "/.crosspoint",
+    "/.crosspoint/clippings",
+    "/.crosspoint/bookmarks",
+    "/.crosspoint/orbify/walk"
+  ]
+}
