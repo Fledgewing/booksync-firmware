@@ -1,0 +1,9 @@
+{
+  "app_slot_bytes": 6553600,
+  "minimum_free_bytes": 131072,
+  "devices": {
+    "x4-pro": "X4 Pro",
+    "x4-classic": "X4 Classic",
+    "default": "X3 / C3 X4"
+  }
+}

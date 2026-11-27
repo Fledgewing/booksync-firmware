@@ -1,0 +1,108 @@
+name: BookSync firmware checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Check out shared BookSync CI inputs from PR 200
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Fledgewing/Orbify
+          ref: d457a19b805eaa8099f42a8b11a475da28e602d7
+          path: .ci-booksync
+          persist-credentials: false
+          sparse-checkout: tools/firmware
+      - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libexpat1-dev libssl-dev zlib1g-dev
+      - run: python3 tools/ci/check_shared.py .ci-booksync
+      - run: python3 tools/ci/host.py 2>&1 | tee host.log
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: host-evidence
+          if-no-files-found: error
+          path: |
+            host.log
+            build/host/Testing/
+
+  build:
+    name: build (${{ matrix.environment }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [x4-pro, x4-classic, default, x4-pro-simulator, x4-classic-simulator, simulator-X3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: ./.github/actions/setup-platformio
+        with:
+          cache-scope: ${{ matrix.environment }}
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libsdl2-dev libssl-dev libwolfssl-dev pkg-config
+      - name: Build one profile
+        env:
+          BUILD_ENV: ${{ matrix.environment }}
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          pio run -j 2 -e "$BUILD_ENV" 2>&1 | tee "reports/$BUILD_ENV.log"
+      - name: Measure application and static sections
+        if: matrix.environment == 'x4-pro' || matrix.environment == 'x4-classic' || matrix.environment == 'default'
+        env:
+          BUILD_ENV: ${{ matrix.environment }}
+        run: |
+          python3 tools/ci/measure.py "$BUILD_ENV"
+          cat "reports/$BUILD_ENV/size.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Run isolated simulator scenarios
+        if: contains(matrix.environment, 'simulator')
+        env:
+          BUILD_ENV: ${{ matrix.environment }}
+        run: python3 test/simulator/boot.py "$BUILD_ENV"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: test-build-${{ matrix.environment }}
+          if-no-files-found: error
+          include-hidden-files: true
+          path: |
+            .pio/build/${{ matrix.environment }}/firmware.bin
+            .pio/build/${{ matrix.environment }}/firmware.elf
+            .pio/build/${{ matrix.environment }}/firmware.map
+            .pio/build/${{ matrix.environment }}/partitions.bin
+            .pio/build/${{ matrix.environment }}/program
+            reports/
+
+  check:
+    name: BookSync firmware check
+    if: always()
+    needs: [host, build]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every test and all six profiles
+        env:
+          HOST: ${{ needs.host.result }}
+          BUILD: ${{ needs.build.result }}
+        run: test "$HOST" = success && test "$BUILD" = success
