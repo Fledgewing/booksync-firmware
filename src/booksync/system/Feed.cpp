@@ -71,7 +71,9 @@ void Feed::feed(const char* data, size_t len) {
   }
 }
 void Feed::feedResponse(int status, const char* data, size_t len) {
-  if (status == 200 && len) feed(data, len);
+  // Transport callbacks use int lengths. Ignore nonpositive callbacks even if
+  // a negative length was converted to size_t by the caller.
+  if (status == 200 && len && len <= static_cast<size_t>(std::numeric_limits<int>::max())) feed(data, len);
 }
 bool Feed::complete() const { return closed && !invalid && !parser.hasError(); }
 

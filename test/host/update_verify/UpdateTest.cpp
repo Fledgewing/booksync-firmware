@@ -123,3 +123,14 @@ TEST(BookSyncUpdate, DetachedFeedSignatureFormatAndDomain) {
   text += text;
   EXPECT_FALSE(sig::decodeDetached(text.data(), text.size(), "releases.json", detached));
 }
+
+TEST(BookSyncUpdate, NonPositiveTransportLengthsDoNotPoisonTheFeed) {
+  Feed parser(matches);
+  parser.feedResponse(200, nullptr, 0);
+  // esp_http_client callback lengths are signed ints; preserve the old > 0 guard
+  // even when a caller converts the callback length to this byte-count API.
+  parser.feedResponse(200, nullptr, static_cast<size_t>(-1));
+  parser.feedResponse(200, update_fixture::feed, sizeof(update_fixture::feed) - 1);
+  ASSERT_TRUE(parser.complete());
+  EXPECT_EQ(check(parser.release()), sig::Result::Ok);
+}
