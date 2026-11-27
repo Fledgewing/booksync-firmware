@@ -10,6 +10,7 @@ def run(*args):
 
 run(sys.executable, 'tools/ci/test_size_report.py')
 run(sys.executable, 'tools/ci/test_harness.py')
+run(sys.executable, 'tools/ci/test_size.py')
 run(sys.executable, 'tools/ci/check_workflow.py')
 guards = [root / 'tools/test' / name for name in
           ('test-ui-boundary.py', 'test-server-boundary.py')]

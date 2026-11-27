@@ -17,6 +17,20 @@ def check(elf, nm='nm', map_path=None):
         raise RuntimeError('retired linked symbols: ' + ', '.join(forbidden))
     if map_path:
         mapping = Path(map_path).read_text()
+        # Demangle the actual map: word-boundary regexes cannot recognize C++
+        # identifiers embedded in Itanium length-prefixed symbol names.
+        filt = str(nm).removesuffix('nm') + 'c++filt'
+        demangled = subprocess.check_output([filt], input=mapping, text=True)
+        writers = sorted(set(m[0] for m in RETIRED.finditer(demangled)))
+        if writers:
+            raise RuntimeError('retired writer symbols in map: ' + ', '.join(writers))
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('home_map', ROOT / 'tools/test/test-home-map.py')
+        home_map = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(home_map)
+        homes = home_map.violations(symbols + '\n' + demangled)
+        if homes:
+            raise RuntimeError('native Home/catalog symbols: ' + ', '.join(homes))
         objects = [Path(p).name + '.o' for p in ARCHIVED]
         objects += ['KOReaderSyncClient.cpp.o', 'StatsUploadPayload.cpp.o']
         present = [name for name in objects if name in mapping]
