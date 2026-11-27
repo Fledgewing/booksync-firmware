@@ -3,9 +3,9 @@
 #include "booksync/interface/Library.h"
 
 namespace booksync {
-// Temporary worker-side factory; no adapter or network is needed to boot.
+// Device-local facade; no adapter or network is needed to boot.
 Library& offlineLibrary();
-// Main-loop-only shell handoff; F13 will publish indexed local books.
+// Main-loop-only recent-book shell handoff, alongside F13 indexed open intents.
 void publishHomeBook(bool available);
 bool takeHomeOpenRequest();
 }  // namespace booksync

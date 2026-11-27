@@ -33,7 +33,10 @@ storage::JournalResult Capture::open(std::string_view path, uint16_t nativeForma
   payload[6] = static_cast<char>(path.size());
   payload[7] = static_cast<char>(path.size() >> 8);
   memcpy(payload + 8, path.data(), path.size());
-  return journal_.enqueue({0, "native", "local-unbound", "native-source", {payload, path.size() + 8}, {}, 0}, id_);
+  const auto result =
+      journal_.enqueue({0, "native", "local-unbound", "native-source", {payload, path.size() + 8}, {}, 0}, id_);
+  if (result == storage::JournalResult::Ok && captureChanged) captureChanged();
+  return result;
 }
 storage::JournalResult Capture::update(Sample sample, bool closed) {
   if (!id_ || (closed_ && !closed)) return storage::JournalResult::Invalid;
@@ -66,6 +69,7 @@ storage::JournalResult Capture::update(Sample sample, bool closed) {
     previous_ = sample;
     previous_.openingTotalSeconds = get(bytes + 96);
     memcpy(previous_.openingCounter.data(), bytes + 100, previous_.openingCounter.size());
+    if (captureChanged) captureChanged();
     sampled_ = true;
     closed_ = closed;
   } else
@@ -122,6 +126,7 @@ storage::JournalResult Capture::session(const SessionObservation& observation) {
   if (result == JournalResult::Ok) {
     if (!same) sessionId_ = next;
     session_ = observation;
+    if (captureChanged) captureChanged();
   } else
     LOG_ERR("BSC", "Native session observation unavailable: %u", unsigned(result));
   return result;
@@ -189,6 +194,7 @@ storage::JournalResult Capture::artifact(std::string_view kind, std::string_view
     }
     if (!group) group = id;
   }
+  if (captureChanged) captureChanged();
   return JournalResult::Ok;
 }
 }  // namespace booksync::reader

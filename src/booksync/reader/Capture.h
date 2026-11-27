@@ -6,6 +6,8 @@
 #include "booksync/storage/LifecycleJournal.h"
 
 namespace booksync::reader {
+// Serialized native producer notification; no UI callback or presentation.
+inline void (*captureChanged)() = nullptr;
 // These are observations, not a second reading timer. Native totals and the
 // current native session remain separate so providers cannot add them twice.
 struct Sample {

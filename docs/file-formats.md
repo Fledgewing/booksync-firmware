@@ -2408,3 +2408,39 @@ expect every accepted unacknowledged capture to remain, uncertain outcomes to st
 unacknowledged, and local EPUB reading/anchors to behave unchanged. No EPUB cache
 reset is needed. Device heap/largest block, stack high-water and SD latency still
 require maintainer measurements; native metrics cannot qualify those constraints.
+
+### BookSync local device index, version 1
+
+`/.booksync/device.index` is a 48-byte little-endian manifest, published with
+`FilePublish` (`.tmp` staging, `.bak` fallback). It contains `BSI1`, a one-byte
+data-slot selector and three zero bytes, generation/u32, account epoch/u32,
+opaque owner/u64, capture revision/u64, record count/u32 (maximum 10,000),
+record width/u32 (1224), reserved/u32 zero, and FNV-1a/u32 over bytes 0–43.
+Unknown/malformed versions are retained and never treated as a successful empty
+index. The two same-directory slots are `device.a` and `device.b`.
+
+Every data slot begins with a 40-byte `BSD1` header: magic, the manifest's exact
+24-byte provenance tuple, record width/u32, reserved/u32 zero and FNV-1a/u32 over
+bytes 0–35. This binds bytes to their generation even when an interrupted scan
+reuses a backup's slot at the same length. Expected data length is
+`40 + count * 1224`; an old manifest can never select uncommitted replacement data.
+
+Each following fixed-width record contains the F08 book/edition/revision bytes at 0/16/32,
+a 96-byte zero-terminated display title at 64, native observed page/pages/seconds
+u32 at 160/164/168, reading-known/title-truncated/stats-known bytes at 172/173/174, zero padding through 187 and a
+summary FNV-1a/u32 at 188. A 1025-byte zero-terminated absolute source path begins
+at 192, followed by zero padding through 1219 and a path FNV-1a/u32 at 1220.
+Checksums detect corruption; they are not source identities or authorization.
+
+Readers seek directly to 192-byte summaries; resolving an open validates the
+whole bounded record. No path-derived canonical IDs or source digests are issued.
+Unbound local files stay unbound. Native capture overlay is display evidence tied
+to an exact local path, never permission to replay a locator against an edition.
+
+A scan streams at most 16 directory entries per worker tick into the inactive
+slot, syncs/closes it, then atomically publishes the manifest. Readers keep the
+current generation during scanning. Recovery validates the manifest and exact
+data length without a full directory/catalog scan; individual reads validate
+record integrity before exposing values. Missing/truncated current data falls
+back to the complete backup. An interrupted inactive slot is never selected.
+Only the two data slots and the two complete manifests are retained.
