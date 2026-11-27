@@ -1,0 +1,15 @@
+add_executable(tailnet_lock lwip_lock_test.c ${REPO_ROOT}/tailnet/shim/TailnetLwipLock.c)
+target_include_directories(tailnet_lock PRIVATE stubs)
+add_test(NAME TailnetLock COMMAND tailnet_lock)
+add_executable(tailnet_resolver resolver_test.cpp ${REPO_ROOT}/tailnet/shim/TailnetResolver.cpp)
+target_include_directories(tailnet_resolver PRIVATE stubs ${REPO_ROOT}/tailnet/shim)
+add_test(NAME TailnetResolver COMMAND tailnet_resolver)
+add_executable(tailnet_lease lease_test.cpp ${REPO_ROOT}/tailnet/shim/TailnetNetPhase.cpp)
+target_include_directories(tailnet_lease PRIVATE ${REPO_ROOT}/tailnet/shim)
+add_test(NAME TailnetLease COMMAND tailnet_lease)
+# Assertions are test checks, including in the host suite's Release builds.
+foreach(target tailnet_lock tailnet_resolver tailnet_lease)
+  target_compile_options(${target} PRIVATE -UNDEBUG)
+endforeach()
+
+add_test(NAME TailnetIdentity COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/identity_test.py)

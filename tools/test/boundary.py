@@ -7,6 +7,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCTION = ('src', 'lib', 'include', 'tailnet', 'web', 'scripts')
+PINNED_MODULES = ('tailnet/third_party/microlink',)
 BUILD_INPUTS = ('platformio.ini', 'partitions.csv', '.gitmodules')
 TEXT = {'.h', '.hpp', '.hh', '.c', '.cc', '.cpp', '.inc', '.S', '.json', '.html', '.css', '.js', '.yaml', '.yml', '.xml', '.txt', '.manifest', '.py', '.csv', '.svg', '.ini', '.cfg'}
 # Strings precede comments so URLs, raw literals and comment markers in strings survive.
@@ -116,6 +117,7 @@ def ui_source_errors(name, source):
 def files(root):
     inputs = {p.relative_to(root).as_posix() for directory in PRODUCTION
               for p in (root / directory).rglob('*') if p.is_file() and not any(part in {'.git', '__pycache__'} for part in p.relative_to(root).parts)}
+    inputs = {name for name in inputs if not any(name == module or name.startswith(module + '/') for module in PINNED_MODULES)}
     inputs.update(name for name in BUILD_INPUTS if (root / name).is_file())
     config = root / 'platformio.ini'
     if config.is_file():
@@ -198,6 +200,24 @@ def check_ui(root=ROOT):
     for name, record in manifest['files'].items():
         if record.get('generated_by') and not (root / record['generated_by']).is_file():
             errors.append(f'{name}: missing declared generator')
+    for module in PINNED_MODULES:
+        expected = manifest['pinned'].get(module)
+        if not expected:
+            errors.append(f'{module}: immutable third-party pin is required')
+            continue
+        directory = root / module
+        if not (directory / '.git').exists():
+            errors.append(f'{module}: initialize pinned third-party module')
+            continue
+        actual = subprocess.check_output(['git', '-C', str(directory), 'rev-parse', 'HEAD'], text=True).strip()
+        indexed = subprocess.check_output(['git', '-C', str(root), 'ls-files', '--stage', '--', module], text=True).split()
+        if actual != expected or len(indexed) < 2 or indexed[0] != '160000' or indexed[1] != expected:
+            errors.append(f'{module}: module, gitlink and inventory pins must match')
+        inputs = subprocess.check_output(['git', '-C', str(directory), 'ls-files'], text=True).splitlines()
+        if inputs != manifest['pinned'].get(module + '-inputs'):
+            errors.append(f'{module}: pinned source/resource inventory changed')
+        if subprocess.check_output(['git', '-C', str(directory), 'status', '--porcelain', '--untracked-files=all'], text=True).strip():
+            errors.append(f'{module}: modified/unclassified third-party input')
     sdk = root / 'freeink-sdk'
     if not (sdk / 'library.json').exists() and not (sdk / '.git').exists():
         return errors + ['freeink-sdk: initialize the pinned submodule before checking']
