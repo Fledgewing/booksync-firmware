@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -56,13 +57,13 @@ with tempfile.TemporaryDirectory(prefix='booksync-contract-') as temp:
         raise SystemExit('Hidden writer rejection fixture did not expose a forbidden symbol')
     app = temp / 'offline-boot'
     # Service HAL fault stub throws on simulated power cuts; UI above retains -fno-exceptions.
-    subprocess.run(common + ['-fexceptions', '-Wno-unused-parameter', '-I' + str(ROOT / 'src'), '-I' + str(ROOT / 'test/host/file_publish/stubs'), '-I' + str(ROOT / 'lib/Memory'), str(ROOT / 'test/host/booksync_contract.cpp'),
+    subprocess.run(common + ['-fexceptions', '-DSIMULATOR', '-Wno-unused-parameter', '-I' + str(ROOT / 'src'), '-I' + str(ROOT / 'test/host/file_publish/stubs'), '-I' + str(ROOT / 'lib/Memory'), str(ROOT / 'test/host/booksync_contract.cpp'),
                    str(ROOT / 'src/booksync/services/Library.cpp'),
                    *[str(ROOT / ('src/booksync/' + source)) for source in (
-                       'services/DeviceIndex.cpp','services/ReadModel.cpp','services/SdIndexSource.cpp',
+                       'services/Account.cpp','server/bookorbit/Auth.cpp','services/DeviceIndex.cpp','services/ReadModel.cpp','services/SdIndexSource.cpp',
                        'services/NativeHistory.cpp','services/Layout.cpp','storage/LayoutStore.cpp','storage/Index.cpp','storage/FilePublish.cpp',
                        'storage/Identity.cpp','storage/LifecycleJournal.cpp','reader/Capture.cpp','reader/Locator.cpp')],
-                   str(ROOT / 'src/booksync/server/bookorbit/Factory.cpp'), str(obj), '-o', str(app)], check=True)
+                   str(ROOT / 'src/booksync/server/bookorbit/Factory.cpp'), str(obj), *([] if sys.platform == 'darwin' else ['-lcrypto']), '-o', str(app)], check=True)
     for boot in range(2):
         subprocess.run([str(app)], check=True)
 print('BookSync Library: UI-only compile/link and two offline stub boots PASS')
