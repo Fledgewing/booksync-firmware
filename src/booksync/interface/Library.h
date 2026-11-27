@@ -3,6 +3,7 @@
 #include "Capabilities.h"
 #include "Commands.h"
 #include "Models.h"
+#include "booksync/interface/HomeLayout.h"
 
 namespace booksync {
 // UI reads bounded published values. No scans, writes, parsing or transport in
@@ -17,6 +18,9 @@ class Library {
   virtual bool requestBatch(WindowBatchRequest) { return false; }
   virtual CommandStatus open(BookKey) { return CommandStatus::Unavailable; }
   virtual LibraryWindow window() const { return {}; }
+  virtual void readWindow(LibraryWindow& out) const { out = window(); }
+  virtual HomePage homePage() const { return {}; }
+  virtual bool requestHomePage(uint8_t) { return false; }
   virtual Subscription subscribe() const { return {}; }
   virtual bool changed(Subscription) const { return false; }
 

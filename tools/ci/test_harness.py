@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fail-closed harness fixtures complement the unchanged shared parser tests."""
 from pathlib import Path
+import ast
 import struct
 import subprocess
 import sys
@@ -11,6 +12,21 @@ from measure import validate_partitions, validate_partition_binary
 CONFIG = {'app_slot_bytes': 6553600}
 
 class HarnessTests(unittest.TestCase):
+    def test_simulator_scenarios_are_reachable(self):
+        script = Path(__file__).resolve().parents[2] / 'test/simulator/boot.py'
+        terminated = False
+        scenarios = set()
+        for statement in ast.parse(script.read_text()).body:
+            calls = [node for node in ast.walk(statement) if isinstance(node, ast.Call)
+                     and isinstance(node.func, ast.Attribute) and node.func.attr == 'run'
+                     and isinstance(node.func.value, ast.Name) and node.func.value.id == 'subprocess']
+            self.assertFalse(terminated and calls, 'Simulator scenario is after an unconditional exit')
+            for call in calls:
+                scenarios.update(node.value for node in ast.walk(call)
+                                 if isinstance(node, ast.Constant) and isinstance(node.value, str))
+            terminated = terminated or isinstance(statement, ast.Raise)
+        self.assertIn('test/simulator/widgets.py', scenarios)
+
     def test_partitions(self):
         with tempfile.TemporaryDirectory() as directory:
             p = Path(directory) / 'partitions.csv'

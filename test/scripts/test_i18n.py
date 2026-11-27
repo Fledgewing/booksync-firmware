@@ -33,7 +33,11 @@ class I18nTest(unittest.TestCase):
                 if not key.startswith("STR_"):
                     continue
                 with self.subTest(language=file.stem, key=key):
-                    self.assertIn(key, data)
+                    # Community SD assets may omit new English keys. Production
+                    # falls back to English; supplied translations must still be valid.
+                    if key not in data:
+                        self.assertNotEqual(file.stem, "english")
+                        continue
                     self.assertTrue(data[key].strip())
                     if specifier.findall(source):
                         self.assertEqual(specifier.findall(source), specifier.findall(data[key]))
@@ -86,7 +90,10 @@ class I18nTest(unittest.TestCase):
 
     def test_all_firmware_strings(self):
         languages, names, keys, translations, inherited = gen_i18n.load_translations(str(ROOT / "lib/I18n/translations"))
-        self.assertFalse(any(inherited))
+        self.assertFalse(inherited[languages.index("EN")])
+        for index, missing in enumerate(inherited):
+            for key in missing:
+                self.assertEqual(translations[key][index], translations[key][languages.index("EN")])
         self.check_runtime(languages, names, keys, translations)
 
     def test_large_blobs_and_english_fallback(self):

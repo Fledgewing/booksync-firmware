@@ -86,6 +86,14 @@ class Boundaries(unittest.TestCase):
         for source in ('class PrivateStore;', 'class Secret;', 'void* handle;', 'Secret& handle;'):
             self.assertTrue(boundary.ui_source_errors('src/booksync/interface/Leak.h', source))
 
+    def test_concrete_window_copy_does_not_allow_opaque_handles(self):
+        self.assertFalse(boundary.ui_source_errors('src/booksync/interface/Probe.h',
+                                                  'void copy(LibraryWindow& out);'))
+        for source in ('LibraryWindow* handle;', 'Secret& out;', 'void* out;',
+                       'LibraryWindow& out;', 'struct Bad { LibraryWindow& out; };',
+                       'struct Bad { LibraryWindow& out, other; };'):
+            self.assertTrue(boundary.ui_source_errors('src/booksync/interface/Probe.h', source))
+
     def test_build_hook_outside_script_directory_is_inventoried(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

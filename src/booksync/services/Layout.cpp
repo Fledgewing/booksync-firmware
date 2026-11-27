@@ -492,6 +492,112 @@ bool Layout::validate(LayoutInput input, const char* device, SpanValidator spans
   }
   return valid;
 }
+bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePage& output) {
+  output = {};
+  if (!validate(input, device)) return false;
+  uint32_t position = 0;
+  Span root;
+  nodes_ = 0;
+  if (!value(position, root)) return false;
+  auto grid = field(field(root, "grids"), device);
+  uint32_t n = 0;
+  if (!number(field(grid, "cols"), 1, 12, n)) return false;
+  output.cols = n;
+  output.textOnly = !std::strcmp(device, "x3");
+  if (!number(field(grid, "rows"), 1, 12, n)) return false;
+  output.rows = n;
+  auto pages = field(root, "pages");
+  auto over = field(field(root, "overrides"), device);
+  position = pages.begin + 1;
+  space(position);
+  uint8_t index = 0;
+  while (at(position) != ']') {
+    Span pg;
+    nodes_ = 0;
+    if (!value(position, pg)) return false;
+    if (index == page) {
+      auto name = field(pg, "name");
+      if (name.type && !text(name, output.title.data())) return false;
+      auto placements = field(pg, "placements");
+      uint32_t q = placements.begin + 1;
+      space(q);
+      while (at(q) != ']') {
+        Span tile;
+        nodes_ = 0;
+        if (!value(q, tile) || !text(field(tile, "instance"), text_)) return false;
+        auto override = field(over, std::string_view(text_, textLength_));
+        Geometry g;
+        if (!geometry(tile, g, false) || (override.type && !geometry(override, g, true))) return false;
+        if (!text(field(tile, "widget"), text_) || !number(field(tile, "version"), 1, 2147483647, n)) return false;
+        WidgetKind kind{};
+        bool installed = n == 1 && !g.hidden;
+        if (!std::strcmp(text_, "continue-reading"))
+          kind = WidgetKind::Continue;
+        else if (!std::strcmp(text_, "booklist"))
+          kind = WidgetKind::Shelf;
+        else if (!std::strcmp(text_, "library"))
+          kind = WidgetKind::Browse;
+        else
+          installed = false;
+        if (installed) {
+          if (output.count == HomeWidgets) {
+            LOG_ERR("BSL", "Visible widget budget exceeded");
+            return false;
+          }
+          auto& out = output.widgets[output.count++];
+          out.kind = kind;
+          out.x = g.x;
+          out.y = g.y;
+          out.w = g.w;
+          out.h = g.h;
+          auto settings = field(tile, "settings");
+          auto changed = override.type ? field(override, "settings") : Span{};
+          auto source = changed.type ? field(changed, "src") : Span{};
+          if (!source.type) source = field(settings, "src");
+          auto style = changed.type ? field(changed, "style") : Span{};
+          if (!style.type) style = field(settings, "style");
+          uint32_t styleValue = 0;
+          if (style.type && number(style, 0, 1, styleValue)) out.style = styleValue;
+          if (source.type && text(source, text_)) {
+            if (!std::strcmp(text_, "device"))
+              out.source = WindowSource::OnDevice;
+            else if (!std::strcmp(text_, "up-next"))
+              out.source = WindowSource::UpNext;
+            else if ((!std::strcmp(text_, "want-to-read") || !std::strcmp(text_, "wtr")))
+              out.source = WindowSource::WantToRead;
+            else if (!std::strcmp(text_, "unopened"))
+              out.source = WindowSource::Unopened;
+            else if (!std::strcmp(text_, "random"))
+              out.source = WindowSource::Random;
+            else if (!std::strcmp(text_, "finished-this-year"))
+              out.source = WindowSource::FinishedYear;
+            else if (!std::strcmp(text_, "pick-back-up"))
+              out.source = WindowSource::PickBackUp;
+            else if (!std::strcmp(text_, "recent") || !std::strcmp(text_, "recently-added"))
+              out.source = WindowSource::Recent;
+            else {
+              out.source = WindowSource::Unknown;
+            }
+          }
+        }
+        space(q);
+        if (at(q) != ',') break;
+        ++q;
+        space(q);
+      }
+    }
+    ++index;
+    space(position);
+    if (at(position) != ',') break;
+    ++position;
+    space(position);
+  }
+  if (page >= index || !ok_) return false;
+  output.pages = index;
+  output.page = page;
+  output.revision = revision_;
+  return true;
+}
 const char* Layout::deviceClass() {
 #if (defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO) ||                                             \
     (defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC) || defined(SIMULATOR_DEVICE_X4_PRO) || \

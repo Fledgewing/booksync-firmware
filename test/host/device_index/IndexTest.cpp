@@ -315,6 +315,9 @@ TEST_F(IndexTest, RealLibraryPaintIsIoFreeAndOpenResolvesInWorker) {
   card.files[record.path.data()] = "synthetic book";
   enterLocalLibrary();
   auto& library = offlineLibrary();
+  workLocalLibrary();
+  EXPECT_EQ(library.window().windowCount, 0);
+  EXPECT_EQ(library.window().publication, 0u);
   ASSERT_TRUE(library.requestWindow({0, 1, 16384}));
   workLocalLibrary();
   const auto window = library.window();
@@ -456,3 +459,37 @@ TEST_F(IndexTest, UncertainFinalBarrierReconcilesVisibleGenerationBeforeRetry) {
   retry.cancel();
 }
 }  // namespace
+
+TEST_F(IndexTest, WidgetBatchPreservesIndependentContinueMissingShelfAndLocalFailure) {
+  publish(2);
+  ReadModel model{index};
+  BookRow recent;
+  recent.title[0] = 'R';
+  recent.readingKnown = true;
+  recent.page = 42;
+  recent.pages = 100;
+  model.setContinue(recent, true);
+  WindowBatchRequest batch;
+  batch.count = 3;
+  batch.windows[0] = {0, 1, 16384, WindowSource::Continue};
+  batch.windows[1] = {0, 3, 16384, WindowSource::Recent};
+  batch.windows[2] = {0, 1, 16384, WindowSource::OnDevice};
+  ASSERT_TRUE(model.materializeBatch(batch));
+  auto value = model.window();
+  EXPECT_EQ(value.windows[0].availability, Availability::Ready);
+  EXPECT_EQ(value.windows[0].count, 1);
+  EXPECT_EQ(value.windows[1].availability, Availability::NotSaved);
+  EXPECT_EQ(value.windows[1].count, 0);
+  EXPECT_EQ(value.windows[2].total, 2);
+  ASSERT_TRUE(model.beginHistory({[](void*, ReadingVisit&) { return HistoryStep::End; }, nullptr, 7, 1}));
+  ASSERT_TRUE(model.historyTick());
+  EXPECT_TRUE(model.window().rows[0].readingKnown);
+  EXPECT_EQ(model.window().rows[0].page, 42u);
+  card.files["/data-a"][100] ^= 1;
+  EXPECT_FALSE(model.materializeBatch(batch));
+  value = model.window();
+  EXPECT_EQ(value.windows[0].availability, Availability::Ready);
+  EXPECT_EQ(value.windows[0].count, 1);
+  EXPECT_EQ(value.windows[1].availability, Availability::NotSaved);
+  EXPECT_EQ(value.windows[2].availability, Availability::Unavailable);
+}

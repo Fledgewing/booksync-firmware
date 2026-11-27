@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+
+#include "booksync/interface/HomeLayout.h"
 namespace booksync {
 // Seekable worker input. Caller owns bytes/context until validation/save returns.
 // Reads must return the exact requested count; no filesystem handles reach UI.
@@ -22,6 +24,7 @@ class Layout {
                                  uint8_t height, void* context);
   // Optional installed-widget registry: unknown IDs/versions must return true.
   bool validate(LayoutInput input, const char* deviceClass, SpanValidator spans = nullptr, void* context = nullptr);
+  bool project(LayoutInput input, const char* deviceClass, uint8_t page, HomePage& output);
   uint32_t revision() const { return revision_; }
   static LayoutInput defaults();
   static const char* deviceClass();

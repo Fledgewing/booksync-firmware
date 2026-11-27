@@ -33,12 +33,25 @@ struct BookKey {
   uint32_t ordinal = 0;
   bool operator==(BookKey other) const { return provenance == other.provenance ? ordinal == other.ordinal : false; }
 };
+enum class WindowSource : uint8_t {
+  OnDevice,
+  Continue,
+  Recent,
+  UpNext,
+  WantToRead,
+  Unopened,
+  Random,
+  FinishedYear,
+  PickBackUp,
+  Unknown
+};
 struct WindowRequest {
   uint32_t offset = 0;
   uint16_t limit = 12;
   uint32_t bytes = LibraryBytes;
+  WindowSource source = WindowSource::OnDevice;
   bool operator==(WindowRequest other) const {
-    if (offset != other.offset) return false;
+    if (source != other.source || offset != other.offset) return false;
     return limit == other.limit ? bytes == other.bytes : false;
   }
 };

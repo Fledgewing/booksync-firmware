@@ -13,6 +13,8 @@ class LayoutStore {
       : paths_(paths), device_(deviceClass), spans_(spans), context_(context) {}
   LayoutSource load();
   bool save(LayoutInput input);
+  bool project(uint8_t page, HomePage& output);
+  bool projectDefault(HomePage& output) { return validator_.project(Layout::defaults(), device_, 0, output); }
   // Validated selected path, or null for defaults(). Caller must exclude writers
   // while streaming it. No open handle is retained across calls.
   const char* selectedPath() const { return selected_; }
