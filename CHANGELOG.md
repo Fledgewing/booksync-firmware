@@ -3,6 +3,7 @@
 ### Added
 
 - BookSync captures bounded timestamped reading-page history and checkpoints stats batches through its sole sync owner, retaining explicit coverage gaps and reconciling uncertain uploads without counting reading time twice; live delivery remains deferred.
+- BookSync Home supports local add/remove/reset widget edits on X4 Pro and Classic, with revision checks and atomic saves. The X3 Settings-list editor remains pending design approval.
 
 - BookSync streams server catalog and manifest records with fixed memory bounds, rejects incomplete or revoked responses, and preserves the prior offline index after interrupted refreshes.
 - BookSync commits account-scoped catalog generations only after complete refreshes, coalesces refresh requests under one network lease, and keeps closed Home views quiet after cancellation or late completion.
@@ -41,6 +42,8 @@
 - BookSync now owns cold boot and Home with a minimal offline shell that opens the last local book and receives reader Back. Native Home/catalog entry routes and Home theme renderers are removed from device builds; reader, list and sleep styling are retained.
 
 ### Fixed
+
+- BookSync projects valid Home layouts without requiring a device-class override group.
 
 - BookSync firmware CI reuses cached PlatformIO packages across configuration changes and retries package installation after transient release-download failures.
 

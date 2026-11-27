@@ -284,3 +284,5 @@ add_subdirectory(host/import_identity)
 add_subdirectory(host/credentials)
 add_subdirectory(host/version)
 add_subdirectory(host/lifecycle_stats)
+
+add_subdirectory(host/layout_editor)

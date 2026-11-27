@@ -13,6 +13,8 @@ struct LayoutInput {
   Read read = nullptr;
   void* context = nullptr;
   size_t bytes = 0;
+  // Release any lazy reader before publication validates or renames files.
+  void (*release)(void*) = nullptr;
   static LayoutInput memory(const void* data, size_t bytes);
 };
 // Fixed reusable worker workspace, no heap or JSON tree. Unknown values are
@@ -30,6 +32,7 @@ class Layout {
   static const char* deviceClass();
 
  private:
+  friend class LayoutEditor;
   struct Span {
     uint32_t begin = 0, end = 0;
     char type = 0;

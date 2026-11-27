@@ -41,3 +41,13 @@
 
 // Every button-only reader uses the full-screen menu and its bounded sample preview.
 #define CROSSINK_APP_READER_SAMPLE_PREVIEW (!CROSSINK_APP_CAP_TOUCH)
+
+// Only X4 Pro/Classic have approved Home editor scenes. The X3 Settings-list
+// proposal is pending approval; keep its presentation out of C3 images.
+#if (defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO) ||                                             \
+    (defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC) || defined(SIMULATOR_DEVICE_X4_PRO) || \
+    defined(SIMULATOR_DEVICE_X4_CLASSIC)
+#define CROSSINK_APP_CAP_HOME_EDITOR 1
+#else
+#define CROSSINK_APP_CAP_HOME_EDITOR 0
+#endif
