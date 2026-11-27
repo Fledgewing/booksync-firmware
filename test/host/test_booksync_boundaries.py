@@ -132,7 +132,9 @@ class Boundaries(unittest.TestCase):
                                                  '#include "booksync/ui/Home.h"'))
 
     def test_import_cannot_link_transport(self):
-        self.assertTrue(boundary.ui_source_errors('src/booksync/import/Probe.cpp', '#include <HTTPClient.h>'))
+        for include in ('HTTPClient.h', 'mbedtls/ssl.h', 'wolfssl/ssl.h', 'tailnet/shim/Tailnet.h'):
+            self.assertTrue(boundary.ui_source_errors('src/booksync/import/Probe.cpp', '#include <'+include+'>'))
+        self.assertFalse(boundary.ui_source_errors('src/booksync/import/Probe.cpp', '#include <mbedtls/sha256.h>'))
 
 
 if __name__ == '__main__':
