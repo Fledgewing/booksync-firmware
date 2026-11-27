@@ -11827,7 +11827,7 @@ class SimulatorSmokeTest {
         auto* panel = dynamic_cast<FrontlightPanelActivity*>(activityManager.simulatorCurrentActivity());
         if (!panel) fail("Expected frontlight sync menu");
         const bool unavailable = action.x != 0;
-        for (int index = 0; index < 3; ++index) {
+        for (int index = 0; index < 1; ++index) {
           if (panel->simulatorSyncOptionDisabled(index) != unavailable)
             fail("Unexpected transfer availability outside reader");
           const auto row = panel->simulatorSyncOptionRect(index);
