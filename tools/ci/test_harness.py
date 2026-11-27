@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Fail-closed harness fixtures complement the unchanged shared parser tests."""
 from pathlib import Path
+import struct
 import subprocess
 import sys
 import tempfile
 import unittest
-from measure import validate_partitions
+from measure import validate_partitions, validate_partition_binary
 
 CONFIG = {'app_slot_bytes': 6553600}
 
@@ -21,6 +22,20 @@ class HarnessTests(unittest.TestCase):
                 else:
                     with self.assertRaises(ValueError):
                         validate_partitions(p, CONFIG)
+
+    def test_binary_partitions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            p = Path(directory) / 'partitions.bin'
+            def entry(subtype, address, size):
+                return struct.pack('<HBBII16sI', 0x50aa, 0, subtype, address, size, b'app', 0)
+            good = entry(0x10, 0x10000, 6553600) + entry(0x11, 0x650000, 6553600)
+            p.write_bytes(good)
+            validate_partition_binary(p, CONFIG)
+            for bad in (b'', good[:32], good[:32] + entry(0x11, 0x650000, 6553599),
+                        entry(0x10, 0x20000, 6553600) + good[32:]):
+                p.write_bytes(bad)
+                with self.assertRaises(ValueError):
+                    validate_partition_binary(p, CONFIG)
 
     def test_missing_image(self):
         with tempfile.TemporaryDirectory() as directory:

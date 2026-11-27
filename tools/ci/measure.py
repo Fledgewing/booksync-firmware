@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import struct
 import sys
 
 from size_report import main as size_main
@@ -23,6 +24,19 @@ def validate_partitions(path, config):
         raise ValueError('partition map must contain two matching budgeted application slots')
 
 
+def validate_partition_binary(path, config):
+    data = path.read_bytes()
+    apps = []
+    for offset in range(0, len(data) - 31, 32):
+        magic, kind, subtype, address, size = struct.unpack_from('<HBBII', data, offset)
+        if magic == 0x50aa and kind == 0:
+            apps.append((subtype, address, size))
+    expected = [(0x10, 0x10000, config['app_slot_bytes']),
+                (0x11, 0x650000, config['app_slot_bytes'])]
+    if apps != expected:
+        raise ValueError('built application partitions differ from the budgeted map')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('environment', choices=('x4-pro', 'x4-classic', 'default'))
@@ -35,6 +49,7 @@ def main():
     for name in ('firmware.bin', 'firmware.elf', 'firmware.map', 'partitions.bin'):
         if not (build / name).is_file() or not (build / name).stat().st_size:
             raise SystemExit(f'missing build evidence: {name}')
+    validate_partition_binary(build / 'partitions.bin', config)
     sys.argv = [sys.argv[0], '--environment', args.environment, '--bin', str(build / 'firmware.bin'),
                 '--log', str(root / 'reports' / f'{args.environment}.log'), '--out', str(out)]
     status = size_main()
