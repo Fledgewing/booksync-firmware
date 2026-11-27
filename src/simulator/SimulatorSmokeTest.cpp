@@ -11766,13 +11766,11 @@ class SimulatorSmokeTest {
         inputScript.push_back(render("Frontlight sync menu rendered", 4));
         inputScript.push_back(
             {ScriptActionType::CheckFrontlightSync, MappedInputManager::Button::Back, nullptr, 0, 0, 0});
-        inputScript.push_back(press(MappedInputManager::Button::Confirm));
-        inputScript.push_back(release(MappedInputManager::Button::Confirm));
-        inputScript.push_back(render("Frontlight sync opens account settings", 4));
-
+        // F05 retains local book transfer. Opening its menu must stay offline;
+        // native account/sync choices no longer exist, so cancel this menu.
         inputScript.push_back(press(MappedInputManager::Button::Back));
         inputScript.push_back(release(MappedInputManager::Button::Back));
-        inputScript.push_back(render("File Browser restored after sync settings", 4));
+        inputScript.push_back(render("File Browser restored after local transfer menu", 4));
         inputScript.push_back(assertActivity("FileBrowser"));
       }
       inputScript.push_back({ScriptActionType::EnableReadingStats, MappedInputManager::Button::Back, nullptr, 0, 0, 0});
