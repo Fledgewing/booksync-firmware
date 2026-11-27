@@ -125,7 +125,15 @@ TEST_F(LifecycleMatchTest, CommitsIdentityAndNativeCheckpointTogetherThenStopsAt
   EXPECT_TRUE(saved.positionCompatible);
   EXPECT_EQ(saved.native, "native");
   EXPECT_EQ(e.acknowledged, 1);
-  EXPECT_EQ(step(), SyncResult::Unavailable);
+  const std::string matched(e.checkpoint);
+  for (unsigned boot = 0; boot < 2; ++boot) {
+    card.restart();
+    EXPECT_EQ(step(), SyncResult::Unavailable);
+    const auto pending = read();
+    EXPECT_EQ(pending.acknowledged, 1);
+    EXPECT_EQ(pending.attempting, 2);  // F17 durably attempts the next, unavailable phase.
+    EXPECT_EQ(pending.checkpoint, matched);
+  }
   EXPECT_EQ(adapter.remote.calls, 1);
 }
 TEST_F(LifecycleMatchTest, TimeoutBeforeCommitRestartsAndReconcilesWithoutInventingAck) {

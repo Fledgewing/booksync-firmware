@@ -116,10 +116,10 @@ inline void runLifecycleMatchScenario() {
     } else {
       MatchCheckpoint checkpoint;
       ok = ok && (result == SyncResult::Advanced || result == SyncResult::Unavailable) && entry.acknowledged == 1 &&
-           entry.attempting == 0 && LifecycleMatch::decode(entry.checkpoint, checkpoint) &&
-           checkpoint.source == adapter.evidence.source && checkpoint.hash == Hash && checkpoint.bookId == 11 &&
-           checkpoint.bookFileId == 22 && checkpoint.native == "native" && owner.step() == SyncResult::Unavailable &&
-           journal.pending() == 1;
+           (entry.attempting == (result == SyncResult::Advanced ? 0 : 2)) &&
+           LifecycleMatch::decode(entry.checkpoint, checkpoint) && checkpoint.source == adapter.evidence.source &&
+           checkpoint.hash == Hash && checkpoint.bookId == 11 && checkpoint.bookFileId == 22 &&
+           checkpoint.native == "native" && owner.step() == SyncResult::Unavailable && journal.pending() == 1;
     }
   }
   if (ok)
