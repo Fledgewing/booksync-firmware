@@ -69,8 +69,9 @@ ESP32 heap/largest-block/stack acceptance.
 
 Host: `python3 tools/ci/host.py`. Each simulator runs
 `python3 test/simulator/reading_positions.py <profile>` with two separate boots,
-F03 sources, a private journal, backup/unknown/corrupt cases and complete source
-inventory checks. The corpus generator/checksum baseline stays unchanged.
+F03 sources under a private prefix, a private journal, all 13 position
+records and complete source inventory checks. The prefix excludes unrelated
+native settings migration; real-root activation belongs to F29. The corpus generator/checksum baseline stays unchanged.
 
 Maintainer hardware acceptance after F29: back up the SD, boot twice on each
 reader with both native progress slots and the historical sidecars, compare

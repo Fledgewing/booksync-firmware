@@ -19,19 +19,24 @@ out.mkdir(parents=True, exist_ok=True)
 fixtures = root / 'test/fixtures/legacy'
 with tempfile.TemporaryDirectory(prefix='booksync-positions-') as directory:
     sd = Path(directory) / 'fs_'
-    shutil.copytree(fixtures / 'sd', sd)
+    shutil.copytree(fixtures / 'sd', sd / 'legacy-upgrade')
+    # F29 owns real-root activation. Keep unrelated native settings migration
+    # from rewriting the settings corpus before this read-only importer runs.
     (sd / 'legacy').mkdir()
     for name, origin in {
         'progress.bin': 'sd/.crosspoint/epub_305419896/progress.bin',
         'progress.bin.bak': 'sd/.crosspoint/epub_305419896/progress.bin.bak',
         'torn.bin': 'variants/progress/torn.bin',
         'future.bin': 'variants/unknown/future.bin',
+        'legacy-4.bin': 'variants/progress/legacy-4.bin',
+        'legacy-6.bin': 'variants/progress/legacy-6.bin',
+        'legacy-10.bin': 'variants/progress/legacy-10.bin',
     }.items():
         shutil.copy2(fixtures / origin, sd / 'legacy' / name)
     def inventory():
         return {str(p.relative_to(sd)): hashlib.sha256(p.read_bytes()).hexdigest()
                 for p in sd.rglob('*') if p.is_file() and
-                (str(p.relative_to(sd)).startswith(('.crosspoint/', 'legacy/')))}
+                (str(p.relative_to(sd)).startswith(('legacy-upgrade/', 'legacy/')))}
     before = inventory()
     env = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy',
                BOOKSYNC_READING_POSITIONS_SCENARIO='1', CROSSPOINT_SIM_SD=str(sd))

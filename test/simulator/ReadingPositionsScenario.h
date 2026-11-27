@@ -2,6 +2,7 @@
 #pragma once
 #include <cstdio>
 #include <cstdlib>
+#include <utility>
 
 #include "booksync/import/ReadingPositions.h"
 
@@ -36,11 +37,26 @@ inline void runReadingPositionsScenario() {
        status == PositionStatus::Corrupt;
   ok = ok && worker.retain("/legacy/future.bin", PositionFormat::Epub, {}, status, id) == JournalResult::Ok &&
        status == PositionStatus::Unsupported;
+  for (const char* path : {"/legacy/legacy-4.bin", "/legacy/legacy-6.bin", "/legacy/legacy-10.bin",
+                           "/legacy-upgrade/.crosspoint/book_0123456789abcdef0123456789abcdef/progress.bin",
+                           "/legacy-upgrade/.crosspoint/book_0123456789abcdef0123456789abcdef/progress.bin.bak"}) {
+    ok = ok && worker.retain(path, PositionFormat::Epub, source, status, id) == JournalResult::Ok &&
+         status == PositionStatus::Supported;
+  }
+  const std::pair<const char*, PositionFormat> provenance[]{
+      {"/legacy-upgrade/.crosspoint/epub_305419896/progress-path.bin", PositionFormat::Path},
+      {"/legacy-upgrade/.crosspoint/epub_305419896/links.bin", PositionFormat::Links},
+      {"/legacy-upgrade/.crosspoint/book_0123456789abcdef0123456789abcdef/bookorbit_sync.bin", PositionFormat::Settled},
+      {"/legacy-upgrade/.crosspoint/orbismart/0123456789abcdef0123456789abcdef.0", PositionFormat::Intent}};
+  for (const auto& [path, format] : provenance) {
+    ok = ok && worker.retain(path, format, source, status, id) == JournalResult::Ok &&
+         status == PositionStatus::Supported;
+  }
   pe.raw = "torn";
   ok = ok && ReadingPositions::select(&pe, &be, locator, sample) && sample.sourceOffset == 96;
   be.source.edition.bytes[0] = 8;
   ok = ok && !ReadingPositions::select(&pe, &be, locator, sample);
-  ok = ok && journal.pending() == 4 && (before == 0 || before == 4);
+  ok = ok && journal.pending() == 13 && (before == 0 || before == 13);
   std::printf(
       "BookSync reading positions scenario %s: two-boot evidence, raw anchor, backup, unresolved; workspace=%zu\n",
       ok ? "PASS" : "FAIL", sizeof(worker));
