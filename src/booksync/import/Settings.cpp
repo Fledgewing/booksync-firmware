@@ -12,8 +12,7 @@
 #elif defined(SIMULATOR) || defined(BOOKSYNC_IMPORT_HOST)
 #include <openssl/sha.h>
 #else
-#include <wolfssl/wolfcrypt/settings.h>
-#include <wolfssl/wolfcrypt/sha256.h>
+#include <mbedtls/sha256.h>
 #endif
 #if defined(ARDUINO_ARCH_ESP32) && !defined(SIMULATOR)
 #include <nvs.h>
@@ -104,8 +103,9 @@ bool fingerprint(SettingsInput input, uint8_t* digest) {
   SHA256_CTX hash;
   bool ok = SHA256_Init(&hash) == 1;
 #else
-  wc_Sha256 hash;
-  bool ok = wc_InitSha256(&hash) == 0;
+  mbedtls_sha256_context hash;
+  mbedtls_sha256_init(&hash);
+  bool ok = mbedtls_sha256_starts(&hash, 0) == 0;
 #endif
   uint8_t chunk[64];
   for (size_t offset = 0; ok && offset < input.bytes;) {
@@ -117,7 +117,7 @@ bool fingerprint(SettingsInput input, uint8_t* digest) {
 #elif defined(SIMULATOR) || defined(BOOKSYNC_IMPORT_HOST)
     ok = SHA256_Update(&hash, chunk, n) == 1;
 #else
-    ok = wc_Sha256Update(&hash, chunk, n) == 0;
+    ok = mbedtls_sha256_update(&hash, chunk, n) == 0;
 #endif
     offset += n;
   }
@@ -126,8 +126,8 @@ bool fingerprint(SettingsInput input, uint8_t* digest) {
 #elif defined(SIMULATOR) || defined(BOOKSYNC_IMPORT_HOST)
   if (ok) ok = SHA256_Final(digest, &hash) == 1;
 #else
-  if (ok) ok = wc_Sha256Final(&hash, digest) == 0;
-  wc_Sha256Free(&hash);
+  if (ok) ok = mbedtls_sha256_finish(&hash, digest) == 0;
+  mbedtls_sha256_free(&hash);
 #endif
   return ok;
 }

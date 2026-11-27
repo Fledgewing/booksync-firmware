@@ -99,7 +99,9 @@ def ui_source_errors(name, source):
         errors.append(f'{name}: macro include cannot bypass public include closure')
     for inc in INCLUDE.findall(code):
         if name.startswith('src/booksync/import/'):
-            if re.search(r'HTTP|TLS|WiFi|Transport|ServerAdapter|server/|tailnet/', inc, re.I):
+            # SHA-256 is a leaf digest primitive, not a TLS/session API. Keep
+            # this exact header allowance; all transport headers still fail.
+            if inc != 'mbedtls/sha256.h' and re.search(r'HTTP|TLS|WiFi|Transport|ServerAdapter|server/|tailnet/', inc, re.I):
                 errors.append(f'{name}: importer transport dependency {inc}')
         else:
             public_path = inc.startswith('booksync/interface/')
