@@ -253,3 +253,5 @@ add_test(NAME EegoPanelIdleRegression
 
 # BookSync synthetic legacy corpus and retained production reader baseline.
 add_subdirectory(host/reader_baseline)
+
+add_subdirectory(host/file_publish)
