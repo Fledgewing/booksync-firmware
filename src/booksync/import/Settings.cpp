@@ -290,23 +290,28 @@ EnumValue Settings::enumValue(const char* key) const {
     if (!strcmp(key, begin[i].key)) {
       if (!raw.is<int32_t>()) return {EnumStatus::Unknown};
       const int32_t n = raw.as<int32_t>();
-      if (n < begin[i].low || n > begin[i].high || (!strcmp(key, "fontSize") && n > 3 && n < 8))
-        return {EnumStatus::Unknown, n, n};
+      if (n < begin[i].low || n > begin[i].high) return {EnumStatus::Unknown, n, n};
       int32_t value = n;
       if (!strcmp(key, "sdFontSizeRange") && n == 3) value = 4;
       if (!strcmp(key, "fontSize")) {
         const char* family = document_["sdFontFamilyName"].as<const char*>();
         const bool cardFont = family && *family;
-        if (n <= 3) {
+        if (n < 8) {
           if (cardFont) {
-            static constexpr uint8_t sizes[][4] = {
-                {8, 9, 10, 12}, {10, 12, 14, 16}, {14, 16, 18, 20}, {8, 9, 10, 12}, {8, 9, 10, 12}};
+            static constexpr uint8_t sizes[][8] = {{8, 9, 10, 12},
+                                                   {10, 12, 14, 16},
+                                                   {14, 16, 18, 20},
+                                                   {8, 9, 10, 12, 14, 16, 18, 20},
+                                                   {8, 9, 10, 12, 14, 16, 18, 20}};
             const auto range = document_["sdFontSizeRange"];
             if (!range.isUnbound() && (!range.is<uint8_t>() || range.as<uint8_t>() > 4))
               return {EnumStatus::Unknown, n, n};
             value = sizes[range.isUnbound() ? 1 : range.as<uint8_t>()][n];
-          } else
+            if (!value) return {EnumStatus::Unknown, n, n};
+          } else {
+            if (n > 3) return {EnumStatus::Unknown, n, n};
             value = 10 + 2 * n;
+          }
         } else if (!cardFont && n > 22)
           return {EnumStatus::Unknown, n, n};
       }

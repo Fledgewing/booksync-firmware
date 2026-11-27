@@ -291,3 +291,12 @@ TEST(SettingsImport, EveryIoFailureLeavesSourceAndRequiresVerifiedBackup) {
     EXPECT_EQ(card.handles, 0);
   }
 }
+TEST(SettingsImport, ExtendedLegacyCardFontStepsArePreserved) {
+  seed(R"({"fontSize":6,"sdFontFamilyName":"Synthetic","sdFontSizeRange":4})");
+  Settings settings;
+  ASSERT_EQ(settings.readFile(Source::Native, backup), Status::Ready);
+  EXPECT_EQ(settings.enumValue("fontSize").raw, 6);
+  EXPECT_EQ(settings.enumValue("fontSize").value, 18);
+  seed(R"({"fontSize":6})");
+  EXPECT_EQ(settings.readFile(Source::Native, backup), Status::Unresolved);
+}
