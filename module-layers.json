@@ -5651,7 +5651,7 @@
     },
     "platformio.ini": {
       "role": "retained-build-input",
-      "rationale": "Retained build/generator input; inventoried and scanned alongside generated resources. Build dependency changes require review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": []
     },
     "scripts/app_only_upload.py": {
@@ -6044,7 +6044,7 @@
     },
     "scripts/test_reader_restart_stats.py": {
       "role": "retained-build-input",
-      "rationale": "Retained build/generator input; inventoried and scanned alongside generated resources. Build dependency changes require review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "ReadingSessionStats.h",
         "algorithm",
@@ -6067,7 +6067,7 @@
     },
     "scripts/test_reader_stats_latency.py": {
       "role": "retained-build-input",
-      "rationale": "Retained build/generator input; inventoried and scanned alongside generated resources. Build dependency changes require review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "CrossPointSettings.h",
         "HalClock.h",
@@ -6547,7 +6547,7 @@
     },
     "src/GlobalActions.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "BoardConfig.h",
         "CrossPointSettings.h",
@@ -6662,7 +6662,7 @@
     },
     "src/QuickActions.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "CrossInkHalFrontlight.h",
         "CrossPointSettings.h",
@@ -6756,7 +6756,7 @@
     },
     "src/SettingsList.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "SettingsList.h",
         "sync/DocumentMatching.h",
@@ -6765,7 +6765,7 @@
     },
     "src/SettingsList.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "CrossInkHalFrontlight.h",
         "CrossPointSettings.h",
@@ -6875,14 +6875,13 @@
     },
     "src/activities/Activity.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "Activity.h",
         "ActivityManager.h",
         "CrossPointState.h",
         "FilenameFontSystem.h",
         "GlobalActions.h",
-        "KOReaderCredentialStore.h",
         "reader/EpubReaderMenuModel.h"
       ]
     },
@@ -6908,7 +6907,7 @@
     },
     "src/activities/ActivityManager.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "ActivityManager.h",
         "CrossInkHalFrontlight.h",
@@ -6931,7 +6930,6 @@
         "ReleaseNotes.h",
         "SilentRestart.h",
         "Xtc.h",
-        "activities/plugins/PluginCatalogActivity.h",
         "algorithm",
         "boot_sleep/BootActivity.h",
         "boot_sleep/SleepActivity.h",
@@ -6946,7 +6944,6 @@
         "library/LibraryActivity.h",
         "network/CrossPointWebServerActivity.h",
         "network/NearbyBookTransferActivity.h",
-        "network/NearbyStatsSyncActivity.h",
         "network/UsbDriveActivity.h",
         "reader/BookReadingStats.h",
         "reader/BookStatsActivity.h",
@@ -6967,7 +6964,7 @@
     },
     "src/activities/ActivityManager.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "CrossPointSettings.h",
         "GfxRenderer.h",
@@ -7319,7 +7316,7 @@
     },
     "src/activities/home/BookActions.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "BookActions.h",
         "BookKey.h",
@@ -7335,14 +7332,12 @@
         "GlobalActions.h",
         "HalStorage.h",
         "I18n.h",
-        "KOReaderCredentialStore.h",
         "Logging.h",
         "Memory.h",
         "RecentBookProgress.h",
         "RecentBooksStore.h",
         "Xtc.h",
         "activities/RenderLock.h",
-        "activities/network/StatsUploadActivity.h",
         "activities/reader/BookReadingStats.h",
         "activities/reader/BookStatsActivity.h",
         "activities/reader/BookStatsTracking.h",
@@ -7360,7 +7355,7 @@
     },
     "src/activities/home/BookActions.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "FileBrowserActionActivity.h",
         "PendingOverlayResume.h",
@@ -7412,7 +7407,7 @@
     },
     "src/activities/home/FileBrowserActivity.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "Arduino.h",
         "BookActions.h",
@@ -7436,7 +7431,6 @@
         "Utf8.h",
         "Xtc.h",
         "activities/boot_sleep/ImageFolderIndex.h",
-        "activities/network/StatsUploadActivity.h",
         "activities/reader/EpubReaderActivity.h",
         "activities/settings/SettingsActivity.h",
         "activities/util/ConfirmationActivity.h",
@@ -7627,7 +7621,7 @@
     },
     "src/activities/library/LibraryActivity.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "Arduino.h",
         "Bitmap.h",
@@ -7770,7 +7764,7 @@
     },
     "src/activities/network/CrossPointWebServerActivity.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "CrossPointState.h",
         "CrossPointWebServerActivity.h",
@@ -7789,7 +7783,6 @@
         "WifiSelectionActivity.h",
         "activities/ActivityManager.h",
         "activities/network/CalibreConnectActivity.h",
-        "activities/network/StatsUploadActivity.h",
         "components/CompactHeader.h",
         "components/TouchHeaderBackButton.h",
         "components/UITheme.h",
@@ -7910,7 +7903,7 @@
     },
     "src/activities/network/NetworkModeSelectionActivity.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "CrossPointSettings.h",
         "GfxRenderer.h",
@@ -7924,8 +7917,7 @@
         "components/icons/listIcons.h",
         "components/icons/readingStatsIcons.h",
         "components/icons/syncIcons.h",
-        "fontIds.h",
-        "network/ReadingSyncUpload.h"
+        "fontIds.h"
       ]
     },
     "src/activities/network/NetworkModeSelectionActivity.h": {
@@ -8184,7 +8176,7 @@
     },
     "src/activities/reader/BookReadingStats.cpp": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "BookReadingStats.h",
         "HalStorage.h",
@@ -8199,7 +8191,7 @@
     },
     "src/activities/reader/BookReadingStats.h": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "ReadingStatsUtils.h",
         "StatsCounterId.h",
@@ -8210,7 +8202,7 @@
     },
     "src/activities/reader/BookStatsActivity.cpp": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "BookStatsActivity.h",
         "BookStatsView.h",
@@ -8218,11 +8210,9 @@
         "FilenameFontSystem.h",
         "I18n.h",
         "MappedInputManager.h",
-        "activities/network/StatsUploadActivity.h",
         "activities/util/ConfirmationActivity.h",
         "components/TouchHeaderBackButton.h",
         "components/UITheme.h",
-        "network/ReadingSyncUpload.h",
         "sync/BookSyncFile.h",
         "sync/SyncPending.h",
         "util/InputReleaseGuard.h"
@@ -8636,10 +8626,9 @@
     },
     "src/activities/reader/EpubReaderActivity.cpp": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "../settings/DictionarySelectActivity.h",
-        "../settings/KOReaderSettingsActivity.h",
         "Arduino.h",
         "BidiUtils.h",
         "BookFontSystem.h",
@@ -8678,13 +8667,11 @@
         "I18n.h",
         "InputWake.h",
         "KOReaderCredentialStore.h",
-        "KOReaderSyncActivity.h",
         "Logging.h",
         "LookedUpWordsActivity.h",
         "MappedInputManager.h",
         "Memory.h",
         "MemoryBudget.h",
-        "NearbyBookPositionSyncActivity.h",
         "PageWordGeometry.h",
         "ProgressMapper.h",
         "QrDisplayActivity.h",
@@ -8733,7 +8720,7 @@
     },
     "src/activities/reader/EpubReaderActivity.h": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "BackgroundBuildMemoryGuard.h",
         "BookLoadingFeedback.h",
@@ -8770,7 +8757,6 @@
         "memory",
         "optional",
         "string",
-        "sync/KeptPosition.h",
         "sync/SyncPending.h"
       ]
     },
@@ -9021,7 +9007,7 @@
     },
     "src/activities/reader/EpubReaderMenuModel.h": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "array",
         "cstddef",
@@ -9112,7 +9098,7 @@
     },
     "src/activities/reader/GlobalReadingStats.cpp": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "DailyReadingStats.h",
         "FsHelpers.h",
@@ -9133,7 +9119,7 @@
     },
     "src/activities/reader/GlobalReadingStats.h": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "ReadingStatsUtils.h",
         "StatsCounterId.h",
@@ -9566,7 +9552,7 @@
     },
     "src/activities/reader/ReadingSessionStats.cpp": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "Logging.h",
         "Memory.h",
@@ -10653,7 +10639,7 @@
     },
     "src/activities/settings/SettingsActivity.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "AboutActivity.h",
         "AppCapabilities.h",
@@ -10675,7 +10661,6 @@
         "HalGPIO.h",
         "HyphenationManagerActivity.h",
         "I18n.h",
-        "KOReaderSettingsActivity.h",
         "KeyboardLayoutsActivity.h",
         "Logging.h",
         "MappedInputManager.h",
@@ -10694,7 +10679,6 @@
         "TtfRenderOptionsActivity.h",
         "WiFi.h",
         "activities/network/WifiSelectionActivity.h",
-        "activities/plugins/PluginCatalogActivity.h",
         "activities/reader/GlobalReadingStats.h",
         "activities/util/ConfirmationActivity.h",
         "activities/util/IntervalSelectionActivity.h",
@@ -10894,7 +10878,7 @@
     },
     "src/activities/util/FrontlightPanelActivity.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "CrossInkHalFrontlight.h",
         "CrossPointSettings.h",
@@ -12137,7 +12121,7 @@
     },
     "src/main.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "AppCapabilities.h",
         "AppVersion.h",
@@ -12184,14 +12168,11 @@
         "activities/ActivityManager.h",
         "activities/boot_sleep/ImageFolderIndex.h",
         "activities/home/BookActions.h",
-        "activities/reader/KOReaderSyncActivity.h",
         "activities/reader/ReaderUtils.h",
         "activities/reader/ReadingStatsUtils.h",
         "activities/reader/StatsBackup.h",
         "activities/settings/AssetDownloadActivity.h",
         "activities/settings/FontDownloadActivity.h",
-        "activities/settings/KOReaderAuthActivity.h",
-        "activities/settings/KOReaderSettingsActivity.h",
         "activities/settings/OtaUpdateActivity.h",
         "activities/settings/SdFirmwareUpdateActivity.h",
         "algorithm",
@@ -12318,7 +12299,7 @@
     },
     "src/network/CrossPointPluginServer.cpp": {
       "role": "retained-native-network",
-      "rationale": "Native baseline only; not callable from product UI. F05 owns writer retirement before SyncOwner activation.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "ArduinoJson.h",
         "ArduinoJsonStringCompat.h",
@@ -12359,7 +12340,7 @@
     },
     "src/network/CrossPointWebServer.cpp": {
       "role": "retained-native-network",
-      "rationale": "Native baseline only; not callable from product UI. F05 owns writer retirement before SyncOwner activation.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "AppVersion.h",
         "ArduinoJson.h",
@@ -12425,7 +12406,7 @@
     },
     "src/network/CrossPointWebServer.h": {
       "role": "retained-native-network",
-      "rationale": "Native baseline only; not callable from product UI. F05 owns writer retirement before SyncOwner activation.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "ArduinoJson.h",
         "HalStorage.h",
@@ -12648,7 +12629,7 @@
     },
     "src/network/ReadingSyncUpload.cpp": {
       "role": "retained-native-network",
-      "rationale": "Native baseline only; not callable from product UI. F05 owns writer retirement before SyncOwner activation.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "ClippingsUpload.h",
         "CrossPointSettings.h",
@@ -12755,7 +12736,7 @@
     },
     "src/network/UsbSerialFileTransfer.cpp": {
       "role": "retained-native-network",
-      "rationale": "Native baseline only; not callable from product UI. F05 owns writer retirement before SyncOwner activation.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "AppVersion.h",
         "Arduino.h",
@@ -12773,7 +12754,6 @@
         "SyncJsonAllocator.h",
         "TransferWriteCheckpoint.h",
         "USBCDC.h",
-        "UsbProgressSync.h",
         "UsbSerialFileTransfer.h",
         "activities/Activity.h",
         "activities/ActivityManager.h",
@@ -13166,7 +13146,7 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native simulator-only harness; F06 test header invokes bounded publication/restart scenarios after storage initialization, without reader or UI behavior changes.",
+      "rationale": "F05 retires native network scenarios and verifies local reader capture; F06 retains bounded publication/restart hooks after storage initialization, with no product UI dependency.",
       "includes": [
         "../../test/simulator/FilePublishScenario.h",
         "AppVersion.h",
@@ -13196,8 +13176,6 @@
         "Logging.h",
         "MappedInputManager.h",
         "OpdsCatalogSmokeTest.h",
-        "PluginSmokeTest.h",
-        "ReadingUploadSmokeTest.h",
         "RecentBooksStore.h",
         "ReleaseNotes.h",
         "SDL.h",
@@ -13207,7 +13185,6 @@
         "SettingsList.h",
         "SilentRestart.h",
         "SimulatorSmokeTest.h",
-        "StatsUploadSmokeTest.h",
         "SupportInfo.h",
         "SupportInfoExport.h",
         "TtfRenderProfileStore.h",
@@ -13228,7 +13205,6 @@
         "activities/library/LibraryActivity.h",
         "activities/network/CrossPointWebServerActivity.h",
         "activities/network/NetworkModeSelectionActivity.h",
-        "activities/network/StatsUploadActivity.h",
         "activities/network/UsbDriveActivity.h",
         "activities/reader/BookLoadingFeedback.h",
         "activities/reader/BookReadingStats.h",
@@ -13245,7 +13221,6 @@
         "activities/reader/EpubReaderFootnotesActivity.h",
         "activities/reader/EpubReaderPercentSelectionActivity.h",
         "activities/reader/EpubReaderUtils.h",
-        "activities/reader/KOReaderSyncActivity.h",
         "activities/reader/QrDisplayActivity.h",
         "activities/reader/ReaderButtonShortcuts.h",
         "activities/reader/ReaderFontLoading.h",
@@ -13261,7 +13236,6 @@
         "activities/settings/FontSelectionActivity.h",
         "activities/settings/FrontlightTimePickerActivity.h",
         "activities/settings/HyphenationManagerActivity.h",
-        "activities/settings/KOReaderSettingsActivity.h",
         "activities/settings/KeyboardLayoutsActivity.h",
         "activities/settings/OpdsServerListActivity.h",
         "activities/settings/OtaUpdateActivity.h",
@@ -13313,7 +13287,7 @@
     },
     "src/simulator/StatsUploadSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "ArduinoJson.h",
         "CrossPointSettings.h",
@@ -14107,30 +14081,21 @@
     },
     "src/util/PluginEvents.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "ArduinoJson.h",
         "CrossPointSettings.h",
-        "DownloadFileSwap.h",
-        "FilePublication.h",
         "HalStorage.h",
-        "LibraryBuilder.h",
-        "LibraryFileTypes.h",
         "Logging.h",
         "Memory.h",
         "PluginEventOutbox.h",
         "PluginEvents.h",
-        "PluginHttp.h",
         "PluginLocations.h",
         "TrustedTime.h",
-        "WiFi.h",
-        "WifiCredentialStore.h",
-        "components/UITheme.h",
         "cstdio",
         "cstring",
         "esp_random.h",
         "mutex",
-        "network/ProtectedPaths.h",
         "random",
         "string",
         "time.h",
@@ -14139,7 +14104,7 @@
     },
     "src/util/PluginEvents.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "cstddef",
         "cstdint"
@@ -14147,27 +14112,23 @@
     },
     "src/util/PluginHttp.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "FilePublication.h",
         "HalStorage.h",
         "Logging.h",
         "PluginHttp.h",
-        "SecureHttpClient.h",
-        "TransferWriteCheckpoint.h",
         "algorithm",
         "cctype",
         "cstdio",
         "cstdlib",
         "cstring",
-        "network/ProtectedPaths.h",
-        "network/WifiPowerSaveGuard.h",
-        "util/TaskWatchdog.h"
+        "network/ProtectedPaths.h"
       ]
     },
     "src/util/PluginHttp.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "ArduinoJson.h",
         "PluginHttpPolicy.h",
@@ -14339,12 +14300,12 @@
     },
     "src/util/StatsStorage.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
       "includes": [
         "FsHelpers.h",
         "HalStorage.h",
-        "KOReaderSyncClient.h",
         "Logging.h",
+        "StatsIdentity.h",
         "StatsStorage.h",
         "algorithm",
         "cstdio",
@@ -14571,6 +14532,28 @@
     "src/booksync/storage/FilePublish.h": {
       "role": "storage",
       "rationale": "F06 worker-only publication mechanics use HAL storage; no UI, adapter or reader dependency."
+    },
+    "scripts/retire_native_transport.py": {
+      "role": "retained-system",
+      "rationale": "BookSync F05: local stats identity extracted unchanged from the retired transport; no network dependency.",
+      "includes": []
+    },
+    "src/util/StatsIdentity.cpp": {
+      "role": "retained-system",
+      "rationale": "BookSync F05: local stats identity extracted unchanged from the retired transport; no network dependency.",
+      "includes": [
+        "StatsIdentity.h",
+        "cstdint",
+        "cstdio",
+        "esp_mac.h"
+      ]
+    },
+    "src/StatsIdentity.h": {
+      "role": "retained-system",
+      "rationale": "BookSync F05: exclude archived transport in every build or provide unchanged local stats identity without transport linkage.",
+      "includes": [
+        "cstddef"
+      ]
     }
   },
   "generators": {

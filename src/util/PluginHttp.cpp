@@ -3,8 +3,6 @@
 #include <FilePublication.h>
 #include <HalStorage.h>
 #include <Logging.h>
-#include <SecureHttpClient.h>
-#include <TransferWriteCheckpoint.h>
 
 #include <algorithm>
 #include <cctype>
@@ -13,32 +11,10 @@
 #include <cstring>
 
 #include "network/ProtectedPaths.h"
-#include "network/WifiPowerSaveGuard.h"
-#include "util/TaskWatchdog.h"
 
 namespace {
 constexpr size_t MAX_TOKEN_FILE_SIZE = 2 * 1024;
 
-// Resolves the caller's reused TLS session (or `tmp`) into a configured,
-// connected client, or nullptr if initialization or the connection failed.
-freeink::SecureHttpClient* openClient(freeink::SecureHttpClient* session, freeink::SecureHttpClient& tmp,
-                                      const std::string& url, const pluginhttp::Headers& headers, uint32_t timeoutMs,
-                                      const std::function<bool()>& shouldAbort) {
-  freeink::SecureHttpClient& http = session ? *session : tmp;
-  if (!pluginhttp::validHeaders(headers)) return nullptr;
-  http.setUserAgent("CrossInk");
-  // Same trust posture as every other SecureNet consumer: no CA bundle ships
-  // with the transport, so verification is skipped; traffic stays encrypted.
-  http.setInsecure();
-  http.setTimeout(timeoutMs);
-  if (!http.begin(url) || !http.connect(shouldAbort)) {
-    LOG_ERR("PHTP", "Plugin connection failed");
-    return nullptr;
-  }
-  // Copy headers only after TLS setup has released its temporary allocations.
-  for (const auto& h : headers) http.addHeader(h.first, h.second);
-  return &http;
-}
 }  // namespace
 
 namespace pluginhttp {
@@ -224,132 +200,6 @@ void loadConfigFile(const std::string& file, Headers& out) {
   for (JsonPairConst kv : fields) {
     out.emplace_back(kv.key().c_str(), variantToString(kv.value()));
   }
-}
-
-int request(freeink::SecureHttpClient* session, const std::string& url, const std::string& method,
-            const std::string& body, const Headers& headers, String& out, const size_t maxResponse,
-            Headers* responseHeaders, const std::function<bool()>& shouldAbort, uint32_t timeoutMs) {
-  // Bound the input before encoding, and validate the actual outgoing URL.
-  if (url.size() > 2048) {
-    LOG_ERR("PHTP", "Plugin URL exceeds request limit");
-    return -1;
-  }
-  const std::string escapedUrl = escapeUrl(url);
-  if (!validRequest(escapedUrl, method) || !validHeaders(headers)) {
-    LOG_ERR("PHTP", "Invalid plugin request");
-    return -1;
-  }
-  const uint32_t started = millis();
-  const auto abort = [&] {
-    resetTaskWatchdogIfSubscribed();
-    return static_cast<uint32_t>(millis() - started) >= 60000 || (shouldAbort && shouldAbort());
-  };
-  WifiPowerSaveGuard psGuard;
-  freeink::SecureHttpClient tmp;
-  freeink::SecureHttpClient* httpPtr = openClient(session, tmp, escapedUrl, headers, timeoutMs, abort);
-  if (!httpPtr) return -1;
-  freeink::SecureHttpClient& http = *httpPtr;
-
-  out.remove(0);
-  size_t reserved = 0;
-  bool overflow = false;
-  const int status = http.sendRequest(
-      method.c_str(), reinterpret_cast<const uint8_t*>(body.data()), body.size(),
-      [&](const uint8_t* data, size_t len) {
-        if (len > maxResponse - out.length()) {
-          overflow = true;
-          return false;
-        }
-        const size_t needed = out.length() + len;
-        // Grow geometrically instead of reallocating for every network chunk.
-        if (needed > reserved) reserved = std::min(maxResponse, std::max(needed, reserved * 2));
-        if (!out.reserve(reserved) || !out.concat(reinterpret_cast<const char*>(data), len)) {
-          overflow = true;
-          return false;
-        }
-        return true;
-      },
-      abort);
-  if (responseHeaders) *responseHeaders = http.getHeaders();
-  // Error statuses still return their body: OAuth device-code polling carries
-  // its state ("authorization_pending") in 4xx response bodies.
-  if (overflow || status < 0 || !http.responseComplete()) {
-    LOG_ERR("PHTP", "API request failed: status=%d overflow=%d complete=%d %s", status, overflow,
-            http.responseComplete(), url.c_str());
-    return -1;
-  }
-  return status;
-}
-
-int requestToFile(freeink::SecureHttpClient* session, const std::string& url, const std::string& method,
-                  const std::string& body, const Headers& headers, const char* destPath, const size_t maxResponse,
-                  const std::function<bool()>& shouldAbort, uint32_t timeoutMs) {
-  // Bound the input before encoding, and validate the actual outgoing URL.
-  if (url.size() > 2048) {
-    LOG_ERR("PHTP", "Plugin URL exceeds request limit");
-    return -1;
-  }
-  const std::string escapedUrl = escapeUrl(url);
-  if (!validRequest(escapedUrl, method) || !validHeaders(headers)) {
-    LOG_ERR("PHTP", "Invalid plugin request");
-    return -1;
-  }
-  const uint32_t started = millis();
-  const auto abort = [&] {
-    resetTaskWatchdogIfSubscribed();
-    return static_cast<uint32_t>(millis() - started) >= 60000 || (shouldAbort && shouldAbort());
-  };
-  WifiPowerSaveGuard psGuard;
-  freeink::SecureHttpClient tmp;
-  freeink::SecureHttpClient* httpPtr = openClient(session, tmp, escapedUrl, headers, timeoutMs, abort);
-  if (!httpPtr) return -1;
-  freeink::SecureHttpClient& http = *httpPtr;
-
-  int status = -1;
-  bool writeOk = true;
-  size_t written = 0;
-  {
-    HalFile file;
-    if (!Storage.openFileForWrite("PHTP", destPath, file)) return -1;
-    status = http.sendRequest(
-        method.c_str(), reinterpret_cast<const uint8_t*>(body.data()), body.size(),
-        [&](const uint8_t* data, size_t len) {
-          if (len > maxResponse - written) {
-            writeOk = false;
-            return false;
-          }
-          if (!FsHelpers::writeAndCheckpoint(file, data, len)) {
-            writeOk = false;
-            return false;
-          }
-          written += len;
-          return true;
-        },
-        abort);
-    writeOk = file.close() && writeOk;
-    // Closed before publishing or removing the destination.
-  }
-  if (!writeOk || status < 0 || !http.responseComplete()) {
-    LOG_ERR("PHTP", "API request (to file) failed: status=%d writeOk=%d complete=%d %s", status, writeOk,
-            http.responseComplete(), url.c_str());
-    Storage.remove(destPath);
-    return -1;
-  }
-  return status;
-}
-
-bool mintPasswordToken(freeink::SecureHttpClient* session, const std::string& url, const std::string& method,
-                       const std::string& body, const Headers& headers, const std::string& tokenPath,
-                       std::string& outToken, const std::function<bool()>& shouldAbort, uint32_t timeoutMs) {
-  String response;
-  constexpr size_t MAX_AUTH_RESPONSE = 8 * 1024;
-  const int status =
-      request(session, url, method, body, headers, response, MAX_AUTH_RESPONSE, nullptr, shouldAbort, timeoutMs);
-  if (status < 200 || status >= 300) return false;
-  JsonDocument doc;
-  if (deserializeJson(doc, response) != DeserializationError::Ok) return false;
-  outToken = variantToString(resolvePath(doc.as<JsonVariantConst>(), tokenPath));
-  return !outToken.empty();
 }
 
 }  // namespace pluginhttp

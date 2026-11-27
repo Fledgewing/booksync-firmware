@@ -66,7 +66,7 @@ struct SecureHttpClient {
 };
 }
 '''
-source += function(http, 'freeink::SecureHttpClient* openClient(')
+assert 'freeink::SecureHttpClient* openClient(' not in http  # F05 retired plugin transport
 source += r'''
 namespace BidiUtils { bool isTransparentMark(uint32_t cp) { return cp == 0x05b0; } }
 struct EpdFontFamily {
@@ -125,16 +125,6 @@ int main() {
   assert(pluginhttp::urlEncodeQuery("a &/é?#%+") == "a%20%26%2F%C3%A9%3F%23%25%2B");
   assert(pluginhttp::escapeUrl("https://x/a é?q=%20&b=+/#") == "https://x/a%20%C3%A9?q=%20&b=+/#");
   assert(pluginhttp::escapeUrl("x\r\ny\t") == "x%0D%0Ay%09");
-  freeink::SecureHttpClient temporary, session;
-  const pluginhttp::Headers headers{{"Cookie", std::string(2000, 'a')}};
-  assert(openClient(&session, temporary, "https://x", headers, 42, [] {return false;}) == &session);
-  assert((session.calls == std::vector<std::string>{"begin", "connect", "header"}));
-  session.calls.clear(); session.connectOk = false;
-  assert(openClient(&session, temporary, "https://x", headers, 42, [] {return false;}) == nullptr);
-  assert(session.calls.size() == 2);
-  session.calls.clear(); session.connectOk = true;
-  assert(openClient(&session, temporary, "https://x", headers, 42, [] {return true;}) == nullptr);
-  assert(session.calls.size() == 2);
   assert(measure("aaaaaaaaaa") == 10); // Previously rounds 170/16 once, giving 11.
   assert(measure("aaaaaaaaaa", 17, EpdFontFamily::REGULAR, 0, 0, 0, 15) == 15);
   assert(measure("a\u0301\ufe0fb\u05b0c") == 3);
@@ -155,4 +145,4 @@ with tempfile.TemporaryDirectory(prefix='crossink-upstream-ports-') as directory
                     '-fno-omit-frame-pointer', '-I'+str(ROOT/'lib/Utf8'), '-I'+str(ROOT/'lib/EpdFont'),
                     str(cpp), str(ROOT/'lib/Utf8/Utf8.cpp'), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
-print('Production-path regression checks passed: UTF-8 masking, URL encoding, connection ordering/cancellation and SD advance rounding.')
+print('Production-path regression checks passed: UTF-8 masking, URL encoding, retired plugin transport and SD advance rounding.')

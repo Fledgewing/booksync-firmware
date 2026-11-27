@@ -38,7 +38,6 @@
 #include <utility>
 
 #include "../settings/DictionarySelectActivity.h"
-#include "../settings/KOReaderSettingsActivity.h"
 #include "BookFontSystem.h"
 #include "BookStatsActivity.h"
 #include "BookStatsTracking.h"
@@ -59,10 +58,8 @@
 #include "GlobalActions.h"
 #include "HyphenationPackStore.h"
 #include "KOReaderCredentialStore.h"
-#include "KOReaderSyncActivity.h"
 #include "LookedUpWordsActivity.h"
 #include "MappedInputManager.h"
-#include "NearbyBookPositionSyncActivity.h"
 #include "PageWordGeometry.h"
 #include "ProgressMapper.h"
 #include "QrDisplayActivity.h"
@@ -2655,17 +2652,6 @@ void EpubReaderActivity::onEnter() {
     }
   }
 
-  // Look up a kept remote position now, before the first page renders: a
-  // binary-matching id may need the book's bytes, and the render task must not
-  // be reading the EPUB meanwhile. Nothing kept costs one failed file open.
-  {
-    KeptPosition::Offer offer;
-    if (KeptPosition::find(epub->getPath(), offer)) {
-      keptOffer = makeUniqueNoThrow<KeptPosition::Offer>(std::move(offer));
-      if (!keptOffer) LOG_ERR("ERS", "OOM: kept position offer");
-    }
-  }
-
   loadLinkStack();
 
   // Load reading stats and record session start time.
@@ -3248,107 +3234,6 @@ bool EpubReaderActivity::checkHyphenationPack() {
   return true;
 }
 
-bool EpubReaderActivity::offerKeptPosition() {
-  static constexpr float SAME_PROGRESS_EPSILON = 0.001f;  // as Sync Book: 0.1 percentage points
-  float local = 0.0f;
-  {
-    RenderLock lock(*this, RenderLock::Mode::Try);
-    if (!lock.ownsLock() || !epub || !section || activeFootnotePreview || pageShownAtMs == 0) return false;
-    local = getCurrentBookProgressPercent() / 100.0f;
-  }
-  keptOfferShown = true;
-  const float remote = keptOffer->entry.percentage;
-  if (remote - local <= SAME_PROGRESS_EPSILON) {
-    // This reader is already there or further along: nothing to offer. When
-    // ahead, queue its position so the next sync sends it.
-    KeptPosition::resolve(epub->getPath(), *keptOffer, local - remote > SAME_PROGRESS_EPSILON);
-    keptOffer.reset();
-    return false;
-  }
-
-  char body[128];
-  const char* device = keptOffer->entry.device[0] ? keptOffer->entry.device : tr(STR_SYNC_REMOTE_TITLE);
-  snprintf(body, sizeof(body), tr(STR_KEPT_POSITION_FORMAT), static_cast<int>(remote * 100.0f + 0.5f), device);
-  auto confirmation =
-      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_PROGRESS_FOUND), body, false, true);
-  if (!confirmation) {
-    // Kept for the next open or sync.
-    LOG_ERR("ERS", "OOM: kept position prompt");
-    keptOffer.reset();
-    return false;
-  }
-  confirmation->setOptionLabels(StrId::STR_STAY_HERE, StrId::STR_CONTINUE);
-  {
-    RenderLock lock(*this);
-    pauseReadingPaceTimer("kept_position_prompt");
-  }
-  startActivityForResult(std::move(confirmation), [this](const ActivityResult& result) {
-    const auto offer = std::move(keptOffer);
-    if (!offer || !epub) return;
-    if (!result.isCancelled) {
-      applyKeptPosition(*offer);
-      return;
-    }
-    // Declined (Stay here, Back, or a tap outside): this reader's position wins.
-    KeptPosition::resolve(epub->getPath(), *offer, true);
-    RenderLock lock(*this);
-    resumeReadingPaceTimer("kept_position_declined");
-    requestUpdate();
-  });
-  return true;
-}
-
-void EpubReaderActivity::applyKeptPosition(const KeptPosition::Offer& offer) {
-  clearPendingManualPageTurns(/*requestRecoveryRedraw=*/false);
-  RenderLock lock(*this);
-  resumeReadingPaceTimer("kept_position_applied");
-  // Mapping reads section caches: free a still-building section's file first.
-  if (section && section->isBuilding()) section->releaseBuildFile();
-  const int localPages = section ? std::max(1, static_cast<int>(section->estimatedTotalPages())) : 1;
-  const CrossPointPosition position =
-      KOReaderSyncActivity::mapRemotePosition(epub, renderer, offer.entry.toProgress(offer.document),
-                                              KOREADER_STORE.getMatchMethod(), currentSpineIndex, localPages);
-  if (!position.valid || position.spineIndex < 0 || position.spineIndex >= epub->getSpineItemsCount()) {
-    // Left kept: Sync Book reports why it can't be applied (re-optimize the EPUB).
-    LOG_ERR("ERS", "Cannot map kept position for %s", epub->getPath().c_str());
-    requestUpdate();
-    return;
-  }
-
-  const int pageCount = std::max(position.totalPages, position.pageNumber + 1);
-  const std::optional<uint32_t> visibleTextOffset =
-      position.hasVisibleTextOffset ? std::optional<uint32_t>(position.visibleTextOffset) : std::nullopt;
-  section.reset();
-  if (EpubReaderUtils::saveProgress(*epub, position.spineIndex, position.pageNumber, pageCount, visibleTextOffset)) {
-    RecentBookProgress::saveCachedEpubPercent(*epub, position.spineIndex, position.pageNumber, pageCount);
-  } else {
-    LOG_ERR("ERS", "Cannot save kept position; the reader saves it on the next page turn");
-  }
-  KeptPosition::resolve(epub->getPath(), offer, false);
-  LOG_INF("ERS", "Applied kept position: spine=%d page=%d/%d", position.spineIndex, position.pageNumber, pageCount);
-
-  // Reopen at the new position exactly as onEnter() resumes saved progress,
-  // which is what Sync Book's apply-and-reopen does.
-  clearFootnotePreviewState();
-  pendingPercentJump = false;
-  pendingPageJump.reset();
-  pendingParagraphIndex = UINT16_MAX;
-  pendingClippingIndex = UINT16_MAX;
-  pendingAnchor.clear();
-  currentSpineIndex = position.spineIndex;
-  nextPageNumber = position.pageNumber;
-  cachedSpineIndex = currentSpineIndex;
-  cachedChapterPageNumber = position.pageNumber;
-  cachedChapterTotalPageCount = pageCount;
-  cachedVisibleTextOffset = visibleTextOffset;
-  cachedPageParagraphIndex = UINT16_MAX;
-  cachedPageParagraphOffset = 0;
-  cachedPageParagraphSpan = 0;
-  pendingRelayoutReposition = visibleTextOffset.has_value();
-  armReadingPaceWarmup("kept_position");
-  requestUpdate();
-}
-
 void EpubReaderActivity::flushPendingSyncMark() {
   if (!pendingSyncDue.exchange(false, std::memory_order_relaxed) || !epub) return;
   // Reading moves the position and, only with tracking on, the book's stats.
@@ -3360,7 +3245,6 @@ void EpubReaderActivity::loop() {
   if (mappedInput.hasPendingActivity() || RenderLock::peek()) statsSaveDelay.defer(millis());
   pluginEvents.pollWhenIdle(getCurrentBookPath());
   flushPendingSyncMark();
-  if (keptOffer && !keptOfferShown && offerKeptPosition()) return;
   if (!hyphenationPackChecked && checkHyphenationPack()) return;
   syncStatsTrackingState();
   if (pendingTtfRenderRelayout && epub) {
@@ -4663,122 +4547,9 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuAction action, const 
       requestUpdate();
       break;
     }
-    case EpubReaderMenuAction::SYNC: {
-      if (!KOREADER_STORE.hasCredentials()) {
-        pauseReadingPaceTimer("koreader_settings");
-        if (!saveProgressBeforeRestart()) {
-          resumeReadingPaceTimer("restart_save_failed");
-          requestUpdate();
-          return;
-        }
-        startActivityForResult(std::make_unique<KOReaderSettingsActivity>(renderer, mappedInput),
-                               [this, returnToReaderMenu](const ActivityResult&) {
-                                 resumeReadingPaceTimer("koreader_settings_return");
-                                 saveGlobalSettingsPreservingBookOverrides();
-                                 if (returnToReaderMenu)
-                                   openReaderMenu();
-                                 else
-                                   requestUpdate();
-                               });
-      } else {
-        // Persist current position so the reader resumes at the right page on return.
-        // goToReader() depends on this file, so abort the sync if the write fails.
-        const bool saved = saveProgressBeforeRestart();
-        if (!saved) {
-          LOG_ERR("KOSync", "Aborting sync because current progress could not be saved");
-          pendingSyncSaveError = true;
-          requestUpdate();
-          return;
-        }
-
-        // ActivityManager owns this one-shot handoff across deferred reader teardown.
-        auto restartActivity = makeUniqueNoThrow<KOReaderSyncActivity>(renderer, mappedInput, SETTINGS.orientation);
-        if (!restartActivity) {
-          LOG_ERR("KOSync", "OOM: restart handoff (free=%u maxAlloc=%u)", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
-          drawToast(renderer, tr(STR_KOREADER_SYNC_LOW_MEMORY));
-          delay(1200);
-          requestUpdate();
-          break;
-        }
-
-        if (replacementResume) APP_STATE.setPendingOverlayResume(*replacementResume);
-        pauseReadingPaceTimer("sync_progress");
-        activityManager.replaceActivity(std::move(restartActivity));
-      }
+    case EpubReaderMenuAction::SYNC:
+    case EpubReaderMenuAction::NEARBY_POSITION_SYNC:
       break;
-    }
-    case EpubReaderMenuAction::NEARBY_POSITION_SYNC: {
-      const int currentPage = section ? section->currentPage : nextPageNumber;
-      const int totalPages = section ? section->estimatedTotalPages() : std::max(1, cachedChapterTotalPageCount);
-      std::optional<uint16_t> paragraphIndex;
-      std::optional<uint16_t> listItemIndex;
-      if (section) {
-        getSyncPageAnchors(*section, currentPage, paragraphIndex, listItemIndex);
-      }
-
-      CrossPointPosition localPos = {currentSpineIndex, currentPage, totalPages};
-      if (section && currentPage >= 0 && currentPage < section->pageCount) {
-        if (const auto offset = section->getVisibleTextOffsetForPage(static_cast<uint16_t>(currentPage))) {
-          localPos.visibleTextOffset = *offset;
-          localPos.hasVisibleTextOffset = true;
-        }
-      }
-      if (paragraphIndex.has_value()) {
-        localPos.paragraphIndex = *paragraphIndex;
-        localPos.hasParagraphIndex = true;
-      }
-      if (listItemIndex.has_value()) {
-        localPos.liIndex = *listItemIndex;
-        localPos.hasLiIndex = true;
-      }
-      const DocumentMatchMethod matchMethod = KOREADER_STORE.getMatchMethod();
-      const PositionCoordinateSpace coordinateSpace = matchMethod == DocumentMatchMethod::FILENAME
-                                                          ? PositionCoordinateSpace::SourceDocument
-                                                          : PositionCoordinateSpace::CurrentDocument;
-      KOReaderPosition localKoPos = ProgressMapper::toKOReader(epub, localPos, coordinateSpace);
-      if (!localKoPos.valid) {
-        LOG_ERR("NBPS", "Cannot resolve nearby sync position (needs re-optimization=%d)",
-                localKoPos.needsReoptimization);
-        drawToast(renderer,
-                  localKoPos.needsReoptimization ? tr(STR_SYNC_REOPTIMIZE_REQUIRED) : tr(STR_SYNC_FAILED_MSG));
-        delay(1200);
-        requestUpdate();
-        break;
-      }
-      const int tocIdx = epub->getTocIndexForSpineIndex(currentSpineIndex);
-      std::string localChapterName = (tocIdx >= 0) ? epub->getTocItem(tocIdx).title : "";
-      const std::string savedEpubPath = epub->getPath();
-
-      if (!saveProgress(currentSpineIndex, currentPage, totalPages)) {
-        LOG_ERR("NBPS", "Aborting nearby position sync because current progress could not be saved");
-        pendingSyncSaveError = true;
-        requestUpdate();
-        return;
-      }
-
-      LOG_DBG("NBPS", "Releasing section for nearby position sync (heap before: %u)", (unsigned)ESP.getFreeHeap());
-      {
-        RenderLock lock(*this);
-        if (section) {
-          nextPageNumber = section->currentPage;
-        }
-        section.reset();
-      }
-      LOG_DBG("NBPS", "Section released for nearby position sync (heap after: %u)", (unsigned)ESP.getFreeHeap());
-
-      auto syncActivity = makeUniqueNoThrow<NearbyBookPositionSyncActivity>(
-          renderer, mappedInput, epub, savedEpubPath, currentSpineIndex, currentPage, totalPages, std::move(localKoPos),
-          std::move(localChapterName), matchMethod, paragraphIndex, listItemIndex);
-      if (!syncActivity) {
-        LOG_ERR("NBPS", "OOM opening nearby position sync");
-        requestUpdate();
-        break;
-      }
-      if (replacementResume) APP_STATE.setPendingOverlayResume(*replacementResume);
-      pauseReadingPaceTimer("nearby_position_sync");
-      activityManager.replaceActivity(std::move(syncActivity));
-      break;
-    }
     case EpubReaderMenuAction::BOOKMARK_TOGGLE: {
       const int bookmarkPageCount = section ? section->estimatedTotalPages() : 0;
       if (activeFootnotePreview || !section || bookmarkPageCount == 0 || section->pageCount == 0) break;
@@ -5043,18 +4814,8 @@ bool EpubReaderActivity::handleFrontlightPanelResult(const FrontlightPanelResult
   resume.overlay = PendingOverlayType::FrontlightDrawer;
   resume.selectedIndex = result.state.selectedAction;
   resume.bookPath = epub->getPath();
-  if (result.action == FrontlightPanelAction::SyncProgress) {
-    if (!KOREADER_STORE.hasCredentials()) return startGlobalSyncProgress();
-    resume.readerOrientation = SETTINGS.orientation;
-    resume.preserveReaderOrientation = true;
-    // Use the reader's save-and-handoff path; a direct network restart skips onExit().
-    onReaderMenuConfirm(EpubReaderMenuAction::SYNC, false, &resume);
-    return true;
-  }
-  if (result.action == FrontlightPanelAction::NearbyPositionSync) {
-    onReaderMenuConfirm(EpubReaderMenuAction::NEARBY_POSITION_SYNC, false, &resume);
-    return true;
-  }
+  if (result.action == FrontlightPanelAction::SyncProgress) return false;
+  if (result.action == FrontlightPanelAction::NearbyPositionSync) return false;
   if (!activityManager.goToNearbyBookSend(epub->getPath(), true)) return false;
   APP_STATE.setPendingOverlayResume(std::move(resume));
   return true;

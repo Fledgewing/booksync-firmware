@@ -494,9 +494,6 @@ void CrossPointWebServer::begin() {
     if (!webtransfer::rejectMutationDuringWebSocketUpload(*server)) handlePluginJobComplete();
   });
   server->on("/api/plugin-jobs/status", HTTP_GET, [this] { handlePluginJobStatus(); });
-  server->on("/api/relay", HTTP_POST, [this] {
-    if (!webtransfer::rejectMutationDuringWebSocketUpload(*server)) handleRelay();
-  });
   server->on("/api/crypto", HTTP_POST, [this] {
     if (!webtransfer::rejectMutationDuringWebSocketUpload(*server)) handleCrypto();
   });

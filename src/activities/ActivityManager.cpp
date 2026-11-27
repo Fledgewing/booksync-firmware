@@ -4,8 +4,6 @@
 #include "util/BatteryDiagnosticLog.h"
 #endif
 
-#include "activities/plugins/PluginCatalogActivity.h"
-
 #if CROSSINK_SCALABLE_FONTS
 #include <HalScalableFont.h>
 #endif
@@ -47,7 +45,6 @@
 #include "library/LibraryActivity.h"
 #include "network/CrossPointWebServerActivity.h"
 #include "network/NearbyBookTransferActivity.h"
-#include "network/NearbyStatsSyncActivity.h"
 #include "network/UsbDriveActivity.h"
 #include "reader/BookReadingStats.h"
 #include "reader/BookStatsActivity.h"
@@ -1056,10 +1053,7 @@ bool ActivityManager::resumeFileTransferFromNetworkBoot(const uint32_t payload) 
   return true;
 }
 
-void ActivityManager::goToNearbyStatsSync() {
-  if (!SETTINGS.shouldTrackReadingStats()) return;
-  replaceActivity(std::make_unique<NearbyStatsSyncActivity>(renderer, mappedInput));
-}
+void ActivityManager::goToNearbyStatsSync() {}
 
 void ActivityManager::goToSettings(const bool dismissOnUpSwipe, const bool openLanguageDownloads,
                                    const bool touchscreenRecovery) {
@@ -1091,24 +1085,7 @@ void ActivityManager::goToLibrary() {
   replaceActivity(std::move(library));
 }
 
-bool ActivityManager::goToPlugins(const bool networkBootReady) {
-#ifndef SIMULATOR
-  if (!networkBootReady) {
-    // Hub installation and catalog parsing need the same clean heap as OPDS.
-    silentRestartToNetwork(NetworkBootTarget::PLUGINS);
-    return true;
-  }
-#else
-  (void)networkBootReady;
-#endif
-  auto plugins = makeUniqueNoThrow<PluginCatalogActivity>(renderer, mappedInput, true);
-  if (!plugins) {
-    LOG_ERR("ACT", "Cannot allocate Plugins activity (free=%u maxAlloc=%u)", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
-    return false;
-  }
-  replaceActivity(std::move(plugins));
-  return true;
-}
+bool ActivityManager::goToPlugins(const bool) { return false; }
 
 void ActivityManager::goToBrowser() {
   const auto& servers = OPDS_STORE.getServers();
@@ -1183,8 +1160,7 @@ bool ActivityManager::goToSleep(bool fromTimeout) {
     sleepActivity->showSleepPopup();
   }
 
-  const bool deliverAfterScreen = prepareSleepPlugins(quickResume, fromReaderOrHome);
-  // Artwork can change during delivery. Check the cover cache only after plugins have run.
+  captureSleepEvents();
   const bool renderBeforeExit = sleepActivity && fromReaderOrHome && sleepActivity->rendersBeforeExit();
   if (renderBeforeExit) sleepActivity->onEnter();
 
@@ -1203,7 +1179,7 @@ bool ActivityManager::goToSleep(bool fromTimeout) {
   auto* sleepScreen = sleepActivity.get();
   currentActivity = std::move(sleepActivity);
   if (sleepScreen && !earlyMoon && !renderBeforeExit) sleepScreen->onEnter();
-  if (deliverAfterScreen) pluginevents::deliverSleepEvents();
+
   return sleepScreen && sleepScreen->hasMonochromeFrame();
 }
 
@@ -1574,21 +1550,11 @@ bool RenderLock::heldByCurrentTask() {
   return xSemaphoreGetMutexHolder(activityManager.renderingMutex) == xTaskGetCurrentTaskHandle();
 }
 
-bool ActivityManager::prepareSleepPlugins(bool quickResume, bool fromReaderOrHome) {
-  if (!SETTINGS.pluginsEnabled) return false;
+void ActivityManager::captureSleepEvents() {
+  if (!SETTINGS.pluginsEnabled) return;
   for (auto& activity : stackActivities) activity->prepareForSleep();
   if (currentActivity) currentActivity->prepareForSleep();
   const std::string book = getCurrentBookPath();
   pluginevents::queueSleep(book.c_str(), getScreenshotInfo().progressPercent);
-  if (powerManager.getBatteryPercentage() < 20) return false;
-
-  // Built-in screens don't need downloaded artwork. Book pages and Home have
-  // no active network session that reader exit would disconnect.
-  const auto mode = SETTINGS.sleepScreen;
-  const bool builtInScreen = quickResume || mode == CrossPointSettings::READING_STATS_SLEEP ||
-                             mode == CrossPointSettings::DARK || mode == CrossPointSettings::LIGHT ||
-                             mode == CrossPointSettings::BLANK;
-  if (builtInScreen && fromReaderOrHome) return true;
-  pluginevents::deliverSleepEvents();
-  return false;
+  return;
 }

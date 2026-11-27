@@ -171,7 +171,7 @@ StatsUploadClient::Result ReadingSyncUpload::globalStats(StatsUploadClient& clie
   if (failedStep) *failedStep = GlobalStatsStep::None;
   if (!SETTINGS.shouldTrackReadingStats()) return Result::Skipped;
   GlobalReadingStats global;
-  if (!GlobalReadingStats::loadForUpload(global))
+  if (!GlobalReadingStats::loadStored(global))
     return globalOutcome(client.downloadStreak(), GlobalStatsStep::Streak, failedStep);
   if (!StatsUploadPayload::global(payload, capacity, deviceId, global))
     return globalOutcome(Result::InvalidResponse, GlobalStatsStep::Totals, failedStep);
@@ -248,7 +248,7 @@ bool ReadingSyncUpload::loadBookStats(const std::string& path, BookReadingStats&
   // XTC books keep stats in their own cache folder; they have no KOReader position.
   const auto cache = FsHelpers::hasXtcExtension(path) ? Xtc(path, "/.crosspoint").getCachePath()
                                                       : Epub::resolveCachePathForFilePath(path, "/.crosspoint");
-  return BookStatsTracking::isEnabled(cache) && BookReadingStats::loadForUpload(cache, stats);
+  return BookStatsTracking::isEnabled(cache) && BookReadingStats::loadStored(cache, stats);
 }
 
 bool ReadingSyncUpload::canSyncReadingStats() {

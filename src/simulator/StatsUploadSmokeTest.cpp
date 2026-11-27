@@ -98,14 +98,14 @@ void verifyStatsUploadContract() {
   // Host-only buffers: firmware uses one reusable heap buffer in its activity.
   std::vector<char> payload(StatsUploadPayload::CAPACITY);
   GlobalReadingStats global;
-  require(!GlobalReadingStats::loadForUpload(global), "missing global stats must not export zeros");
+  require(!GlobalReadingStats::loadStored(global), "missing global stats must not export zeros");
   global.totalSessions = 12;
   global.totalReadingSeconds = 3456;
   global.readingHistoryAnchorDay = 9769;
   global.readingHistoryBits[0] = 7;
   global.save();
   GlobalReadingStats loaded;
-  require(GlobalReadingStats::loadForUpload(loaded) && loaded.totalReadingSeconds == 3456, "checked global read");
+  require(GlobalReadingStats::loadStored(loaded) && loaded.totalReadingSeconds == 3456, "checked global read");
   require(StatsUploadPayload::global(payload.data(), payload.size(), "crossink-test", loaded), "global serialization");
   JsonDocument json;
   require(!deserializeJson(json, payload.data()), "global JSON");
@@ -276,7 +276,7 @@ void verifyStatsUploadContract() {
       require(readingStatsDateFromDayIndex(todayDay, today), "streak fixture date");
       if (strcmp(mode, "empty") == 0) {
         require(ReadingSyncUpload::globalStats() == StatsUploadClient::Result::Ok, "empty reader downloads streak");
-        require(!GlobalReadingStats::loadForUpload(loaded), "download does not create local upload stats");
+        require(!GlobalReadingStats::loadStored(loaded), "download does not create local upload stats");
         require(loaded.currentReadingStreak(&today) == 3, "empty reader displays remote streak");
         std::_Exit(0);
       }
@@ -289,7 +289,7 @@ void verifyStatsUploadContract() {
       require(ReadingSyncUpload::globalStats() == StatsUploadClient::Result::Ok, "two-way stats sync");
       require(KOREADER_STORE.getServerSupport() == SyncServerSupport::SUPPORTED, "download retains stats support");
       const bool old = strcmp(mode, "old-server") == 0;
-      require(GlobalReadingStats::loadForUpload(loaded), "local snapshot after download");
+      require(GlobalReadingStats::loadStored(loaded), "local snapshot after download");
       require(loaded.currentReadingStreak(&today) == (old ? 1 : 4), "combined streak displayed");
       require(loaded.readingHistoryBits[0] == 1 && loaded.totalReadingSeconds == 60, "download stays out of uploads");
       require(loaded.displayLongestReadingStreak() == (old ? 1 : 4), "combined longest streak");

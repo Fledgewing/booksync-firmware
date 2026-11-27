@@ -84,7 +84,7 @@ TEST_F(StatsStorageTest, CorruptGlobalSlotsCannotBecomeANewSavedHistoryOrBackup)
   unreadable.totalReadingSeconds = 60;
   EXPECT_FALSE(unreadable.save());
   EXPECT_FALSE(backupGlobalStats(false));
-  EXPECT_FALSE(GlobalReadingStats::loadForUpload(unreadable));
+  EXPECT_FALSE(GlobalReadingStats::loadStored(unreadable));
   EXPECT_EQ(Storage.files.at(path)->bytes, original);
   EXPECT_EQ(Storage.files.at(path + ".bak")->bytes, previous);
 }
@@ -251,7 +251,7 @@ TEST_F(StatsStorageTest, CopiedBookStartsSeparateCountersAndSourceResumes) {
   ASSERT_TRUE(a.save(CACHE));
   switchReader(6);
   BookReadingStats b;
-  EXPECT_FALSE(BookReadingStats::loadForUpload(CACHE, b));
+  EXPECT_FALSE(BookReadingStats::loadStored(CACHE, b));
   EXPECT_EQ(b.totalReadingSeconds, 0u);
   EXPECT_FALSE(BookReadingStats::peekCompleted(CACHE));
   b.totalReadingSeconds = 60;
@@ -492,17 +492,17 @@ TEST_F(StatsStorageTest, LifetimeTotalsUseOnlyTheCurrentReaderAndResetIsScoped) 
   ASSERT_TRUE(a.save());
   switchReader(6);
   GlobalReadingStats b;
-  EXPECT_FALSE(GlobalReadingStats::loadForUpload(b));
+  EXPECT_FALSE(GlobalReadingStats::loadStored(b));
   EXPECT_EQ(GlobalReadingStats::load().totalReadingSeconds, 0u);
   b.totalReadingSeconds = 60;
   b.totalSessions = 1;
   ASSERT_TRUE(b.save());
-  ASSERT_TRUE(GlobalReadingStats::loadForUpload(b));
+  ASSERT_TRUE(GlobalReadingStats::loadStored(b));
   EXPECT_EQ(b.totalReadingSeconds, 60u);
   ASSERT_TRUE(GlobalReadingStats::resetLocal());
   EXPECT_EQ(GlobalReadingStats::load().totalReadingSeconds, 0u);
   switchReader(5);
-  ASSERT_TRUE(GlobalReadingStats::loadForUpload(a));
+  ASSERT_TRUE(GlobalReadingStats::loadStored(a));
   EXPECT_EQ(a.totalReadingSeconds, 3600u);
   EXPECT_EQ(a.totalSessions, 10u);
 }
@@ -606,7 +606,7 @@ TEST_F(StatsStorageTest, LegacyGlobalCollisionDoesNotDisableBookStats) {
   ASSERT_TRUE(book.save(CACHE));
   writeBytes("/.crosspoint/global_stats.bin", {1, 2, 3});
   switchReader(5);
-  ASSERT_TRUE(GlobalReadingStats::loadForUpload(global));
+  ASSERT_TRUE(GlobalReadingStats::loadStored(global));
   EXPECT_EQ(global.totalReadingSeconds, 3600u);
   EXPECT_EQ(BookReadingStats::load(CACHE).totalReadingSeconds, 565u);
   global.totalReadingSeconds += 60;

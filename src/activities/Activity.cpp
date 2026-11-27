@@ -4,7 +4,6 @@
 #include "CrossPointState.h"
 #include "FilenameFontSystem.h"
 #include "GlobalActions.h"
-#include "KOReaderCredentialStore.h"
 #include "reader/EpubReaderMenuModel.h"
 
 void Activity::onEnter() {
@@ -55,16 +54,8 @@ bool Activity::handleFrontlightPanelResult(const FrontlightPanelResult& result) 
   resume.selectedIndex = result.state.selectedAction;
   resume.bookPath = result.bookPath;
   resume.returnHomeAfterReaderFlow = result.action == FrontlightPanelAction::NearbyPositionSync;
-  if (result.action == FrontlightPanelAction::SyncProgress) {
-    if (restoreHomeDrawer && KOREADER_STORE.hasCredentials()) APP_STATE.setPendingOverlayResume(resume);
-    return startGlobalSyncProgress();
-  }
-  if (result.action == FrontlightPanelAction::NearbyPositionSync) {
-    activityManager.goToReaderAndRunMenuAction(result.bookPath,
-                                               static_cast<uint8_t>(EpubReaderMenuAction::NEARBY_POSITION_SYNC));
-    if (restoreHomeDrawer) APP_STATE.setPendingOverlayResume(std::move(resume));
-    return true;
-  }
+  if (result.action == FrontlightPanelAction::SyncProgress) return false;
+  if (result.action == FrontlightPanelAction::NearbyPositionSync) return false;
   if (!activityManager.goToNearbyBookSend(result.bookPath, false)) return false;
   if (restoreHomeDrawer) APP_STATE.setPendingOverlayResume(std::move(resume));
   return true;

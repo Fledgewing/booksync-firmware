@@ -199,69 +199,6 @@ void CrossPointWebServer::handlePluginFile() const {
   f.close();
 }
 
-// POST /api/relay {plugin, method, url, headers:{}, body}
-//   -> 200 with the upstream body raw, its status in X-Relay-Status and its
-//      headers in X-Relay-Headers ([[name, value], ...] JSON, duplicates kept)
-// Lets a plugin make an outbound HTTP(S) call the browser can't (CORS): the
-// device makes it via SecureNet. Sending the body raw avoids escaping it into
-// JSON on the device; PluginHost.relay() rebuilds {status, headers, body}.
-void CrossPointWebServer::handleRelay() {
-  if (rejectIfPluginsDisabled()) return;
-  JsonDocument req;
-  if (!readJsonBody(req)) return;
-  const String plugin = req["plugin"] | "";
-  const std::string url = req["url"] | "";
-  const std::string method = req["method"] | "GET";
-  if (!safeComponent(plugin) || url.empty()) {
-    server->send(400, "application/json", "{\"error\":\"missing plugin/url\"}");
-    return;
-  }
-  pluginhttp::Headers headers;
-  pluginhttp::readHeaders(req["headers"], headers);
-  const std::string body = req["body"] | "";
-  // All values needed below now have independent storage. Drop both copies of
-  // the inbound JSON before wolfSSL allocates its handshake working set.
-  req.clear();
-  req.shrinkToFit();
-  releasePluginRequest();
-
-  suspendTransferServices();
-  ScopedCleanup resumeServices{[this] { resumeTransferServices(); }};
-  LOG_DBG("WEB", "Relay TLS start: heap %u, max block %u: %s", (unsigned)ESP.getFreeHeap(),
-          (unsigned)ESP.getMaxAllocHeap(), url.c_str());
-
-  // One bounded body buffer; larger payloads use /api/fetch. This task is
-  // subscribed to the task WDT for the whole web-server session, so feed it
-  // while a slow peer keeps the request waiting.
-  static constexpr size_t RELAY_BODY_LIMIT = 32 * 1024;
-  String respBody;
-  pluginhttp::Headers respHeaders;
-  const int status =
-      pluginhttp::request(nullptr, url, method, body, headers, respBody, RELAY_BODY_LIMIT, &respHeaders, [] {
-        resetTaskWatchdogIfSubscribed();
-        return false;  // timeout is enforced by the shared transport
-      });
-  // Transport failure, a truncated body, or one over the cap / out of memory
-  // (the reason is logged by pluginhttp).
-  if (status < 0) {
-    server->send(502, "application/json", "{\"error\":\"relay failed; large bodies need /api/fetch\"}");
-    return;
-  }
-
-  JsonDocument headersDoc;
-  JsonArray headerArray = headersDoc.to<JsonArray>();
-  for (const auto& h : respHeaders) {
-    JsonArray pair = headerArray.add<JsonArray>();
-    pair.add(h.first);
-    pair.add(h.second);
-  }
-  String headersJson;
-  serializeJson(headersDoc, headersJson);
-  server->sendHeader("X-Relay-Status", String(status));
-  server->sendHeader("X-Relay-Headers", headersJson);
-  server->send(200, "application/octet-stream", respBody);
-}
-
 // Reserved upstream APIs: fail explicitly until protected-book integration ships.
 void CrossPointWebServer::handleCrypto() {
   if (rejectIfPluginsDisabled()) return;

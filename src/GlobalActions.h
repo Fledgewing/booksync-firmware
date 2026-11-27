@@ -26,7 +26,6 @@ inline bool isPowerButtonActionAvailableOutsideReader(const CrossPointSettings::
     case CrossPointSettings::SHORT_PWRBTN::WAKE_ONLY:
     case CrossPointSettings::SHORT_PWRBTN::QUICK_LOCK:
     case CrossPointSettings::SHORT_PWRBTN::FORCE_REFRESH:
-    case CrossPointSettings::SHORT_PWRBTN::SYNC_PROGRESS:
     case CrossPointSettings::SHORT_PWRBTN::SCREENSHOT:
     case CrossPointSettings::SHORT_PWRBTN::FILE_TRANSFER:
     case CrossPointSettings::SHORT_PWRBTN::CALIBRE_WIRELESS:
@@ -66,5 +65,3 @@ void enterDeepSleep(bool fromTimeout = false);
 bool handleGlobalPowerButtonAction(CrossPointSettings::SHORT_PWRBTN action,
                                    QuickLockTrigger quickLockTrigger = QuickLockTrigger::None);
 bool dispatchShortcutAction(CrossPointSettings::SHORT_PWRBTN action);
-bool startGlobalSyncProgress(bool networkBootReady = false,
-                             uint8_t readerOrientation = CrossPointSettings::ORIENTATION_COUNT);

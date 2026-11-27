@@ -29,7 +29,7 @@ struct GlobalReadingStats {
 
   // Checked local export, never includes nearby-device snapshots.
   static bool exportLocal(uint8_t* data, size_t capacity);
-  static bool loadForUpload(GlobalReadingStats& stats);
+  static bool loadStored(GlobalReadingStats& stats);
   // A failed read is not an empty history. Only explicit backup recovery (or
   // restarting after repairing storage) may clear this write protection.
   static bool recoveryRequired();
@@ -62,6 +62,6 @@ struct GlobalReadingStats {
   uint16_t currentReadingStreak(const ReadingStatsDate* today) const;
   uint16_t displayLongestReadingStreak() const;
 
-  // Separate server calendar; never included in loadForUpload() or nearby exports.
+  // Separate server calendar; never included in loadStored() or nearby exports.
   static bool saveServerStreak(const GlobalReadingStats& streak);
 };

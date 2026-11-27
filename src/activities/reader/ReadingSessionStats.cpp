@@ -81,8 +81,7 @@ bool saveReadingSessionCheckpoint(const BookReadingStats& book, const GlobalRead
   if (!preview->book.save(cachePath)) return false;
   if (!preview->global.save()) return false;
   GlobalReadingStats checked;
-  if (!GlobalReadingStats::loadForUpload(checked) ||
-      checked.totalReadingSeconds != preview->global.totalReadingSeconds ||
+  if (!GlobalReadingStats::loadStored(checked) || checked.totalReadingSeconds != preview->global.totalReadingSeconds ||
       checked.totalSessions != preview->global.totalSessions) {
     LOG_ERR("SessionStats", "Global stats checkpoint could not be verified");
     return false;

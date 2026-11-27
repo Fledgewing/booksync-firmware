@@ -17,7 +17,7 @@ bool GlobalReadingStats::save() const {
   savedGlobal = *this;
   return true;
 }
-bool GlobalReadingStats::loadForUpload(GlobalReadingStats& out) {
+bool GlobalReadingStats::loadStored(GlobalReadingStats& out) {
   out = savedGlobal;
   return true;
 }
