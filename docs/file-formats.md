@@ -2719,3 +2719,30 @@ complete bytes on explicit Resume. The final book and reader sidecars are never
 removed by Cancel. Unrelated destination collisions fail; F24 owns replacement.
 A durable canceled flag precedes staging removal. Restart never starts transport,
 links a file or creates an automatic-open intent.
+
+### BookSync private pending progress checkpoint (`BSP1`)
+
+F18e nests the preceding matched checkpoint (including a completed `BST1` wrapper
+when present) without changing its bytes. This is an adapter-private tag in the
+existing versioned/checksummed lifecycle journal, not a native reader format.
+Unknown versions, flags, malformed fields and truncated data remain pending.
+
+| Offset | Bytes | Value |
+| --- | --- | --- |
+| 0 | 4 | `BSP1` tag/version |
+| 4 | 1 | Flags: bit 0 present, bit 1 percentage present, bit 2 reset, bit 3 web |
+| 5 | 1 | Reserved zero |
+| 6 | 2 | Nested matched checkpoint byte count, little endian |
+| 8 | 2 | Raw protocol position byte count, little endian |
+| 10 | 2 | Label byte count, little endian |
+| 12 | 8 | Percentage IEEE-754 binary64 bits, little endian; zero when absent |
+| 20 | 8 | Timestamp, unsigned little endian; zero when absent |
+| 28 | variable | Matched checkpoint, raw position, then label |
+
+Percentage must be finite and in [0,1]. Reset requires a present zero percentage.
+Absent progress has no position, timestamp, percentage, label or reset/web flags.
+Timestamps fit a signed 64-bit Unix value. Protocol position is at most 4096
+bytes; label at most 100. The entire checkpoint must fit the existing 1024-byte
+journal limit. Unpersistable replies stay uncertain; no truncation is allowed.
+Publication is idempotent and durable before the progress phase acknowledgement,
+which restores the unchanged nested match/stats checkpoint.

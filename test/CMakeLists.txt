@@ -295,3 +295,4 @@ add_subdirectory(host/queries)
 add_subdirectory(host/personal_reading)
 
 add_subdirectory(host/account_surface)
+add_subdirectory(host/lifecycle_progress)

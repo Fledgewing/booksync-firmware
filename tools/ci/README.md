@@ -110,3 +110,9 @@ using real saved page segments and neutral account fixtures. Deterministic perso
 picks share the service policy. `docs/booksync/F39.md` describes the frozen cursor,
 coverage evidence and maintainer hardware checks. No presentation or live sync is
 activated. The full dormant service is retained in hardware size measurements.
+
+F18e adds `test/simulator/lifecycle_progress.py` to every boot gate. The production
+progress handler and route selector use F15 accounts/F17 ownership against an
+independently persisted fake server, with remote-commit, projection-publication
+and owner-checkpoint cuts. Hardware images force-link the dormant handler for
+size checks. See `docs/booksync/F18e.md` for bounds and maintainer hardware checks.
