@@ -35,9 +35,18 @@ void CatalogSurface::enterCatalog(bool textOnly, CatalogRoute entry) {
     summary_.stale = true;
   }
   summary_.sourceLabel.back() = 0;
-  if (entry_.destination == CatalogDestination::BookList) {
-    current_.root = CatalogRoot::All;
-    panel_ = Panel::Books;
+  if (entry_.destination != CatalogDestination::Library) {
+    current_.root = entry_.destination == CatalogDestination::BookList      ? CatalogRoot::All
+                    : entry_.destination == CatalogDestination::Authors     ? CatalogRoot::Authors
+                    : entry_.destination == CatalogDestination::Series      ? CatalogRoot::Series
+                    : entry_.destination == CatalogDestination::Collections ? CatalogRoot::Collections
+                                                                            : CatalogRoot::Lists;
+    panel_ =
+        entry_.destination == CatalogDestination::Authors || entry_.destination == CatalogDestination::Series
+            ? Panel::Groups
+        : (entry_.destination == CatalogDestination::SavedList || entry_.destination == CatalogDestination::BookList)
+            ? Panel::Books
+            : Panel::Sources;
     focus_ = 0;
   }
   requestCatalogPage();
@@ -130,7 +139,9 @@ void CatalogSurface::requestCatalogPage() {
       }
       return;
     }
-    queryAccepted_ = library_.requestQuery(request_);
+    queryAccepted_ = entry_.destination == CatalogDestination::SavedList
+                         ? library_.requestListBooks(request_, entry_.list)
+                         : library_.requestQuery(request_);
   }
   if (!queryAccepted_) {
     pending_ = false;
