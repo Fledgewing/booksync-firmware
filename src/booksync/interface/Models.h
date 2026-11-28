@@ -12,6 +12,8 @@ struct Snapshot {
   uint32_t generation = 0;
   uint32_t accountEpoch = 0;
   bool canOpenLastBook = false;
+  bool upgradeNoticePending = false;
+  bool upgradeRecoveryRequired = false;
 };
 }  // namespace booksync
 

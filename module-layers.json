@@ -4917,7 +4917,7 @@
     },
     "lib/Serialization/PersistableStore.cpp": {
       "role": "retained-library",
-      "rationale": "Native engine/support library; exact include edges retained, not a product-layer escape.",
+      "rationale": "F29 extends shared cold JSON reader with bounded current-only mode for credential removal; default recovery semantics for reader/settings callers remain unchanged.",
       "includes": [
         "AtomicFile.h",
         "HalStorage.h",
@@ -4929,7 +4929,7 @@
     },
     "lib/Serialization/PersistableStore.h": {
       "role": "retained-library",
-      "rationale": "Native engine/support library; exact include edges retained, not a product-layer escape.",
+      "rationale": "F29 extends shared cold JSON reader with bounded current-only mode for credential removal; default recovery semantics for reader/settings callers remain unchanged.",
       "includes": [
         "Arduino.h",
         "ArduinoJson.h",
@@ -7002,7 +7002,7 @@
     },
     "src/WifiCredentialStore.cpp": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "F29 boot-only retained activation and private owned Wi-Fi storage; legacy sources untouched. Tailnet admission uses a neutral atomic identity gate; no new reader/network writer.",
       "includes": [
         "HalStorage.h",
         "Logging.h",
@@ -7010,13 +7010,14 @@
         "Serialization.h",
         "WifiCredentialStore.h",
         "algorithm",
+        "booksync/system/Upgrade.h",
         "cstring",
         "utility"
       ]
     },
     "src/WifiCredentialStore.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "F29 boot-only retained activation and private owned Wi-Fi storage; legacy sources untouched. Tailnet admission uses a neutral atomic identity gate; no new reader/network writer.",
       "includes": [
         "ArduinoJson.h",
         "PersistableStore.h",
@@ -12273,7 +12274,7 @@
     },
     "src/main.cpp": {
       "role": "retained-runtime",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F11: retain sleep intent until admitted workers drain and display storage is restored.",
+      "rationale": "F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change.",
       "includes": [
         "AppCapabilities.h",
         "AppVersion.h",
@@ -12329,6 +12330,7 @@
         "activities/settings/SdFirmwareUpdateActivity.h",
         "algorithm",
         "array",
+        "booksync/system/Bootstrap.h",
         "booksync/system/NetworkPhase.h",
         "builtinFonts/all.h",
         "components/UITheme.h",
@@ -12773,7 +12775,7 @@
     },
     "src/network/ProtectedPaths.h": {
       "role": "retained-native-network",
-      "rationale": "Native baseline only; not callable from product UI. F05 owns writer retirement before SyncOwner activation.",
+      "rationale": "F29 boot-only retained activation and private owned Wi-Fi storage; legacy sources untouched. Tailnet admission uses a neutral atomic identity gate; no new reader/network writer.",
       "includes": [
         "string",
         "string.h",
@@ -13298,9 +13300,10 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F35a adds isolated editor HAL/interaction scenario coverage. F18d exercises private state checkpoints, native writeback and durable fake-server restart scenarios.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F35a adds isolated editor HAL/interaction scenario coverage. F18d exercises private state checkpoints, native writeback and durable fake-server restart scenarios. F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change.",
       "includes": [
         "../../test/simulator/AccountScenario.h",
+        "../../test/simulator/ActivationScenario.h",
         "../../test/simulator/CatalogJobsScenario.h",
         "../../test/simulator/CatalogScenario.h",
         "../../test/simulator/CredentialsScenario.h",
@@ -13453,7 +13456,7 @@
     },
     "src/simulator/SimulatorSmokeTest.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change.",
       "includes": [
         "cstdint"
       ]
@@ -14616,13 +14619,14 @@
     },
     "tailnet/shim/Tailnet.cpp": {
       "role": "transport",
-      "rationale": "F10 owned transport and neutral worker admission; no Library writes or UI routing. MicroLink internals isolated by immutable gitlink. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission.",
+      "rationale": "F29 boot-only retained activation and private owned Wi-Fi storage; legacy sources untouched. Tailnet admission uses a neutral atomic identity gate; no new reader/network writer.",
       "includes": [
         "Tailnet.h",
         "TailnetNetPhase.h",
         "TailnetSysSwitches.h",
         "WiFi.h",
         "atomic",
+        "booksync/system/Upgrade.h",
         "esp_heap_caps.h",
         "esp_log.h",
         "esp_system.h",
@@ -15387,6 +15391,32 @@
     "src/booksync/server/bookorbit/LifecycleState.cpp": {
       "role": "server",
       "rationale": "F18d private bounded state exchange and pending-reply codec under the serial owner; captured source and account epoch gate delivery and durable native writeback. No UI, second writer or live activation."
+    },
+    "src/booksync/import/Activation.cpp": {
+      "role": "import",
+      "rationale": "F29: immutable retained-import activation, durable removal/notice checkpoints, pre-Arduino NVS retention and strict identity reuse; no legacy reading or queue replay."
+    },
+    "src/booksync/import/Activation.h": {
+      "role": "import",
+      "rationale": "F29: immutable retained-import activation, durable removal/notice checkpoints, pre-Arduino NVS retention and strict identity reuse; no legacy reading or queue replay."
+    },
+    "src/booksync/system/NvsGuard.cpp": {
+      "role": "system",
+      "rationale": "F29: immutable retained-import activation, durable removal/notice checkpoints, pre-Arduino NVS retention and strict identity reuse; no legacy reading or queue replay."
+    },
+    "src/booksync/system/Upgrade.h": {
+      "role": "system",
+      "rationale": "F29: immutable retained-import activation, durable removal/notice checkpoints, pre-Arduino NVS retention and strict identity reuse; no legacy reading or queue replay."
+    },
+    "tailnet/shim/RetainedKeys.h": {
+      "role": "transport",
+      "rationale": "F29: immutable retained-import activation, durable removal/notice checkpoints, pre-Arduino NVS retention and strict identity reuse; no legacy reading or queue replay.",
+      "includes": []
+    },
+    "tailnet/retained_keys.py": {
+      "role": "transport",
+      "includes": [],
+      "rationale": "F29 deterministic, hash-checked build transformation removes implicit key generation from pinned dependency without changing its gitlink or checkout."
     }
   },
   "generators": {

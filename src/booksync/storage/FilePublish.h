@@ -7,6 +7,9 @@
 #include <cstdint>
 
 namespace booksync::storage {
+#ifdef SIMULATOR
+uint32_t publicationCheckpoints();
+#endif
 // Caller-owned, null-terminated paths, alive for the transaction. Reserve exactly
 // <current>.tmp and <current>.bak in the same directory, on the same volume.
 struct PublishPaths {
@@ -33,6 +36,10 @@ class FilePublish {
   // False may mean the new complete file is visible but its final directory sync
   // failed: reconcile with select(), rather than assuming a failed remote intent.
   bool finish();
+  // Initial authority records must never replace/recover an existing state.
+  bool finishNew();
+  // Positive current-only validation: missing/read errors never select backup.
+  static bool validateCurrent(PublishPaths paths, FileValidator validator, void* context = nullptr);
   static PublishedFile select(PublishPaths paths, FileValidator validator, void* context = nullptr);
 
  private:
@@ -44,5 +51,6 @@ class FilePublish {
   bool active_ = false;
   bool failed_ = false;
   bool fail(const char* step);
+  bool finishImpl(bool replace);
 };
 }  // namespace booksync::storage

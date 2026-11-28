@@ -24,6 +24,14 @@ class Account final {
   explicit Account(AuthAdapter& adapter) : adapter(adapter) {}
   Account(const Account&) = delete;
   Account& operator=(const Account&) = delete;
+  // Worker-private lifetime hook installed only for an imported connector.
+  // Durable retirement must succeed before the live slot can be removed.
+  using LoginRetirer = bool (*)(LoginKind, void*);
+  void setImportedLoginRetirer(LoginKind kind, LoginRetirer callback, void* context) {
+    const unsigned slot = kind == LoginKind::Sync ? 0 : 1;
+    retirer_[slot] = callback;
+    retirement_[slot] = context;
+  }
   AccountSnapshot snapshot() const;
   AuthError signIn(CredentialCapture& input, DeliveryTicket expected);
   AuthError restoreLogin(CredentialCapture& input, DeliveryTicket expected, LoginAuthorization authorization = {});
@@ -37,6 +45,8 @@ class Account final {
   bool current(DeliveryTicket expected) const;
   void publishOwner();
   void setConnector(LoginKind kind, uint32_t owner, LoginOrigin origin);
+  LoginRetirer retirer_[2]{};
+  void* retirement_[2]{};
   AuthAdapter& adapter;
   AccountSnapshot state{};
 };

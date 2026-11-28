@@ -2,6 +2,7 @@
 // callbacks only post requests to it, because microlink_stop() can block for
 // up to CONFIG_ML_STOP_TIMEOUT_MS and must not run on Arduino's event task.
 #include "Tailnet.h"
+#include "booksync/system/Upgrade.h"
 
 #include <WiFi.h>
 #include <esp_heap_caps.h>
@@ -379,6 +380,11 @@ void storePin(uint32_t ip) {
 
 bool initMl() {
   if (s_ml) return true;
+  if (!booksync::retainedIdentityReady()) {
+    TLOGE("Retained identity unavailable; no key generation or fallback");
+    setStatus(TAILNET_FAILED);
+    return false;
+  }
   microlink_config_t cfg = {};
   cfg.auth_key = nullptr;     // interactive login; nothing secret in the image
   cfg.device_name = nullptr;  // esp32-<mac>; rename it in the admin console

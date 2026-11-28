@@ -13,6 +13,8 @@
 #include "../../test/simulator/CatalogScenario.h"
 #include "../../test/simulator/CredentialsScenario.h"
 #include "../../test/simulator/CatalogJobsScenario.h"
+
+#include "../../test/simulator/ActivationScenario.h"
 #include "../../test/simulator/DeviceIndexScenario.h"
 #include "../../test/simulator/LayoutScenario.h"
 #include "../../test/simulator/UpdateScenario.h"
@@ -12172,6 +12174,8 @@ bool simulatorInterceptNetworkRestart(const uint32_t target, const uint32_t payl
 }
 
 // Every scenario except the release notes one starts with What's New already dismissed so it cannot cover Home.
+void runSimulatorUpgradeBootScenario() { runActivationScenario(); }
+
 void prepareSimulatorSmokeState() {
   runFilePublishScenario();
   runLifecycleMatchScenario();

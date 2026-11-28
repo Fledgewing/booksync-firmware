@@ -6,12 +6,14 @@
 - BookSync Home supports local add/remove/reset widget edits on X4 Pro and Classic, with revision checks and atomic saves. The X3 Settings-list editor remains pending design approval.
 - BookSync checkpoints read/unread/finished state and ratings through its single sync owner, preserving uncertain deliveries, explicit clears and deferred native writeback across restarts; validated against a fake server.
 
+- BookSync activates retained credentials, Wi-Fi and Tailnet identity with recoverable checkpoints, preserves native reader and legacy files, and records a once-only pending upgrade notice through Library. The revised B2 screen remains unbuilt pending approval.
+
 - BookSync streams server catalog and manifest records with fixed memory bounds, rejects incomplete or revoked responses, and preserves the prior offline index after interrupted refreshes.
 - BookSync commits account-scoped catalog generations only after complete refreshes, coalesces refresh requests under one network lease, and keeps closed Home views quiet after cancellation or late completion.
 - BookSync checkpoints verified local-to-server book matches under its sole sync owner, preserving native captures and reconciling uncertain results after restart; validated against a fake server with account and edition isolation.
 - BookSync Home hosts Continue reading, Shelf and Browse widgets from one bounded offline batch, with independent failure cards and touch, button and X3 text presentations.
-- BookSync audits legacy Tailnet identity in place without rewriting NVS or regenerating keys; incomplete, unknown and corrupt state remains untouched for later upgrade recovery. Activation remains deferred.
-- BookSync prepares read-only import of legacy sync, acquisition and Wi-Fi credentials, retaining originals and unresolved formats across repeated boots; activation remains deferred.
+- BookSync audits legacy Tailnet identity in place without rewriting NVS or regenerating keys; incomplete, unknown and corrupt state remains untouched for later upgrade recovery. Activation uses the retained upgrade checkpoint.
+- BookSync prepares read-only import of legacy sync, acquisition and Wi-Fi credentials, retaining originals and unresolved formats across repeated boots; activation uses the retained upgrade checkpoint.
 - BookSync separates product versions from source provenance, preserves legacy bridge upgrades, and selects device-specific Stable, RC and Preview candidates while excluding test artifacts.
 
 - BookSync preserves shared Home layouts and device-class overrides across interrupted saves, retaining unknown widgets and damaged layouts while falling back safely.
@@ -47,6 +49,7 @@
 - BookSync preserves unrecognized Home widget IDs during rendering and editing, including IDs that share an installed widget’s name prefix.
 
 - BookSync projects valid Home layouts without requiring a device-class override group.
+- Upgrading cannot format unsupported NVS or generate fallback Tailnet keys. Forgotten imported logins, Wi-Fi credentials and dismissed upgrade notices cannot revive through automatic legacy or backup recovery.
 
 - BookSync firmware CI reuses cached PlatformIO packages across configuration changes and retries package installation after transient release-download failures.
 

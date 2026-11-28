@@ -21,7 +21,8 @@ inline constexpr const char* SENSITIVE_FILES[] = {"/.crosspoint/xfer",
                                                   "/.crosspoint/plugin-install.txt",
                                                   "/.crosspoint/settings.json",
                                                   "/.crosspoint/settings.bin",
-                                                  "/.crosspoint/crossink-settings.json"};
+                                                  "/.crosspoint/crossink-settings.json",
+                                                  "/.booksync"};
 
 // SdFat also opens a name by its generated 8.3 alias (".crosspoint" is
 // CROSSP~1), which no spelling check can map back to the long name.

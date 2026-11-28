@@ -493,3 +493,25 @@ TEST_F(IndexTest, WidgetBatchPreservesIndependentContinueMissingShelfAndLocalFai
   EXPECT_EQ(value.windows[1].availability, Availability::NotSaved);
   EXPECT_EQ(value.windows[2].availability, Availability::Unavailable);
 }
+
+TEST(LibraryUpgradeNotice, CachedReadsNeverCheckpointAndDismissalRunsOnlyOnWorker) {
+  using namespace booksync;
+  static unsigned writes;
+  writes = 0;
+  auto dismiss = []() {
+    ++writes;
+    publishUpgradeState(false, false, nullptr);
+    return true;
+  };
+  publishUpgradeState(true, false, dismiss);
+  for (unsigned paint = 0; paint < 5; ++paint) EXPECT_TRUE(offlineLibrary().snapshot().upgradeNoticePending);
+  EXPECT_EQ(writes, 0u);
+  EXPECT_EQ(offlineLibrary().submit(Intent::DismissUpgradeNotice), CommandStatus::Accepted);
+  EXPECT_EQ(writes, 0u);
+  workLocalLibrary();
+  EXPECT_EQ(writes, 1u);
+  EXPECT_FALSE(offlineLibrary().snapshot().upgradeNoticePending);
+  workLocalLibrary();
+  EXPECT_EQ(writes, 1u);
+  publishUpgradeState(false, false, nullptr);
+}

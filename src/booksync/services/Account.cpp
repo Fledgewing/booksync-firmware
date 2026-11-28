@@ -135,6 +135,8 @@ AuthError Account::removeLogin(LoginKind kind, DeliveryTicket expected) {
   if (!current(expected)) return AuthError::Stale;
   if (state.ticket.epoch == std::numeric_limits<uint64_t>::max()) return AuthError::Exhausted;
   if (kind != LoginKind::Sync && kind != LoginKind::Acquisition) return AuthError::Invalid;
+  const unsigned slot = kind == LoginKind::Sync ? 0 : 1;
+  if (retirer_[slot] && !retirer_[slot](kind, retirement_[slot])) return AuthError::Unavailable;
   const auto error = adapter.removeLogin(kind);
   if (error != AuthError::None) return error;
   setConnector(kind, 0, LoginOrigin::None);

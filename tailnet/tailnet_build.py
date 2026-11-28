@@ -118,9 +118,22 @@ def _process_project_deps_with_tailnet(env):
 
     build_dir = os.path.join(env.subst("$BUILD_DIR"), "tailnet")
     objs = []
+    # Replace only the pinned unsafe key loader at build time; never modify
+    # the dependency checkout. Fail closed on source drift.
+    import sys
+    sys.path.insert(0, here)
+    from retained_keys import strict_identity_source
+    source_path = os.path.join(ml_dir, "src", "microlink.c")
+    with open(source_path, encoding="utf-8") as input_file:
+        strict = strict_identity_source(input_file.read())
+    strict_path = os.path.join(build_dir, "microlink-retained.c")
+    os.makedirs(build_dir, exist_ok=True)
+    with open(strict_path, "w", encoding="utf-8") as output:
+        output.write(strict)
+    ml_env.Append(CPPPATH=[shim_dir])
     for name in ML_SRCS:
         objs.append(ml_env.Object(os.path.join(build_dir, "ml", name.replace(".c", ".o")),
-                                  os.path.join(ml_dir, "src", name)))
+                                  strict_path if name == "microlink.c" else os.path.join(ml_dir, "src", name)))
     for name in WG_SRCS:
         objs.append(ml_env.Object(os.path.join(build_dir, "wg", name.replace(".c", ".o")),
                                   os.path.join(wg_dir, name)))
@@ -137,6 +150,7 @@ def _process_project_deps_with_tailnet(env):
     # --- 2. The shim, linked directly ----------------------------------------------
 
     shim_env = ml_env.Clone()
+    shim_env.Append(CPPPATH=[os.path.join(root, "src")])
     # Arduino library headers reach only the library builders that the LDF
     # picked; the shim needs WiFi (and Network, which WiFi.h includes).
     fw_dir = env.PioPlatform().get_package_dir("framework-arduinoespressif32")
@@ -147,7 +161,7 @@ def _process_project_deps_with_tailnet(env):
     ]
     env.Append(PIOBUILDFILES=shim_objs)
     env.Append(LIBS=[microlink_lib])
-    env.Append(LINKFLAGS=["-Wl,--wrap=lwip_getaddrinfo", "-Wl,--wrap=lwip_connect",
+    env.Append(LINKFLAGS=["-Wl,--wrap=nvs_flash_init", "-Wl,--wrap=lwip_getaddrinfo", "-Wl,--wrap=lwip_connect",
                           # TailnetLog.cpp: keep our log lines past the
                           # prebuilt ERROR-only log level
                           "-Wl,--wrap=esp_log",

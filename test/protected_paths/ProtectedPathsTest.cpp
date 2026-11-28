@@ -69,3 +69,11 @@ TEST(ProtectedPaths, LegacySettingsAndHashedFatAliasesStayProtected) {
   EXPECT_FALSE(isSensitivePath("/Books/a~b.epub"));
   EXPECT_FALSE(isSensitivePath("/Books/Photos/CRO~A123.JPG"));
 }
+
+TEST(ProtectedPaths, RetainedUpgradeSecretsAndProofsArePrivate) {
+  for (const char* path : {"/.booksync/import/sync", "/.booksync/import/removed-0.tmp",
+                           "/.booksync/import/activation.bak", "/.booksync/wifi.json", "/.booksync/wifi.json.bak"}) {
+    EXPECT_TRUE(protectedpaths::isSensitivePath(path));
+    EXPECT_FALSE(protectedpaths::isPluginPath(path));
+  }
+}

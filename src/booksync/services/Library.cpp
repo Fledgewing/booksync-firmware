@@ -36,6 +36,9 @@ static_assert(sizeof(LocalState) <= 28 * 1024);
 // buffers and the <=3 KiB editor splice workspace exceed the task stack; releasing them before reader entry keeps C3
 // buffers out of the reader lifetime. HAL owns its bounded directory-handle allocations.
 std::unique_ptr<LocalState> local;
+bool noticeDismissalPending = false;
+bool noticePending = false, upgradeRecovery = false;
+bool (*noticeCheckpoint)() = nullptr;
 class OfflineLibrary final : public Library {
  public:
   bool available = false;
@@ -45,6 +48,8 @@ class OfflineLibrary final : public Library {
   Snapshot snapshot() const override {
     Snapshot value;
     value.canOpenLastBook = available;
+    value.upgradeNoticePending = noticePending;
+    value.upgradeRecoveryRequired = upgradeRecovery;
     if (local) {
       value.catalog = local->model.availability();
       value.generation = local->index.provenance().generation;
@@ -98,6 +103,11 @@ class OfflineLibrary final : public Library {
   Subscription subscribe() const override { return local ? local->model.subscribe() : Subscription{}; }
   bool changed(Subscription value) const override { return local && local->model.changed(value); }
   CommandStatus submit(Intent intent) override {
+    if (intent == Intent::DismissUpgradeNotice) {
+      if (!noticeCheckpoint) return CommandStatus::Unavailable;
+      noticeDismissalPending = true;
+      return CommandStatus::Accepted;
+    }
     if (intent == Intent::Refresh && local) {
       if (!local->worker.busy()) local->rescan = true;
       return CommandStatus::Accepted;
@@ -113,6 +123,11 @@ OfflineLibrary& shellLibrary() {
 }
 }  // namespace
 Library& offlineLibrary() { return shellLibrary(); }
+void publishUpgradeState(bool pending, bool recovery, bool (*dismiss)()) {
+  noticePending = pending;
+  upgradeRecovery = recovery;
+  noticeCheckpoint = dismiss;
+}
 void publishHomeBook(bool available, const char* title) {
   shellLibrary().lastBook = {};
   if (title) {
@@ -160,6 +175,11 @@ void leaveLocalLibrary() {
   local.reset();
 }
 void workLocalLibrary() {
+  if (noticeDismissalPending) {
+    noticeDismissalPending = false;
+    if (!noticeCheckpoint || !noticeCheckpoint())
+      LOG_ERR("BSA", "Notice dismissal checkpoint failed; retained for recovery");
+  }
   if (!local) return;
   auto& state = *local;
   if (state.editResult.status == LayoutEditStatus::Pending) {

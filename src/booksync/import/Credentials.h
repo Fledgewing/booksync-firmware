@@ -31,6 +31,11 @@ class Credentials final {
   Credentials& operator=(const Credentials&) = delete;
   ImportResult stage(CredentialFamily family, const char* source, storage::PublishPaths destination);
   ImportResult restore(CredentialFamily family, storage::PublishPaths destination, Account& account, size_t index = 0);
+  // Private cutover proof and owned Wi-Fi publication; never read a legacy
+  // source here. Proof binds the complete validated snapshot, including family.
+  bool proof(CredentialFamily family, storage::PublishPaths paths, uint32_t& value);
+  size_t loginCount(storage::PublishPaths paths);
+  bool activateWifi(storage::PublishPaths paths);
   ImportResult restoreWifi(storage::PublishPaths destination, WifiTarget& target);
 
  private:
