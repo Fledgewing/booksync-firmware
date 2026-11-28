@@ -6,6 +6,7 @@
 #include "booksync/interface/Downloads.h"
 #include "booksync/interface/HomeLayout.h"
 #include "booksync/interface/LayoutEdit.h"
+#include "booksync/interface/Queries.h"
 
 namespace booksync {
 // UI reads bounded published values. No scans, writes, parsing or transport in
@@ -25,6 +26,11 @@ class Library {
   virtual DownloadStatus downloadStatus(uint64_t) const { return {}; }
   virtual CommandStatus resumeDownload(uint64_t) { return CommandStatus::Unavailable; }
   virtual CommandStatus cancelDownload(uint64_t) { return CommandStatus::Unavailable; }
+  virtual bool requestQuery(const QueryRequest&) { return false; }
+  virtual void readQuery(QueryResult& out) const {
+    out.clear();
+    out.availability = Availability::Unsupported;
+  }
   virtual CommandStatus open(BookKey) { return CommandStatus::Unavailable; }
   virtual LibraryWindow window() const { return {}; }
   virtual void readWindow(LibraryWindow& out) const { out = window(); }

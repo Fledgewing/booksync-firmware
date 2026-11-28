@@ -7,6 +7,7 @@
 - BookSync checkpoints read/unread/finished state and ratings through its single sync owner, preserving uncertain deliveries, explicit clears and deferred native writeback across restarts; validated against a fake server.
 - BookSync prepares verified same-path downloads with explicit Resume after interruption, progress and Cancel, space checks, and quiet completion for departed views; live download screens remain deferred.
 - BookSync checkpoints bounded highlight, note and bookmark exchanges under its sole sync owner, retains pending deletions through restart and defers remote application until the book closes; validated against a durable fake server.
+- BookSync adds bounded offline filter, counted facet, series and grouping projections, with explicit unsupported results when saved metadata cannot answer a query.
 
 - BookSync activates retained credentials, Wi-Fi and Tailnet identity with recoverable checkpoints, preserves native reader and legacy files, and records a once-only pending upgrade notice through Library. The revised B2 screen remains unbuilt pending approval.
 
@@ -52,6 +53,7 @@
 
 - BookSync projects valid Home layouts without requiring a device-class override group.
 - Upgrading cannot format unsupported NVS or generate fallback Tailnet keys. Forgotten imported logins, Wi-Fi credentials and dismissed upgrade notices cannot revive through automatic legacy or backup recovery.
+- BookSync reliably notifies Library views when their first query snapshot is published.
 
 - BookSync firmware CI reuses cached PlatformIO packages across configuration changes and retries package installation after transient release-download failures.
 

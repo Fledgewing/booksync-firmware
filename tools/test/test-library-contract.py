@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory(prefix='booksync-contract-') as temp:
     subprocess.run(common + ['-fexceptions', '-DSIMULATOR', '-Wno-unused-parameter', '-I' + str(ROOT / 'src'), '-I' + str(ROOT / 'test/host/file_publish/stubs'), '-I' + str(ROOT / 'lib/Memory'), str(ROOT / 'test/host/booksync_contract.cpp'),
                    str(ROOT / 'src/booksync/services/Library.cpp'),
                    *[str(ROOT / ('src/booksync/' + source)) for source in (
-                       'services/Account.cpp','server/bookorbit/Auth.cpp','services/DeviceIndex.cpp','services/ReadModel.cpp','services/SdIndexSource.cpp',
+                       'services/Queries.cpp','storage/ProjectionStore.cpp','services/Account.cpp','server/bookorbit/Auth.cpp','services/DeviceIndex.cpp','services/ReadModel.cpp','services/SdIndexSource.cpp',
                        'services/NativeHistory.cpp','services/LayoutEditor.cpp','services/Layout.cpp','storage/LayoutStore.cpp','storage/Index.cpp','storage/FilePublish.cpp',
                        'storage/Identity.cpp','storage/LifecycleJournal.cpp','reader/Capture.cpp','reader/Locator.cpp')],
                    str(ROOT / 'src/booksync/server/bookorbit/Factory.cpp'), str(obj), *([] if sys.platform == 'darwin' else ['-lcrypto']), '-o', str(app)], check=True)
