@@ -352,3 +352,22 @@ TEST(LayoutEditor, FailedInputClosePreventsPublication) {
   EXPECT_FALSE(store.save(input));
   EXPECT_EQ(card.files, before);
 }
+
+TEST(LayoutEditor, EscapedNullCannotAliasAnInstalledWidget) {
+  auto raw = original();
+  const auto at = raw.find("continue-reading");
+  raw.replace(at, 16, R"(continue-reading\u0000future)");
+  Layout parser;
+  HomePage page;
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
+  ASSERT_EQ(page.count, 2);
+  EXPECT_EQ(page.widgets[0].kind, WidgetKind::Shelf);
+  LayoutEditor editor;
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", request(LayoutEditKind::Remove)),
+            LayoutEditStatus::Saved);
+  const auto changed = bytes(editor.output());
+  EXPECT_NE(changed.find(R"(continue-reading\u0000future)"), std::string::npos);
+  ASSERT_TRUE(parser.project(LayoutInput::memory(changed.data(), changed.size()), "x4", 0, page));
+  ASSERT_EQ(page.count, 1);
+  EXPECT_EQ(page.widgets[0].kind, WidgetKind::Browse);
+}

@@ -43,6 +43,8 @@
 
 ### Fixed
 
+- BookSync preserves unrecognized Home widget IDs during rendering and editing, including IDs that share an installed widget’s name prefix.
+
 - BookSync projects valid Home layouts without requiring a device-class override group.
 
 - BookSync firmware CI reuses cached PlatformIO packages across configuration changes and retries package installation after transient release-download failures.

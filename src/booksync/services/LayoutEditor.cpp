@@ -151,9 +151,9 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
         if (!p.geometry(tile, g, false) || (o.type && !p.geometry(o, g, true)) ||
             !p.text(p.field(tile, "widget"), p.text_) || !p.number(p.field(tile, "version"), 1, 2147483647, version))
           return LayoutEditStatus::Invalid;
+        const auto widgetId = std::string_view(p.text_, p.textLength_);
         const bool known = version == 1 && !g.hidden &&
-                           (!std::strcmp(p.text_, "continue-reading") || !std::strcmp(p.text_, "booklist") ||
-                            !std::strcmp(p.text_, "library"));
+                           (widgetId == "continue-reading" || widgetId == "booklist" || widgetId == "library");
         p.space(pos);
         if (known && installed++ == edit.index) {
           // Keep orphan override bytes. IDs are never reused by Add, including
