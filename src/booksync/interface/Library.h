@@ -3,6 +3,7 @@
 #include "Capabilities.h"
 #include "Commands.h"
 #include "Models.h"
+#include "booksync/interface/AccountForm.h"
 #include "booksync/interface/Clock.h"
 #include "booksync/interface/AccountView.h"
 #include "booksync/interface/Covers.h"
@@ -21,6 +22,12 @@ class Library {
   virtual Snapshot snapshot() const = 0;
   virtual ClockStatus clockStatus() const { return {}; }
   virtual AccountView accountView() const { return {}; }
+  virtual CommandStatus accountAction(AccountFormRequest) { return CommandStatus::Unavailable; }
+  virtual void readAccountForm(AccountFormView& out) const { out = {}; }
+  virtual CommandStatus submitAccount(AccountFormRequest, AccountEntry& entry) {
+    entry.clear();
+    return CommandStatus::Unavailable;
+  }
   virtual CommandStatus selectService(ServiceSelection) { return CommandStatus::Unavailable; }
   // Called outside paint; one pending visible window, repeated requests coalesce.
   virtual bool requestWindow(WindowRequest) { return false; }

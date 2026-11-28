@@ -146,6 +146,15 @@ class Boundaries(unittest.TestCase):
         self.assertTrue(boundary.ui_source_errors('src/booksync/interface/Leak.h',
                                                  '#include "booksync/ui/Home.h"'))
 
+    def test_account_form_values_do_not_allow_opaque_handles(self):
+        path = 'src/booksync/interface/Probe.h'
+        self.assertFalse(boundary.ui_source_errors(path, 'void read(AccountFormView& out);'))
+        self.assertFalse(boundary.ui_source_errors(path, 'void submit(AccountEntry& entry);'))
+        for declaration in ('void read(AccountFormView* out);', 'void submit(AccountEntry* entry);',
+                            'void read(PrivateForm& out);', 'void submit(PrivateEntry& entry);',
+                            'struct AccountEntry; void submit(AccountEntry& entry);'):
+            self.assertTrue(boundary.ui_source_errors(path, declaration), declaration)
+
     def test_import_cannot_link_transport(self):
         for include in ('HTTPClient.h', 'mbedtls/ssl.h', 'wolfssl/ssl.h', 'tailnet/shim/Tailnet.h'):
             self.assertTrue(boundary.ui_source_errors('src/booksync/import/Probe.cpp', '#include <'+include+'>'))
