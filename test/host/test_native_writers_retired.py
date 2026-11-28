@@ -82,5 +82,38 @@ class NativeWritersRetired(unittest.TestCase):
                 guard.check(base / 'probe')
 
 
+    def test_button_image_rejects_native_settings_root(self):
+        import importlib.util
+        import tempfile
+        spec = importlib.util.spec_from_file_location('retired_guard', ROOT / 'tools/ci/retired_writers.py')
+        guard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(guard)
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            source = base / 'probe.cpp'
+            source.write_text('class SettingsActivity { public: void render() {} }; '
+                              'int main() { SettingsActivity screen; screen.render(); }')
+            subprocess.run(['c++', str(source), '-o', str(base / 'probe')], check=True)
+            for profile in ('default', 'x4-classic'):
+                with self.assertRaisesRegex(RuntimeError, 'native Settings root'):
+                    guard.check(base / 'probe', environment=profile)
+            guard.check(base / 'probe', environment='x4-pro')  # Retained touch recovery.
+
+    def test_button_image_keeps_reader_settings(self):
+        import importlib.util
+        import tempfile
+        spec = importlib.util.spec_from_file_location('retired_guard', ROOT / 'tools/ci/retired_writers.py')
+        guard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(guard)
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            source = base / 'probe.cpp'
+            source.write_text('class ReaderSettingsActivity { public: void render() {} }; '
+                              'int main() { ReaderSettingsActivity screen; screen.render(); }')
+            subprocess.run(['c++', str(source), '-o', str(base / 'probe')], check=True)
+            for profile in ('default', 'x4-classic'):
+                guard.check(base / 'probe', environment=profile)
+
+
 if __name__ == '__main__':
     unittest.main(argv=[sys.argv[0]])

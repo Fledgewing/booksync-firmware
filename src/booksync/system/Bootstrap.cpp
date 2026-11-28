@@ -64,6 +64,42 @@ void publishRetainedAccountView() {
 }
 std::atomic<bool> identityAdmitted{false}, upgradeAdmitted{false};
 bool noticePending = false, recoveryRequired = false, priorReaderState = false;
+#if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
+// The approved X3 Settings entry owns only the available Home widgets action.
+// Do not route through the retired native Settings registry/action graph.
+class HomeSettingsActivity final : public Activity {
+ public:
+  HomeSettingsActivity(GfxRenderer& renderer, MappedInputManager& input) : Activity("Settings", renderer, input) {}
+  void onEnter() override {
+    Activity::onEnter();
+    requestUpdate();
+  }
+  void loop() override {
+    if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+      activityManager.goHome();
+    } else if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+      auto editor = createHomeEditor(renderer, mappedInput);
+      if (editor) startActivityForResult(std::move(editor), [](const ActivityResult&) {});
+    }
+  }
+  void render(RenderLock&&) override {
+    // Static navigation only: no Library reads, work, scans or native settings.
+    renderer.clearScreen();
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const int line = renderer.getLineHeight(UI_10_FONT_ID);
+    renderer.drawText(BITTER_14_FONT_ID, header.x + 12, header.y + 4, tr(STR_SETTINGS_TITLE));
+    renderer.drawText(UI_10_FONT_ID, safe.x + 24, header.y + header.height + 16, tr(STR_CAT_DISPLAY));
+    const int top = header.y + header.height + line + 32;
+    renderer.fillRect(safe.x + 24, top, safe.width - 48, line + 18);
+    renderer.drawText(UI_10_FONT_ID, safe.x + 36, top + 8, tr(STR_HOME_WIDGETS), false);
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+    renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+  }
+};
+static_assert(sizeof(HomeSettingsActivity) <= 512);
+#endif
 class ShellActivity final : public Activity {
   Library& library;
   Home home;
@@ -723,9 +759,11 @@ class ShellActivity final : public Activity {
       const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
       if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Right)) ||
           (tapped && x >= header.x + header.width - 80 && y >= header.y && y < header.y + header.height)) {
-        if (widgets->page().textOnly)
-          activityManager.goToSettings();
-        else
+        if (widgets->page().textOnly) {
+#if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
+          showHomeSettings(renderer, mappedInput);
+#endif
+        } else
           editor.enter();
         requestUpdate();
         return true;
@@ -1179,6 +1217,21 @@ bool dismissUpgradeNotice() {
   return committed;
 }
 Library& homeLibrary() { return offlineLibrary(); }
+void showHomeSettings(GfxRenderer& renderer, MappedInputManager& input) {
+#if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
+  // One fallible <=512-byte activity allocation: ActivityManager owns it across
+  // frames, so it cannot be stack-local. No task, payload buffer or framebuffer.
+  auto settings = makeUniqueNoThrow<HomeSettingsActivity>(renderer, input);
+  if (!settings) {
+    LOG_ERR("BSH", "Cannot allocate Home settings");
+    return;
+  }
+  activityManager.replaceActivity(std::move(settings));
+#else
+  (void)renderer;
+  (void)input;
+#endif
+}
 std::unique_ptr<Activity> createHomeEditor(GfxRenderer& renderer, MappedInputManager& input) {
 #if CROSSINK_APP_CAP_HOME_EDITOR
   auto shell = makeUniqueNoThrow<ShellActivity>(renderer, input, HalDisplay::FULL_REFRESH, offlineLibrary(), true);

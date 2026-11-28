@@ -85,7 +85,7 @@ def main():
         versions[tool] = subprocess.check_output([str(candidates[0]), '--version'], text=True).splitlines()[0]
     from retired_writers import check
     nm = sorted((core / 'packages').glob(f'*/bin/{prefix}-nm'))[0]
-    check(build / 'firmware.elf', nm, build / 'firmware.map')
+    check(build / 'firmware.elf', nm, build / 'firmware.map', args.environment)
     receipt = {'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
                'toolchain': versions,
                'submodules': subprocess.check_output(['git', 'submodule', 'status', '--recursive'], text=True).splitlines(),

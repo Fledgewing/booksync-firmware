@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix='booksync-editor-') as temporary:
     if result.returncode or 'BookSync F35a PASS' not in result.stdout + result.stderr:
         raise SystemExit(f'F35a failed; see reports/{profile}/editor/scenario.log')
     expected = 10 if profile == 'simulator-X3' else 6
-    assert len([p for p in out.glob('*.pgm') if p.stem != 'x3-settings-entry']) == expected
+    assert len([p for p in out.glob('*.pgm') if p.stem not in ('x3-settings-entry', 'x3-settings-menu')]) == expected
 print(f'BookSync F35a {profile}: add/remove/reset/restart/stale/keep PASS; {expected} captures')
 
 if profile == 'simulator-X3':

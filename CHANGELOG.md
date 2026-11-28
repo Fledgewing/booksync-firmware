@@ -1,5 +1,9 @@
 ## [Unreleased] - 2026-11-27
 
+### Fixed
+
+- BookSync Home widgets no longer pulls the retired native Settings screen graph into button images; X3 uses a bounded Settings entry and X4 keeps its spatial editor. Physical symbol guards reject regressions.
+
 ### Added
 
 - BookSync admits verified updates only at Home after reading, activation recovery and network/display ownership are clear; local boot receipts prove completion or interruption, and previous-version returns require current durable-state compatibility proof. The installer remains offline with fake ports.

@@ -21,7 +21,6 @@ enum class SettingType { TOGGLE, ENUM, ACTION, VALUE, STRING, SECTION_HEADER, SU
 
 enum class SettingAction {
   None,
-  HomeWidgets,
   RemapFrontButtons,
   RemapFrontButtonsReader,
   CustomiseStatusBar,
