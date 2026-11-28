@@ -1545,8 +1545,9 @@ bool ActivityManager::checkpointReminderSleep() {
 }
 
 bool ActivityManager::connectReminderClock() {
-  if (!isCurrentActivityNamed("Reminders") || pendingAction != PendingAction::None || booksync::reminderOwnsFrame() ||
-      !currentActivity->allowsReminderOverlay() || currentActivity->blocksGlobalInput())
+  if (!currentActivity || currentActivity->name != "Reminders" || pendingAction != PendingAction::None ||
+      booksync::reminderOwnsFrame() || !currentActivity->allowsReminderOverlay() ||
+      currentActivity->blocksGlobalInput())
     return false;
   auto sync = makeUniqueNoThrow<ClockSyncActivity>(renderer, mappedInput);
   if (!sync) {
