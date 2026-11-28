@@ -10,6 +10,7 @@ extern "C" time_t clockFakeTime(time_t* result) {
   if (result) *result = fakeEpoch;
   return fakeEpoch;
 }
+extern "C" time_t __wrap_time(time_t* result) { return clockFakeTime(result); }
 using namespace trustedtime;
 TEST(ClockSeam, PlausibleColdClockAndFloorNoteNeverEstablishProvenance) {
   EXPECT_EXIT(
