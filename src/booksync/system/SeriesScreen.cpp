@@ -593,16 +593,7 @@ class SeriesActivity final : public Activity {
 #endif
     }
     if (series_.scene() == SeriesScene::Queue) {
-      uint8_t counts[3]{};
-      for (uint8_t i = 0; i < f.queue.count; ++i) {
-        const auto state = f.queue.items[i].state;
-        if (state == SeriesItemState::Complete)
-          ++counts[0];
-        else if (state == SeriesItemState::Canceled)
-          ++counts[1];
-        else if (state == SeriesItemState::Failed || state == SeriesItemState::Unsupported)
-          ++counts[2];
-      }
+      const uint8_t counts[] = {f.queue.saved, f.queue.skipped, f.queue.failed};
 #if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
       std::snprintf(buffer, sizeof(buffer), tr(STR_SERIES_QUEUE_COUNTS_FORMAT), counts[0], tr(STR_SERIES_SAVED),
                     counts[1], tr(STR_SERIES_SKIPPED), counts[2], tr(STR_SERIES_FAILED));

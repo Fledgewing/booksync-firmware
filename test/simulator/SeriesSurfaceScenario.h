@@ -260,6 +260,14 @@ struct Fixture final : Library {
       if (scene == 30)
         for (auto& row : value.queue.items) row.state = SeriesItemState::Complete;
     }
+    for (const auto& row : value.queue.items) {
+      if (row.state == SeriesItemState::Complete)
+        ++value.queue.saved;
+      else if (row.state == SeriesItemState::Canceled)
+        ++value.queue.skipped;
+      else if (row.state == SeriesItemState::Failed || row.state == SeriesItemState::Unsupported)
+        ++value.queue.failed;
+    }
     for (auto& row : value.queue.items)
       row.cancelable = row.state != SeriesItemState::Complete && row.state != SeriesItemState::Canceled &&
                        row.state != SeriesItemState::Unsupported && !row.cancelWanted;

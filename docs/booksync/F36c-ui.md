@@ -31,7 +31,8 @@ Page load error/not-saved states retain Android's Retry. Download notices have
 only Back; “Try again” in their text is not another action. Incomplete membership
 disables bulk download. Saved/unknown-device pages retain the capability-gated
 Series downloads action. Queue rows retain Android's Cancel suffix rules while
-completed/canceled or jobless rows cannot dispatch cancellation. Paused auth
+completed/canceled rows cannot dispatch cancellation. Future queued rows remain
+cancelable before an engine job exists. Queue totals are worker-published values. Paused auth
 and offline variants use the same queue and explicit Resume/connect action.
 Queue completion never navigates or opens a reader. Back stops polling, retires
 presentation work and leaves already accepted downloads with the existing owner.
