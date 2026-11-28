@@ -3,6 +3,7 @@
 ### Fixed
 
 - BookSync Home keeps every installed widget reachable in Add through Classic button focus and Pro touch scrolling.
+- BookSync Library matches the compact cover, count-tile, grouped-list and download layouts, preserves saved-list titles, and checks production text geometry on all three simulator profiles.
 
 - BookSync captures reader progress before a bounded sleep drain even with plugins disabled, retires stale sleep presentation ownership on return, and preserves native sleep screens while new artwork awaits approval.
 - BookSync stats cards no longer reduce sibling shelves to too few books when a Home page contains many summaries; the combined C3 row budget stays bounded.

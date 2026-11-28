@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <cstdio>
+#ifdef SIMULATOR
+#include "../../simulator/fixtures/catalog/Artwork.h"
+#endif
 
 #include "booksync/ui/Catalog.h"
 namespace catalogFixture {
@@ -35,11 +38,15 @@ inline constexpr const char* names[] = {"library",
                                         "download-space",
                                         "download-access",
                                         "list-saved"};
+inline constexpr const char* shelfTitles[] = {"Glasswater", "Paper Coast", "Quiet Harbour", "Moon Atlas"};
+inline constexpr const char* bookTitles[] = {"Glasswater", "The Paper Coast", "A Quiet Harbour", "Moon Atlas",
+                                             "Winter Map"};
 class SceneLibrary final : public Library {
  public:
   unsigned scene = 0, queries = 0, batches = 0, starts = 0, opens = 0, connects = 0, cancelCalls = 0, resumes = 0,
-           detailsCalls = 0, seriesCalls = 0;
+           detailsCalls = 0, seriesCalls = 0, filterCalls = 0;
   unsigned coverRequests = 0;
+  bool dashboardCovers = true;
   mutable unsigned reads = 0;
   Snapshot owner{};
   CatalogSummary summary{};
@@ -54,6 +61,7 @@ class SceneLibrary final : public Library {
   SceneLibrary() { configureScene(0); }
   void configureScene(unsigned value) {
     scene = value;
+    dashboardCovers = true;
     owner.accountEpoch = 1;
     owner.generation = 1;
     summary = {};
@@ -71,7 +79,7 @@ class SceneLibrary final : public Library {
     summary.reading = {17, Availability::Ready};
     summary.libraries = {3, Availability::Ready};
     summary.lists = {12, Availability::Ready};
-    std::snprintf(summary.sourceLabel.data(), summary.sourceLabel.size(), "Saved source");
+    std::snprintf(summary.sourceLabel.data(), summary.sourceLabel.size(), "BookOrbit");
     if (scene >= 3 && scene <= 5) {
       summary.books.availability = summary.authors.availability = summary.series.availability = Availability::NotSaved;
     }
@@ -82,7 +90,8 @@ class SceneLibrary final : public Library {
                                          : Availability::Ready;
     choices.count = scene == 25 || scene == 28 ? 0 : 2;
     for (uint8_t i = 0; i < choices.count; ++i) {
-      std::snprintf(choices.rows[i].label.data(), choices.rows[i].label.size(), "EPUB %u", unsigned(i + 1));
+      std::snprintf(choices.rows[i].label.data(), choices.rows[i].label.size(),
+                    i ? "EPUB · Alternate edition" : "EPUB · Standard");
       choices.rows[i].ordinal = i + 2;
       choices.rows[i].bytes = 2400000;
       choices.rows[i].bytesKnown = i == 0;
@@ -114,6 +123,7 @@ class SceneLibrary final : public Library {
   CommandStatus submit(Intent) override { return CommandStatus::Accepted; }
   bool requestBatch(WindowBatchRequest batch) override {
     ++batches;
+    dashboardCovers = true;
     window = {};
     window.publication = ++sequence;
     window.provenance = summary.provenance;
@@ -132,7 +142,7 @@ class SceneLibrary final : public Library {
         for (uint8_t i = 0; i < 4; ++i) {
           auto& book = window.rows[window.count++];
           book.key = {summary.provenance, window.count};
-          std::snprintf(book.title.data(), book.title.size(), "Synthetic book %u", unsigned(window.count));
+          std::snprintf(book.title.data(), book.title.size(), "%s", shelfTitles[i]);
           window.fileAvailability[window.count - 1] = FileAvailability::OnCard;
           ++span.count;
           span.bytes += sizeof(BookRow);
@@ -147,6 +157,7 @@ class SceneLibrary final : public Library {
   }
   bool requestQuery(const QueryRequest& q) override {
     ++queries;
+    dashboardCovers = false;
     wanted = q;
     result.clear();
     result.requestId = q.requestId;
@@ -158,22 +169,35 @@ class SceneLibrary final : public Library {
     result.membershipComplete = scene != 15;
     result.matchedBooks = scene == 13 ? 0 : scene == 8 ? 6 : q.scope[0] ? 84 : 10020;
     result.count = scene == 13 || scene == 14 || scene == 16 ? 0 : q.kind == QueryKind::Groups ? 3 : q.limit;
+    result.optionTotal = q.kind == QueryKind::Groups ? (q.filter.group == QueryGroup::Author ? 24 : 18) : 0;
     result.bytes = result.count * sizeof(QueryEntry);
     result.hasMore = result.count > 0 && (q.kind == QueryKind::Groups || q.offset + result.count < result.matchedBooks);
     for (uint16_t i = 0; i < result.count; ++i) {
       auto& entry = result.entries[i];
       entry.book.key = {summary.provenance, q.offset + i};
-      std::snprintf(entry.book.title.data(), entry.book.title.size(), "Synthetic book %u", unsigned(q.offset + i + 1));
-      std::snprintf(entry.label.data(), entry.label.size(), "Group %u", unsigned(i + 1));
+      std::snprintf(entry.book.title.data(), entry.book.title.size(), "%s",
+                    q.kind == QueryKind::Groups ? shelfTitles[i % 4] : bookTitles[i % 5]);
+      std::snprintf(entry.label.data(), entry.label.size(), "%s",
+                    q.kind == QueryKind::Groups
+                        ? (q.filter.group == QueryGroup::Author ? (i == 0   ? "Author A"
+                                                                   : i == 1 ? "Author B"
+                                                                            : "Author C")
+                                                                : (i == 0   ? "Harbour sequence"
+                                                                   : i == 1 ? "Tide stories"
+                                                                            : "Not in a series"))
+                        : (i == 0 || i == 4 ? "Author A"
+                           : i == 1         ? "Author B"
+                           : i == 2         ? "Author C"
+                                            : "Author D"));
       std::snprintf(entry.groupKey.data(), entry.groupKey.size(), "group-%u", unsigned(i + 1));
-      entry.books = i == 1 ? 1 : 12;
-      entry.missing = q.kind == QueryKind::Groups && i == 2;
-      entry.onDevice = scene == 8 || i != 1 ? QueryTruth::Yes : QueryTruth::No;
+      entry.books = i == 1 ? 1 : q.filter.group == QueryGroup::Author ? (i == 0 ? 12 : 9) : (i == 0 ? 7 : 17);
+      entry.missing = q.kind == QueryKind::Groups && i == 2 && (scene != 6);
+      entry.onDevice = i == 0 || i == 2 || i == 4 ? QueryTruth::Yes : QueryTruth::No;
       static constexpr QueryShow statuses[] = {QueryShow::Reading,   QueryShow::Unread, QueryShow::Finished,
                                                QueryShow::Rereading, QueryShow::OnHold, QueryShow::Abandoned};
-      entry.status = statuses[(q.offset + i) % 6];
+      entry.status = i == 4 ? QueryShow::Reading : statuses[i == 3 ? 1 : i % 6];
       entry.book.readingKnown = true;
-      entry.book.page = 42;
+      entry.book.page = i == 4 ? 12 : 42;
       entry.book.pages = 100;
     }
     return true;
@@ -188,14 +212,16 @@ class SceneLibrary final : public Library {
     sources.requestId = q.requestId;
     sources.publication = ++sequence;
     sources.availability = scene == 17 ? Availability::Unsupported : Availability::Ready;
-    sources.count = scene == 17 ? 0 : 6;
+    sources.count = scene == 17 ? 0 : 3;
     sources.total = 12;
     sources.hasMore = scene != 17;
     for (uint8_t i = 0; i < sources.count; ++i) {
       std::snprintf(sources.rows[i].key.data(), sources.rows[i].key.size(), "scope-%u", unsigned(i + q.offset));
-      std::snprintf(sources.rows[i].title.data(), sources.rows[i].title.size(), "Saved list %u",
-                    unsigned(i + q.offset + 1));
-      sources.rows[i].books = {84, Availability::Ready};
+      std::snprintf(sources.rows[i].title.data(), sources.rows[i].title.size(), "%s",
+                    i == 0   ? "Short reads"
+                    : i == 1 ? "Unread fiction"
+                             : "Weekend shelf");
+      sources.rows[i].books = {i == 0 ? 84u : i == 1 ? 132u : 26u, Availability::Ready};
     }
     return true;
   }
@@ -220,6 +246,17 @@ class SceneLibrary final : public Library {
     ++starts;
     return CommandStatus::Accepted;
   }
+#ifdef SIMULATOR
+  CoverReference coverReference(BookKey key) const override {
+    return dashboardCovers ? CoverReference{key.ordinal + 1, 98, 110} : CoverReference{};
+  }
+  bool readCover(CoverReference ref, CoverBitmap& out) const override {
+    out.width = 98;
+    out.height = 110;
+    for (unsigned i = 0; i < 1430; ++i) out.pixels[i] = catalogArtwork[(ref.id + 2) % 4][i];
+    return true;
+  }
+#endif
   CommandStatus requestCover(BookKey) override {
     ++coverRequests;
     return CommandStatus::Accepted;
@@ -241,6 +278,10 @@ class SceneLibrary final : public Library {
     ++detailsCalls;
     return CommandStatus::Accepted;
   }
+  CommandStatus showCatalogFilter() override {
+    ++filterCalls;
+    return CommandStatus::Accepted;
+  }
   CommandStatus showCatalogSeries(std::array<char, 64>) override {
     ++seriesCalls;
     return CommandStatus::Accepted;
@@ -256,13 +297,13 @@ inline void arrange(CatalogSurface& ui, SceneLibrary& library) {
     ui.browseCatalog(CatalogRoot::Series);
   else if (scene == 8)
     ui.browseCatalog(CatalogRoot::OnCard);
-  else if (scene == 9 || scene == 10 || scene == 12 || scene == 17)
+  else if (scene == 9 || scene == 10 || scene == 12 || scene == 13 || scene == 14 || scene == 16 || scene == 17)
     ui.browseCatalog(CatalogRoot::Lists);
   else if (scene >= 11)
     ui.browseCatalog(CatalogRoot::All);
   ui.pollCatalog();
-  if (scene == 10 || scene == 12) {
-    ui.activateCatalogRow(1);
+  if (scene == 10 || scene == 12 || scene == 13 || scene == 14 || scene == 16) {
+    ui.activateCatalogRow(0);
     ui.pollCatalog();
   }
   if (scene == 11 || scene == 12) {

@@ -37,13 +37,15 @@ class CatalogSurface {
   auto catalogControls() const -> uint8_t;
   auto catalogVisibleRows() const -> uint8_t;
   uint8_t catalogPageRows() const {
-    return panel_ == Panel::Sources ? CatalogSourceRows : panel_ == Panel::Groups ? 3 : textOnly_ ? 6 : 5;
+    return panel_ == Panel::Sources || panel_ == Panel::Groups || current_.root == CatalogRoot::OnCard ? 3 : 5;
   }
   static CatalogRoot catalogBrowseRoot(uint8_t index);
   CatalogCount catalogRootCount(CatalogRoot root) const;
   CatalogRoot catalogBrowseRootAt(uint8_t index) const;
   uint8_t catalogBrowseCount() const;
   CatalogRoot catalogRoot() const { return current_.root; }
+  const char* catalogScopeTitle() const { return current_.title.data(); }
+  bool catalogScoped() const { return current_.scope[0] || current_.author[0] || current_.withoutAuthor; }
   uint32_t catalogOffset() const { return current_.offset; }
   const CatalogSummary& catalogSummaryValue() const { return summary_; }
   const QueryResult& catalogResult() const { return result_; }
@@ -69,7 +71,7 @@ class CatalogSurface {
     uint32_t offset = 0;
     uint8_t focus = 0;
     std::array<char, 96> author{};
-    std::array<char, 64> scope{}, series{};
+    std::array<char, 64> scope{}, series{}, title{};
     bool withoutSeries = false, withoutAuthor = false;
   } current_{}, history_[4]{};
   // One last-good visible page (not a second catalog/result window). It keeps

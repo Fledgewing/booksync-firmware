@@ -37,4 +37,6 @@ with tempfile.TemporaryDirectory(prefix='booksync-catalog-') as directory:
     assert len(list(out.glob('*.pgm'))) == 30
     assert all(p.stat().st_size>1000 for p in out.glob('*.pgm'))
     assert not any('Font ' in line and 'not found' in line for line in log.splitlines())
+from catalog_geometry import check
+check(out)
 print(f'F36a {profile}: 30 approved states PASS')

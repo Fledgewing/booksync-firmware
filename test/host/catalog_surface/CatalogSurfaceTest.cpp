@@ -204,10 +204,11 @@ TEST(CatalogStateMachine, NestedBackRestoresScopeCursorAndFocus) {
   ui.enterCatalog();
   catalogFixture::arrange(ui, f);
   EXPECT_EQ(ui.catalogOffset(), 5u);
+  EXPECT_STREQ(ui.catalogScopeTitle(), "Short reads");
   ui.backCatalog();
   ui.pollCatalog();
   EXPECT_EQ(ui.catalogPanel(), CatalogSurface::Panel::Sources);
-  EXPECT_EQ(ui.catalogFocus(), 1u);
+  EXPECT_EQ(ui.catalogFocus(), 0u);  // The approved fixture entered the first saved list.
   ui.backCatalog();
   EXPECT_EQ(ui.catalogPanel(), CatalogSurface::Panel::Dashboard);
 }
@@ -605,4 +606,49 @@ TEST(CatalogStateMachine, IncompleteZeroRowsDoNotClaimCompleteEmptyMembership) {
   EXPECT_FALSE(ui.catalogResult().membershipComplete);
   EXPECT_EQ(ui.catalogVisibleRows(), 0);
   EXPECT_EQ(ui.catalogState(), CatalogSurface::State::Ready);
+}
+
+TEST(CatalogStateMachine, RemovingGroupingRequeriesBooksWithoutOpeningAnotherSurface) {
+  catalogFixture::SceneLibrary f;
+  CatalogSurface ui(f);
+  ui.enterCatalog();
+  ui.browseCatalog(CatalogRoot::Authors);
+  ui.pollCatalog();
+  ui.selectCatalogControl(ui.catalogVisibleRows() * 2 + 3);
+  ASSERT_EQ(ui.activateCatalog(), CommandStatus::Accepted);
+  EXPECT_EQ(ui.catalogPanel(), CatalogSurface::Panel::Books);
+  EXPECT_EQ(f.wanted.filter.group, QueryGroup::None);
+  EXPECT_EQ(f.wanted.offset, 0u);
+  EXPECT_EQ(f.opens, 0u);
+}
+TEST(CatalogStateMachine, ApprovedTextRowsAndSourcePagesRemainBounded) {
+  catalogFixture::SceneLibrary f;
+  CatalogSurface ui(f);
+  ui.enterCatalog(true);
+  ui.browseCatalog(CatalogRoot::All);
+  EXPECT_EQ(f.wanted.limit, 5u);
+  ui.browseCatalog(CatalogRoot::OnCard);
+  EXPECT_EQ(f.wanted.limit, 3u);
+  ui.browseCatalog(CatalogRoot::Lists);
+  ui.pollCatalog();
+  ASSERT_EQ(ui.catalogVisibleRows(), 3u);
+  ASSERT_TRUE(ui.pageCatalog(1));
+  EXPECT_EQ(ui.catalogOffset(), 3u);
+}
+
+TEST(CatalogStateMachine, MissingListKeepsFilterAndRetryAsSeparateActions) {
+  catalogFixture::SceneLibrary f;
+  f.configureScene(14);
+  CatalogSurface ui(f);
+  ui.enterCatalog();
+  catalogFixture::arrange(ui, f);
+  ASSERT_EQ(ui.catalogState(), CatalogSurface::State::NotSaved);
+  const auto before = f.queries;
+  ui.selectCatalogControl(ui.catalogVisibleRows());
+  ASSERT_EQ(ui.activateCatalog(), CommandStatus::Accepted);
+  EXPECT_EQ(f.filterCalls, 1u);
+  EXPECT_EQ(f.queries, before);
+  ui.selectCatalogControl(ui.catalogVisibleRows() + 3);
+  ASSERT_EQ(ui.activateCatalog(), CommandStatus::Accepted);
+  EXPECT_GT(f.queries, before);
 }
