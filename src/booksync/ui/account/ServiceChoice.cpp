@@ -2,7 +2,7 @@
 #include "booksync/ui/account/ServiceChoice.h"
 namespace booksync {
 namespace {
-bool same(DeliveryTicket a, DeliveryTicket b) { return a.owner == b.owner && a.epoch == b.epoch; }
+bool choiceTicketsMatch(DeliveryTicket a, DeliveryTicket b) { return a.owner == b.owner && a.epoch == b.epoch; }
 }  // namespace
 void ServiceChoice::enter() {
   view_ = library_.accountView();
@@ -20,7 +20,7 @@ void ServiceChoice::retireChoice() {
 bool ServiceChoice::pollChoice() {
   if (!live_) return false;  // Closed presentations do not even read Library.
   const auto accountValue = library_.accountView();
-  if (!same(view_.ticket, accountValue.ticket)) {
+  if (!choiceTicketsMatch(view_.ticket, accountValue.ticket)) {
     retireChoice();  // A -> B -> A is stale even if the owner is equal again.
     return true;
   }
