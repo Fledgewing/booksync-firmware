@@ -69,7 +69,7 @@ const char* rootTitle(CatalogRoot root) {
 const char* stateTitle(CatalogSurface::State state, bool sources = false) {
   switch (state) {
     case CatalogSurface::State::Loading:
-      return tr(STR_HOME_LOADING);
+      return tr(STR_CATALOG_LOADING);
     case CatalogSurface::State::NotSaved:
       return tr(STR_HOME_NOT_SAVED);
     case CatalogSurface::State::Unsupported:
@@ -667,7 +667,7 @@ class CatalogActivity final : public Activity {
                         : dialog == Dialog::Login              ? tr(STR_CATALOG_DOWNLOAD_UNAVAILABLE)
                         : job.state == DownloadState::Canceled ? tr(STR_CATALOG_CANCELED)
                         : job.state == DownloadState::Failed   ? tr(STR_CATALOG_STOPPED)
-                                                               : tr(STR_DOWNLOADING);
+                                                               : tr(STR_CATALOG_DOWNLOADING);
     text(catalogRect(46, top + 22, 388, offline ? 60 : 32), title, 23, true);
     text(catalogRect(46, top + (offline ? 99 : 70), 388, 26), catalog_->catalogSelectedBook().title.data(), 18);
     auto& label = label_;
@@ -693,7 +693,9 @@ class CatalogActivity final : public Activity {
       else
         std::snprintf(label, sizeof(label), tr(STR_CATALOG_HUMAN_RECEIVED_FORMAT), received);
     }
-    if (!offline) text(catalogRect(46, top + 109, 388, 50), label, 18);
+    if (!offline)
+      text(catalogRect(46, top + 109, 388, 50), label,
+           job.state == DownloadState::Failed && job.error == DownloadError::Unavailable ? 16 : 18);
     hitCount_ = 0;
     if (choices) {
       for (uint8_t i = 0; i < catalog_->catalogChoices().count; ++i) {
