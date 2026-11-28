@@ -26,6 +26,15 @@ const Size* sizes(WidgetKind kind, unsigned& count) {
     count = 1;
     return compact;
   }
+  static constexpr Size discovery[] = {{2, 2}}, recommendation[] = {{1, 1}};
+  if (kind == WidgetKind::Discover) {
+    count = 1;
+    return discovery;
+  }
+  if (kind == WidgetKind::Recommended) {
+    count = 1;
+    return recommendation;
+  }
   if (kind == WidgetKind::Continue) {
     count = 1;
     return hero;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "HistorySource.h"
+#include "booksync/interface/PersonalWidgets.h"
 #include "booksync/storage/Index.h"
 #include "widgets/BookList.h"
 #include "widgets/Collections.h"
@@ -56,6 +57,13 @@ class ReadModel {
     bookListScope_ = scope;
     bookListYear_ = year;
   }
+  void setPersonalWidgetSources(const PersonalWidgetValues* discover, const PersonalWidgetValues* recommended,
+                                ReadingScope scope, BookListSource discoverList = {}) {
+    discoverListSource_ = discoverList;
+    discoverInput_ = discover;
+    recommendedInput_ = recommended;
+    personalScope_ = scope;
+  }
   bool materializeBatch(const WindowBatchRequest& batch);
   static bool accepts(const WindowBatchRequest& batch);
   Availability availability() const { return window_.availability; }
@@ -88,6 +96,11 @@ class ReadModel {
   ReadingScope bookListScope_{};
   uint16_t bookListYear_ = 0;
   bool materializeList(WindowSpan&);
+  bool materializePersonal(WindowSpan&);
+  BookListSource discoverListSource_{};
+  const PersonalWidgetValues* discoverInput_ = nullptr;
+  const PersonalWidgetValues* recommendedInput_ = nullptr;
+  ReadingScope personalScope_{};
   bool continueAvailable_ = false, continueProgressResolved_ = false;
   inline static uint64_t nextPublication_ = 0;
   void publishChanged() {

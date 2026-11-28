@@ -93,4 +93,21 @@ constexpr uint32_t personalWidgetBytes(uint8_t mask) {
                    (((mask / 8) % 2) ? sizeof(DiscoverWidget) : 0);
 }
 static_assert(sizeof(PersonalWidgetBatch) <= 4096);
+
+enum class PersonalWidgetState : uint8_t { NotSaved, Ready, Empty, Off, Unsupported, Error, Oversize };
+struct PersonalWidgetValues {
+  static constexpr uint8_t MaxBooks = 4;
+  std::array<BookRow, MaxBooks> books{};
+  uint32_t total = 0, bytes = 0, ageDays = 0;
+  PersonalWidgetState state = PersonalWidgetState::NotSaved;
+  uint8_t count = 0, rows = 0;
+  bool stale = false, ageKnown = false;
+  void clear() {
+    for (uint8_t i = 0; i < MaxBooks; ++i) books[i] = {};
+    total = bytes = ageDays = count = rows = 0;
+    state = PersonalWidgetState::NotSaved;
+    stale = ageKnown = false;
+  }
+};
+static_assert(sizeof(PersonalWidgetValues) <= 1024);
 }  // namespace booksync

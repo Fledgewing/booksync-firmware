@@ -25,7 +25,7 @@ class EditorAddRemove {
   uint8_t rows() const;
   uint8_t firstVisibleRow(uint8_t capacity) const;
   WidgetKind editorAddKind(uint8_t index) const {
-    constexpr WidgetKind kinds[] = {WidgetKind::Continue, WidgetKind::Shelf,  WidgetKind::Library, WidgetKind::Lists,
+    constexpr WidgetKind kinds[] = {WidgetKind::Continue, WidgetKind::Shelf,  WidgetKind::Library, WidgetKind::Lists, WidgetKind::Discover, WidgetKind::Recommended,
                                     WidgetKind::Week,     WidgetKind::Streak, WidgetKind::Year,    WidgetKind::Monthly,
                                     WidgetKind::Today, WidgetKind::Pages, WidgetKind::When, WidgetKind::Records, WidgetKind::Goal, WidgetKind::Forecast};
     if (library_.homePage().textOnly)

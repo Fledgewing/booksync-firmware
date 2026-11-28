@@ -40,7 +40,12 @@ enum class Label : uint8_t {
   ListBooks,
   ListCountLink,
   ListBooksNumber,
-  ListBooksCaption
+  ListBooksCaption,
+  DiscoverTitle,
+  RecommendedTitle,
+  EmptyDiscover,
+  EmptyRecommended,
+  ReadingHistory
 };
 struct Box {
   int x = 0, y = 0, w = 0, h = 0;
@@ -90,6 +95,8 @@ class Canvas {
   }
   void onCard(Box b) { appendPaint(b, Drawing::OnCardMark, true); }
   void books(Box b) { appendPaint(b, Drawing::BooksIcon, true); }
+  void star(Box b) { appendPaint(b, Drawing::StarIcon, true); }
+  void shuffle(Box b) { appendPaint(b, Drawing::ShuffleIcon, true); }
   void title(Box b, const char* paintCaption, bool black, bool bold = false, uint16_t scale = 0) {
     if (auto* c = appendPaint(b, Drawing::Title, black)) {
       c->caption = paintCaption;

@@ -20,6 +20,8 @@ enum class WidgetKind : uint8_t {
   Forecast,
   Library,
   Lists,
+  Discover,
+  Recommended,
   Count
 };
 constexpr bool isStatsWidget(WidgetKind kind) {

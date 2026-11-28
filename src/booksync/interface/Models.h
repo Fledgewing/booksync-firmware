@@ -38,6 +38,7 @@ enum class WindowSource : uint8_t {
   AllFinished,
   LibrarySummary,
   ListsPreview,
+  Recommended,
   Unknown
 };
 
