@@ -273,7 +273,8 @@ TEST(PageCaptureTest, QueueIsMemoryOnlyAndOverflowPersistsAnExplicitGap) {
   card = {};
   PageJournal journal{"/pages"};
   ASSERT_EQ(journal.recover(), JournalResult::Ok);
-  booksync::reader::PageCapture capture;
+  booksync::reader::PageCaptureQueue pending;
+  booksync::reader::PageCapture capture(pending);
   capture.start({1, 1800000000, 0, 0, 0, 1, 100, 0, 0, 0, 0});
   EXPECT_TRUE(capture.needsLocation(0, 1, 100));
   capture.locate(0, 1, 100, 1, 10000);
@@ -340,7 +341,8 @@ TEST(PageCaptureTest, ClockCorrectionsBecomeGapsAndFailedWritesKeepTheQueue) {
   card = {};
   PageJournal journal{"/pages"};
   ASSERT_EQ(journal.recover(), JournalResult::Ok);
-  booksync::reader::PageCapture capture;
+  booksync::reader::PageCaptureQueue pending;
+  booksync::reader::PageCapture capture(pending);
   capture.start({1, 1800000000, 0, 0, 0, 1, 100, 0, 1, 10000, 0});
   capture.accept(1800000010, 10);
   card.readOnly = true;
@@ -362,4 +364,33 @@ TEST(PageCaptureTest, ClockCorrectionsBecomeGapsAndFailedWritesKeepTheQueue) {
   ASSERT_EQ(capture.flush(journal), JournalResult::Ok);
   ASSERT_EQ(journal.read(2, gap), JournalResult::Ok);
   EXPECT_EQ(gap.flags, PageEvent::Gap);  // End-of-book sentinels are not page events.
+}
+
+TEST(PageCaptureTest, FailedFlushSurvivesReaderDestructionAndRetainsTheOriginalBook) {
+  card = {};
+  PageJournal journal{"/pages"};
+  ASSERT_EQ(journal.recover(), JournalResult::Ok);
+  booksync::reader::PageCaptureQueue pending;
+  {
+    booksync::reader::PageCapture first(pending);
+    first.start({1, 1800000000, 0, 0, 0, 1, 100, 0, 1, 10000, 0});
+    first.accept(1800000010, 10);
+    card.readOnly = true;
+    EXPECT_NE(first.flush(journal), JournalResult::Ok);
+  }
+  booksync::reader::PageCapture next(pending);
+  EXPECT_TRUE(next.hasWork());
+  card.readOnly = false;
+  next.start({2, 1800000020, 0, 0, 0, 2, 100, 0, 2, 10000, 0});
+  next.accept(1800000030, 10);
+  ASSERT_EQ(next.flush(journal), JournalResult::Ok);
+  EXPECT_FALSE(next.hasWork());
+  EXPECT_EQ(journal.count(), 2);
+  PageEvent e;
+  ASSERT_EQ(journal.read(0, e), JournalResult::Ok);
+  EXPECT_EQ(e.open, 1);
+  EXPECT_EQ(e.seconds, 10);
+  ASSERT_EQ(journal.read(1, e), JournalResult::Ok);
+  EXPECT_EQ(e.open, 2);
+  EXPECT_EQ(e.seconds, 10);
 }

@@ -17,6 +17,7 @@ constexpr storage::PublishPaths Paths{"/.booksync/reader.journal", "/.booksync/r
                                       "/.booksync/reader.journal.bak"};
 storage::LifecycleJournal journal(Paths);
 storage::PageJournal pageHistory("/.booksync/pages");
+PageCaptureQueue pageQueue;  // Pending accepted intervals must outlive reader activities.
 bool pagesReady = false;
 bool ready = false;
 bool prepare() {
@@ -36,7 +37,7 @@ bool prepare() {
 }
 
 }  // namespace
-Bridge::Bridge() : capture_(journal) {}
+Bridge::Bridge() : capture_(journal), pages_(pageQueue) {}
 void Bridge::open(std::string_view path, uint16_t format) {
   if (capture_.id() || !prepare()) return;
   const auto result = capture_.open(path, format);
@@ -87,7 +88,8 @@ void Bridge::observe(Sample sample, const std::string& cache, bool closed) {
   sample.rawProgress = capture_.lastSample().rawProgress;
   sample.primaryBytes = capture_.lastSample().primaryBytes;
   sample.backupBytes = capture_.lastSample().backupBytes;
-  if (capture_.unchanged(sample, closed)) return;
+  const bool captureClosed = closed && !pages_.hasWork();
+  if (capture_.unchanged(sample, captureClosed)) return;
   for (unsigned slot = 0; slot < 2; ++slot) {
     char path[128];
     const auto n = snprintf(path, sizeof(path), "%s/progress.bin%s", cache.c_str(), slot ? ".bak" : "");
@@ -107,7 +109,7 @@ void Bridge::observe(Sample sample, const std::string& cache, bool closed) {
     else
       sample.primaryBytes = length;
   }
-  capture_.update(sample, closed);
+  capture_.update(sample, captureClosed);
 }
 storage::JournalResult Bridge::artifact(std::string_view kind, std::string_view book, const char* path, bool deleted) {
   if (!prepare()) return storage::JournalResult::RecoveryRequired;

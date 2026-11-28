@@ -7,7 +7,7 @@ root = Path(__file__).resolve().parents[3]
 class PagePaintBoundary(unittest.TestCase):
     def test_capture_methods_used_by_paint_have_no_storage(self):
         source = (root / 'src/booksync/reader/PageCapture.cpp').read_text()
-        accept = source[source.index('void PageCapture::accept'):source.index('storage::JournalResult PageCapture::flush')]
+        accept = source[source.index('void PageCapture::accept'):source.index('storage::JournalResult PageCaptureQueue::flush')]
         for forbidden in ('Storage', '.append(', '.flush(', '.recover(', 'new ', 'malloc('):
             self.assertNotIn(forbidden, accept)
         for name in ('Epub', 'Xtc'):
