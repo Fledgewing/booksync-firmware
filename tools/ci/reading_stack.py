@@ -62,3 +62,6 @@ def bounded_native_application_frame(node_env, node):
 for source in ("SourceFile.cpp", "ProgressCapture.cpp", "NativeCaptureGate.cpp",
                "NativeProgress.cpp", "NativeStateStore.cpp", "NativeState.cpp"):
     env.AddBuildMiddleware(bounded_native_application_frame, "*/" + source)
+env.AddBuildMiddleware(bounded_reminder_frame, "*/ReminderPresenter.cpp")
+env.AddBuildMiddleware(bounded_reminder_frame, "*/DueSheet.cpp")
+env.AddBuildMiddleware(bounded_reminder_frame, "*/RemindersFormat.cpp")

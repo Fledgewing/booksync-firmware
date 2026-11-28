@@ -70,3 +70,37 @@ service rejects managed or unknown source values before examining or modifying
 local rows/receipts, even when their numeric IDs collide. This does not register
 a family provider or allow UI code to choose provider authority. The extra tag
 uses existing mutation padding; it adds no allocation or serialized field.
+
+The R1 presenter uses one fixed due view and the existing framebuffer. Main-loop
+input/lifecycle hooks pause the interval before menus, modal sheets, Quick Lock,
+USB storage ownership or sleep; a resumed input evaluates the idle gap first.
+Time candidates are evaluated on these transitions and at most once per minute.
+Only initial reminder drawing uses the one-use typed ReadingGate permit. Timer
+work never redraws a visible sheet. Explicit focus/input and save failures may
+redraw that same owned sheet; hidden/navigation retirement cannot revive it.
+
+Native Sleep is a Library response. The main-loop worker checkpoints the actual
+reader (including a reader underneath its menu), queues one request and returns
+an unavailable result if saving failed. Only the main loop consumes that request
+through the existing sleep sequence. No book is closed to simulate sleeping.
+Queued local snoozes and Turn off remain device effects after the view retires;
+unstarted claims and Sleep requests retire with the view. The existing device
+Delivery policy adopts durable results without a presentation callback.
+
+Hardware verification after UI integration: on each profile, open a book and its
+menu, let a time reminder arrive, and check that dismissal preserves both focus
+and the page. Hold Select while it opens, use each page-turn mapping and drag a
+touch onto Sleep: none may sleep or turn a page. A fresh focus movement and
+Select, or a new tap entirely inside Sleep, must checkpoint the current position
+and take the normal sleep path. Test a read-only/full card: snooze/Turn off/save
+failures stay in the sheet with its safe first action focused. No EPUB cache reset
+is needed. Agents do not use hardware or serial ports.
+
+R1 resource names are the `Reminder*Bytes` limits in `interface/Reminders.h`.
+Static assertions count the complete list (including nested labels and decoded
+messages), draft, due view, interval state and combined service workspace. The
+native debug spans are `reminders.evaluate` and `reminders.settings.acquire`;
+Settings entry logs internal free/largest heap through the existing heap-shape
+helper. Hardware compiler `.su` receipts include the presenter, formatter, sheet
+and Settings implementation under the 1 KiB worker-frame gate. Host timing and
+compiler frames do not substitute for maintainer task high-water measurements.

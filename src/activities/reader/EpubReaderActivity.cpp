@@ -2969,6 +2969,7 @@ void EpubReaderActivity::openReaderMenu() {
 }
 
 void EpubReaderActivity::showBuildPopup() {
+  markReminderNonReadingFrame();
   if (!buildPopupPending || !renderer.hasFrameBuffer()) return;
   // drawPopup() already refreshes the panel with a FAST waveform.
   openingFeedback.showIndexing(renderer);
@@ -2987,6 +2988,7 @@ void EpubReaderActivity::invalidatePageBufferAfterBuild(const uint32_t loansBefo
   } else {
     // A storage failure must not expose the returned white frame to overlays.
     renderer.clearScreen(ReaderUtils::readerBackgroundColor());
+    markReminderNonReadingFrame();
     GUI.drawPopup(renderer, tr(STR_PAGE_LOAD_ERROR));
     requestUpdate();
   }
@@ -3004,6 +3006,7 @@ void EpubReaderActivity::restoreStalePageBufferForInputLock() {
     // have cleared the buffer without composing anything the badge can reuse.
     if (pageBufferStale.load(std::memory_order_relaxed)) {
       renderer.clearScreen(ReaderUtils::readerBackgroundColor());
+      markReminderNonReadingFrame();
       GUI.drawPopup(renderer, tr(STR_PAGE_LOAD_ERROR));
     }
   }
@@ -3597,6 +3600,7 @@ void EpubReaderActivity::loop() {
     }
 
     if ((millis() - lastPageTurnTime) >= pageTurnDuration) {
+      activityManager.notifyReminderReadingInput();
       pageTurn(true, "auto");
       return;
     }
@@ -6438,6 +6442,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   const auto showPendingSyncSaveError = [this]() {
     if (!pendingSyncSaveError) return;
     pendingSyncSaveError = false;
+    markReminderNonReadingFrame();
     GUI.drawPopup(renderer, tr(STR_SAVE_PROGRESS_FAILED));
   };
 
@@ -6451,6 +6456,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   const auto showLowMemoryLayoutError = [this, &queueLowMemoryLayoutAlert]() {
     openingFeedback.finish();
     queueLowMemoryLayoutAlert(true);
+    markReminderNonReadingFrame();
     GUI.drawPopup(renderer, tr(STR_EPUB_LAYOUT_MEMORY_TITLE));
   };
 
@@ -6460,6 +6466,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   const auto showBuildError = [this]() {
     openingFeedback.finish();
     renderer.clearScreen(ReaderUtils::readerBackgroundColor());
+    markReminderNonReadingFrame();
     GUI.drawPopup(renderer, tr(STR_INDEX_FAILED));
     pageBufferStale.store(false, std::memory_order_relaxed);
     automaticPageTurnActive = false;
@@ -6533,6 +6540,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       endOfBookOptions->loadOnce(epub->getPath());
       endOfBookMenuActive.store(endOfBookOptions->menuActive(), std::memory_order_relaxed);
       mappedInput.setMenuMode(endOfBookOptions->menuActive());
+      markReminderNonReadingFrame();
       endOfBookOptions->render(renderer, mappedInput);
     }
     openingFeedback.finish();
@@ -7210,6 +7218,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
 #endif
       renderer.clearScreen(ReaderUtils::readerBackgroundColor());
       openingFeedback.finish();
+      markReminderNonReadingFrame();
       GUI.drawPopup(renderer, renderer.isSdCardFont(renderFontId) ? tr(STR_MEMORY_ERROR) : tr(STR_PAGE_LOAD_ERROR));
       pageBufferStale.store(false, std::memory_order_relaxed);
       automaticPageTurnActive = false;
@@ -7233,7 +7242,10 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     if (heapShapeRedrawStages & HEAP_SHAPE_REDRAW_DICT) {
       MemoryBudget::logHeapShape("dict.reader_redrawn");
     }
-    if (!activeFootnotePreview) pluginEvents.rendered(static_cast<int>(getCurrentBookProgressPercent() * 100));
+    if (!activeFootnotePreview) {
+      markReminderReadingFrame();
+      pluginEvents.rendered(static_cast<int>(getCurrentBookProgressPercent() * 100));
+    }
     pageShownAtMs = activeFootnotePreview ? 0UL : millis();
     startDailyReadingInterval();
   }

@@ -88,7 +88,7 @@ bool Reminders::valid(const ReminderData& d) {
   return true;
 }
 ReminderStorage Reminders::load() {
-  live_ = waiting_ = false;
+  live_ = waiting_ = sleepPending_ = false;
   for (auto& target : snoozeElapsed_) target = 0;
   for (auto& start : activationElapsed_) start = 0;
   resetInterval();
@@ -330,9 +330,22 @@ ReminderResult Reminders::claim(const ReminderDue& candidate, uint64_t owner, co
           return {ReminderStatus::StorageError};
         }
       }
-  } else
-    resetInterval();
-  grant_ = {current.kind, current.id, current.revision, current.day, current.scheduled};
+  } else {
+    interval_.active = 0;
+    interval_.ready = false;
+  }
+  grant_ = {current.kind,
+            current.id,
+            current.revision,
+            current.day,
+            current.scheduled,
+            current.effective,
+            now.elapsed + (current.kind == ReminderKind::Time
+                               ? static_cast<uint64_t>(3600 - (now.wall - current.effective)) * 1000
+                               : 0),
+            current.session,
+            current.sequence,
+            false};
   owner_ = owner;
   token_ = ++serial_;
   live_ = true;
@@ -342,6 +355,7 @@ ReminderResult Reminders::claim(const ReminderDue& candidate, uint64_t owner, co
 }
 ReminderResult Reminders::respond(uint64_t token, uint64_t owner, ReminderAction action, const ReminderNow& now) {
   if (!live_ || token != token_ || owner != owner_) return {ReminderStatus::Stale};
+  if (action == ReminderAction::Sleep && !grant_.drawn) return {ReminderStatus::Stale};
   if (static_cast<unsigned>(action) > static_cast<unsigned>(ReminderAction::TurnOff)) return {ReminderStatus::Invalid};
   if (grant_.kind == ReminderKind::Interval) {
     if (action != ReminderAction::Done && action != ReminderAction::TurnOff) return {ReminderStatus::Invalid};
@@ -385,12 +399,64 @@ ReminderResult Reminders::respond(uint64_t token, uint64_t owner, ReminderAction
       }
   }
   live_ = false;
+  sleepPending_ = action == ReminderAction::Sleep;
   interval_.page = false;
   interval_.last = now.elapsed;
   waiting_ = true;
   return {ReminderStatus::Saved, grant_.id, grant_.revision, token_, action == ReminderAction::Sleep};
 }
+bool Reminders::presentation(ReminderClaim claim, const ReminderNow& now, ReminderDue& out) const {
+  if (!live_ || claim.source != ReminderSource::Local || claim.kind != grant_.kind || claim.id != grant_.id ||
+      claim.revision != grant_.revision || claim.token != token_ || claim.lifetime != owner_)
+    return false;
+  out = {};
+  out.kind = grant_.kind;
+  out.id = grant_.id;
+  out.revision = grant_.revision;
+  out.day = grant_.day;
+  out.session = grant_.session;
+  out.sequence = grant_.sequence;
+  if (grant_.kind == ReminderKind::Interval) return data_.enabled && data_.intervalRevision == grant_.revision;
+  out.scheduled = grant_.scheduled;
+  out.effective = grant_.effective;
+  out.missed = now.wall / 60 > out.effective / 60;
+  for (const auto& row : data_.rows)
+    if (row.id == grant_.id && row.revision == grant_.revision && row.fields.enabled) {
+      std::memcpy(out.message, row.fields.message, sizeof(out.message));
+      return true;
+    }
+  return false;
+}
+ReminderAuthorization Reminders::authorize(ReminderClaim claim, const ReminderNow& now) {
+  if (!live_ || grant_.drawn || claim.source != ReminderSource::Local || claim.kind != grant_.kind ||
+      claim.id != grant_.id || claim.revision != grant_.revision || claim.token != token_ || claim.lifetime != owner_ ||
+      claim.session != grant_.session || claim.sequence != grant_.sequence || !now.visible || now.sleeping || now.modal)
+    return {};
+  if (grant_.kind == ReminderKind::Time) {
+    if (!now.known || now.elapsed > grant_.expires ||
+        (!grant_.sequence && (now.wall < grant_.effective || now.wall - grant_.effective > 3600)))
+      return {};
+  } else if (!now.page || grant_.session != interval_.generation)
+    return {};
+  grant_.drawn = true;
+  return {true, grant_.kind, owner_, grant_.expires};
+}
+bool Reminders::sleepFailed(uint64_t token, uint64_t owner) {
+  if (!sleepPending_ || token != token_ || owner != owner_) return false;
+  sleepPending_ = false;
+  for (const auto& row : data_.rows)
+    if (row.id == grant_.id && row.revision == grant_.revision && row.fields.enabled) {
+      live_ = true;
+      waiting_ = false;
+      return true;
+    }
+  return false;
+}
 void Reminders::retire(uint64_t owner) {
-  if (owner_ == owner) live_ = false;
+  if (owner_ == owner) {
+    live_ = false;
+    sleepPending_ = false;
+    owner_ = 0;
+  }
 }
 }  // namespace booksync

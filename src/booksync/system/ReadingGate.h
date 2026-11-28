@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "booksync/interface/Delivery.h"
+#include "booksync/interface/Reminders.h"
 namespace booksync {
 enum class Presentation {
   BackgroundRender,
@@ -14,17 +15,46 @@ enum class Presentation {
   Navigation,
   UserOpened,
   EndOfBook,
-  PositionConsent
+  PositionConsent,
+  Reminder
 };
 struct PresentationState {
   bool reading = false;  // Includes panels opened from the reader.
   bool visible = false;  // Closed/hidden consumers can adopt values, never repaint.
   bool sleeping = false;
 };
+class Library;
+struct ReminderDrawContext {
+  PresentationState state{};
+  uint64_t lifetime = 0, elapsed = 0;
+  bool clockKnown = false, page = false, otherModal = false;
+};
+class ReminderPermit {
+ public:
+  ReminderPermit() = default;
+  ReminderPermit(const ReminderPermit&) = delete;
+  ReminderPermit& operator=(const ReminderPermit&) = delete;
+  ReminderPermit(ReminderPermit&& other) noexcept : granted_(other.granted_), proof_(other.proof_) {
+    other.granted_ = false;
+  }
+  ReminderPermit& operator=(ReminderPermit&& other) noexcept {
+    granted_ = other.granted_;
+    proof_ = other.proof_;
+    other.granted_ = false;
+    return *this;
+  }
+
+ private:
+  friend class ReadingGate;
+  bool granted_ = false;
+  ReminderAuthorization proof_{};
+};
 class ReadingGate {
  public:
   // Main-loop check immediately before presentation, never a cached permission.
   static bool mayShow(Presentation event, PresentationState state, bool liveConsent = false);
+  static ReminderPermit reminderPermit(Library&, ReminderClaim, PresentationState);
+  static bool drawReminder(ReminderPermit&, ReminderDrawContext);
 };
 struct PositionContext {
   // Non-reused identity tokens, not hashes: reader owns exact document/path

@@ -28,6 +28,7 @@
 
 #include "booksync/system/NetworkPhase.h"
 #include "booksync/system/SleepRuntime.h"
+#include "booksync/system/ReminderPresenter.h"
 #include "sync/ProgressBookIterator.h"
 #include "util/PluginEvents.h"
 #if !defined(SIMULATOR) && !FREEINK_MCU_C3
@@ -97,7 +98,6 @@ inline esp_sleep_wakeup_cause_t esp_sleep_get_wakeup_cause() { return ESP_SLEEP_
 #include "AppVersion.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
-#include "booksync/system/Bootstrap.h"
 #include "DeviceCapabilities.h"
 #include "FilenameFontSystem.h"
 #include "GlobalActions.h"
@@ -119,6 +119,7 @@ inline esp_sleep_wakeup_cause_t esp_sleep_get_wakeup_cause() { return ESP_SLEEP_
 #include "activities/settings/FontDownloadActivity.h"
 #include "activities/settings/OtaUpdateActivity.h"
 #include "activities/settings/SdFirmwareUpdateActivity.h"
+#include "booksync/system/Bootstrap.h"
 #include "components/UITheme.h"
 #include "components/icons/tablerFilledIcons.h"
 #include "fontIds.h"
@@ -555,6 +556,7 @@ CrossPointSettings::SHORT_PWRBTN getPowerButtonAction() {
 
 void notifyQuickLockChanged() {
   const bool locked = buttonShortcutController.isQuickLocked();
+  booksync::reminderHidden(locked);
   x4ProHomeKeyTapPending = false;
   mappedInputManager.clearInjectedReleases();
   LOG_DBG("MAIN", "Quick Lock %s", locked ? "enabled" : "disabled");
@@ -1226,6 +1228,7 @@ void enterDeepSleep(bool fromTimeout) {
 
   // Commit to sleeping before goToSleep() runs the outgoing activity's onExit():
   // a WiFi activity would otherwise silentRestart() here and reboot instead.
+  booksync::reminderHidden(true);
   deepSleepInProgress = true;
   [[maybe_unused]] const bool monochromeSleepFrame = activityManager.goToSleep(fromTimeout);
   trustedtime::note();
@@ -1277,6 +1280,7 @@ void enterDeepSleep(bool fromTimeout) {
   if (!storageStopped) {
     deepSleepInProgress = false;
     booksync::retireSleep();
+    booksync::reminderHidden(false);
     APP_STATE.quickLockResumePending = false;
     APP_STATE.quickLockRestoreFrontlight = false;
     if (buttonShortcutController.isQuickLocked()) {
@@ -2262,6 +2266,10 @@ void loop() {
   // unrelated gesture took priority, do not carry it into the next activity.
   mappedInputManager.clearDeferredHomeGesture();
 #endif
+  if (booksync::takeReminderSleep()) {
+    enterDeepSleep(false);
+    return;
+  }
   const unsigned long activityDuration = millis() - activityStartTime;
   // A blocking activity (for example an OPDS download) is not idle time.
   lastActivityTime += activityDuration;

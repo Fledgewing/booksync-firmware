@@ -85,6 +85,13 @@ class EpubReaderDrawerActivity final : public Activity {
   void loop() override;
   void render(RenderLock&&) override;
   bool isReaderActivity() const override { return true; }
+  bool allowsReminderOverlay() const override {
+#if CROSSINK_SCALABLE_FONTS
+    return !ttfResetPopup.isActive();
+#else
+    return true;
+#endif
+  }
   bool allowFrontlightPanelGesture() const override { return false; }
   // A dirty preview can rebuild the page area itself; after a TTF ID change,
   // an unavailable text snapshot is replaced with a safe blank background.

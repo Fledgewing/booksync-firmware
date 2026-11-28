@@ -27,6 +27,7 @@ class Library {
   virtual Capabilities capabilities() const = 0;
   virtual void remindersList(ReminderList& out) const { out.clear(); }
   virtual ReminderResult remindersMutate(const ReminderMutation&) { return {}; }
+  virtual bool reminderSleepAvailable() const { return false; }
   virtual bool remindersRetry() { return false; }
   virtual ReminderResult remindersResult() const { return {}; }
   virtual ReminderEvents remindersEvents() const { return {}; }
@@ -37,6 +38,9 @@ class Library {
   virtual ReminderResult remindersClaim(const ReminderDue&, uint64_t) { return {}; }
   virtual ReminderResult remindersRespond(uint64_t, uint64_t, ReminderAction) { return {}; }
   virtual void remindersRetire(uint64_t) {}
+  virtual ReminderPresentation remindersPresentation(ReminderClaim) const { return {}; }
+  virtual void remindersActivity(ReminderActivity) {}
+  virtual ReminderAuthorization remindersAuthorize(ReminderClaim) { return {}; }
   virtual Snapshot snapshot() const = 0;
   virtual SleepView sleepView() const { return {}; }
   virtual ClockStatus clockStatus() const { return {}; }

@@ -588,6 +588,7 @@ class EpubReaderActivity final : public Activity {
   BookLoadingFeedback openingFeedback;
   bool showOpeningFeedback() {
     if (!openingFeedback.showIfPending(renderer)) return false;
+    markReminderNonReadingFrame();
     pagesUntilFullRefresh = 0;
     return true;
   }
@@ -639,6 +640,17 @@ class EpubReaderActivity final : public Activity {
            !backgroundBuildYieldForInput.load(std::memory_order_relaxed);
   }
   bool isReaderActivity() const override { return true; }
+  void onReminderVisibilityChanged(bool visible) override {
+    if (visible) {
+      clearPendingManualPageTurns(false);
+      recordCurrentPageReadingTime("reminder", true);
+      paceSampleWarmupPending = true;
+    } else {
+      lastPageTurnTime = millis();
+      resumeReadingPaceTimer("reminder_return");
+    }
+  }
+  bool checkpointReminderSleep() override { return saveProgressBeforeRestart(); }
   bool isBookReaderActivity() const override { return true; }
   bool usesMenuButtonOrientation() const override;
   bool isEpubReaderActivity() const override { return true; }
@@ -649,6 +661,7 @@ class EpubReaderActivity final : public Activity {
   bool canSnapshotForSleepOverlay() const override { return true; }
   bool allowPowerAsConfirmInReaderMode() const override { return quickActionsPopup.isActive(); }
   bool blocksGlobalInput() const override { return quickActionsPopup.isActive(); }
+  bool allowsReminderOverlay() const override { return !activeFootnotePreview && !quickActionsPopup.isActive(); }
   bool handleShortcutAction(CrossPointSettings::SHORT_PWRBTN action) override;
   bool openReaderSettingsMenu() override {
     if (!epub) {

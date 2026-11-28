@@ -10,7 +10,8 @@ enum class Intent : uint8_t {
   BrowseLibrary,
   OpenAccount,
   DismissUpgradeNotice,
-  Sync
+  Sync,
+  ConnectReminderTime
 };
 enum class CommandStatus : uint8_t { Unsupported, Unavailable, Accepted };
 }  // namespace booksync

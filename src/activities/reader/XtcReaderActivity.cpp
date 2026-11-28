@@ -1284,6 +1284,7 @@ void XtcReaderActivity::render(RenderLock&&) {
       endOfBookOptions->loadOnce(xtc->getPath());
       endOfBookMenuActive.store(endOfBookOptions->menuActive(), std::memory_order_relaxed);
       mappedInput.setMenuMode(endOfBookOptions->menuActive());
+      markReminderNonReadingFrame();
       endOfBookOptions->render(renderer, mappedInput);
     }
     openingFeedback.finish();
@@ -1441,7 +1442,7 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
           renderOverlays(false);
           return true;
         })) {
-      pluginEvents.rendered(xtc->getPageCount() ? static_cast<int>((pageToRender + 1ULL) * 10000 / xtc->getPageCount())
+      markReminderReadingFrame();      pluginEvents.rendered(xtc->getPageCount() ? static_cast<int>((pageToRender + 1ULL) * 10000 / xtc->getPageCount())
                                                 : 0);
       return;
     }
@@ -1481,7 +1482,7 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
     }
     renderOverlays(true);
     renderer.cleanupGrayscaleWithFrameBuffer();
-    pluginEvents.rendered(xtc->getPageCount() ? static_cast<int>((pageToRender + 1ULL) * 10000 / xtc->getPageCount())
+    markReminderReadingFrame();    pluginEvents.rendered(xtc->getPageCount() ? static_cast<int>((pageToRender + 1ULL) * 10000 / xtc->getPageCount())
                                               : 0);
     return;
   }
@@ -1545,7 +1546,7 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
 
   // Display with appropriate refresh
   ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
-  pluginEvents.rendered(xtc->getPageCount() ? static_cast<int>((pageToRender + 1ULL) * 10000 / xtc->getPageCount())
+  markReminderReadingFrame();  pluginEvents.rendered(xtc->getPageCount() ? static_cast<int>((pageToRender + 1ULL) * 10000 / xtc->getPageCount())
                                             : 0);
 }
 

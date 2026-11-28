@@ -922,7 +922,7 @@ void TxtReaderActivity::renderPage() {
   if (needsTextGrayscale && !deferred) {
     ReaderUtils::renderAntiAliased(renderer, [&renderLines]() { renderLines(); });
   }
-  pluginEvents.rendered(totalPages > 0 ? static_cast<int>((currentPage + 1LL) * 10000 / totalPages) : 0);
+  markReminderReadingFrame();  pluginEvents.rendered(totalPages > 0 ? static_cast<int>((currentPage + 1LL) * 10000 / totalPages) : 0);
   // scope destructor clears font cache via FontCacheManager
 }
 
@@ -1411,4 +1411,11 @@ void TxtReaderActivity::observeBookSync(bool closed, bool refreshNative) {
   sample.hasSourceOffset = currentPage >= 0 && static_cast<size_t>(currentPage) < pageOffsets.size();
   if (sample.hasSourceOffset) sample.sourceOffset = pageOffsets[currentPage];
   booksyncCapture.observe(sample, txt->getCachePath(), closed, refreshNative);
+}
+
+bool TxtReaderActivity::checkpointReminderSleep() {
+  RenderLock lock(*this);
+  const bool saved = flushQueuedProgress();
+  if (!saved) LOG_ERR("READER", "Failed to save progress for reminder sleep");
+  return saved;
 }

@@ -23,6 +23,7 @@
 - BookSync adds account-isolated authenticated catalog transport behind Library, with bounded response spooling and rejection of incomplete or revoked responses; automatic sync scheduling follows separately.
 - BookSync preserves immutable account- and source-bound native observations for live sync, with independent source identities and restart-safe match/statistics evidence; worker scheduling follows separately.
 - BookSync retains immutable state/progress captures and applies closed-book replies with account, source, manual-status and override checks; native reading places stay unchanged, and automatic scheduling follows separately.
+- BookSync presents local bedtime and eye-rest sheets through a one-use reminder gate, preserving the current page and saving position before explicit Sleep. Held keys, page turns and gestures cannot select Sleep.
 
 - BookSync admits verified updates only at Home after reading, activation recovery and network/display ownership are clear; local boot receipts prove completion or interruption, and previous-version returns require current durable-state compatibility proof. The installer remains offline with fake ports.
 - BookSync Home can create, name and reorder pages on X4 Pro touch and Classic buttons with revision checks and atomic saves. The Pro naming keyboard stays docked at the bottom; X3 page editing remains disabled.

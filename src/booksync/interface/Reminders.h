@@ -41,6 +41,20 @@ struct ReminderMutation {
   uint64_t id = 0, revision = 0, key = 0;
   ReminderFields fields{};
 };
+struct ReminderActivity {
+  uint64_t elapsed = 0;
+  bool page = false, visible = false, sleeping = false, modal = false, input = false;
+};
+struct ReminderClaim {
+  ReminderSource source = ReminderSource::Local;
+  ReminderKind kind = ReminderKind::Time;
+  uint64_t id = 0, revision = 0, token = 0, lifetime = 0, session = 0, sequence = 0;
+};
+struct ReminderAuthorization {
+  bool allowed = false;
+  ReminderKind kind = ReminderKind::Time;
+  uint64_t lifetime = 0, validUntil = 0;
+};
 struct ReminderResult {
   ReminderStatus status = ReminderStatus::Unavailable;
   uint64_t id = 0, revision = 0, token = 0;
@@ -63,13 +77,13 @@ struct ReminderList {
   ReminderRow rows[9]{};
   uint8_t count = 0;
   ReminderStorage storage = ReminderStorage::Unreadable;
-  bool clockKnown = false, sleepAvailable = false;
+  bool clockKnown = false, sleepAvailable = false, twelveHour = false;
   void clear() {
     for (unsigned i = 0; i < 9; ++i) rows[i] = {};
     nextMutationKey = 0;
     count = 0;
     storage = ReminderStorage::Unreadable;
-    clockKnown = sleepAvailable = false;
+    clockKnown = sleepAvailable = twelveHour = false;
   }
 };
 static_assert(sizeof(ReminderList) <= ReminderSnapshotBytes);
@@ -83,6 +97,12 @@ struct ReminderDue {
   bool missed = false;
   char message[241]{};
 };
+struct ReminderPresentation {
+  ReminderDue due{};
+  char sourceLabel[32]{}, dueLabel[32]{};
+  bool ready = false;
+};
+static_assert(sizeof(ReminderPresentation) <= ReminderDueBytes);
 static_assert(sizeof(ReminderMutation) <= ReminderDraftBytes);
 static_assert(sizeof(ReminderDue) <= ReminderDueBytes);
 }  // namespace booksync

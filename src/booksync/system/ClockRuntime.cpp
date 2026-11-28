@@ -11,6 +11,9 @@
 namespace booksync {
 void publishRuntimeClock() {
   trustedtime::processSync();
+  sampleRuntimeClock();
+}
+void sampleRuntimeClock() {
   ClockStatus value{};
   switch (trustedtime::clockStatus()) {
     case trustedtime::ClockSource::Sntp:

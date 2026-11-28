@@ -51,9 +51,11 @@ static_assert(sizeof(LocalState) <= 28 * 1024);
 // buffers and the <=4 KiB editor splice workspace exceed the task stack; releasing them before reader entry keeps C3
 // buffers out of the reader lifetime. HAL owns its bounded directory-handle allocations.
 std::unique_ptr<LocalState> local;
-ClockStatus currentClock{};
 SleepView currentSleep{};
 RemindersFacade* reminders = nullptr;
+bool reminderConnect = false;
+void (*reminderActivityHook)(ReminderActivity) = nullptr;
+ClockStatus currentClock{};
 AccountView accountPresentation{};
 // One fixed <=368-byte cached form plus an 8-byte monotonic counter: avoids
 // a heap allocation for the offline capability view and never holds credentials.
@@ -121,6 +123,10 @@ class OfflineLibrary final : public Library {
   ReminderResult remindersMutate(const ReminderMutation& m) override {
     return reminders ? reminders->mutate(m) : ReminderResult{};
   }
+  void remindersActivity(ReminderActivity activityValue) override {
+    if (reminderActivityHook) reminderActivityHook(activityValue);
+  }
+  bool reminderSleepAvailable() const override { return reminders && reminders->sleepAvailable(); }
   bool remindersRetry() override { return reminders && reminders->retry(); }
   ReminderResult remindersResult() const override { return reminders ? reminders->result() : ReminderResult{}; }
   ReminderEvents remindersEvents() const override { return reminders ? reminders->events() : ReminderEvents{}; }
@@ -130,6 +136,12 @@ class OfflineLibrary final : public Library {
   }
   ReminderResult remindersRespond(uint64_t token, uint64_t owner, ReminderAction action) override {
     return reminders ? reminders->respond(token, owner, action) : ReminderResult{};
+  }
+  ReminderPresentation remindersPresentation(ReminderClaim claim) const override {
+    return reminders ? reminders->presentation(claim) : ReminderPresentation{};
+  }
+  ReminderAuthorization remindersAuthorize(ReminderClaim claim) override {
+    return reminders ? reminders->authorize(claim) : ReminderAuthorization{};
   }
   void remindersRetire(uint64_t owner) override {
     if (reminders) reminders->retire(owner);
@@ -257,6 +269,11 @@ class OfflineLibrary final : public Library {
       catalogRequested = true;
       return CommandStatus::Accepted;
     }
+    if (intent == Intent::ConnectReminderTime) {
+      if (!reminders) return CommandStatus::Unavailable;
+      reminderConnect = true;
+      return CommandStatus::Accepted;
+    }
     if (intent == Intent::DismissUpgradeNotice) {
       if (!noticeCheckpoint) return CommandStatus::Unavailable;
       noticePresentationRetired = true;
@@ -279,6 +296,12 @@ OfflineLibrary& shellLibrary() {
 }  // namespace
 Library& offlineLibrary() { return shellLibrary(); }
 void publishSleepView(SleepView value) { currentSleep = value; }
+bool takeReminderConnectRequest() {
+  const bool requested = reminderConnect;
+  reminderConnect = false;
+  return requested;
+}
+void bindReminderActivity(void (*callback)(ReminderActivity)) { reminderActivityHook = callback; }
 void publishClockStatus(ClockStatus value) { currentClock = value; }
 void bindReminders(RemindersFacade& facade) { reminders = &facade; }
 void publishAccountView(AccountView value) {

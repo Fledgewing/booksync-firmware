@@ -39,7 +39,20 @@ pending wait has timed out. This ticket is not a durable acknowledgement.
 `ReadingGate` is checked immediately before a foreground effect, with current
 visibility, reading and sleep state. It refuses background repaint everywhere and
 unsolicited messages, update/network/sync status, navigation and restart while
-reading. User-opened panels and end-of-book remain explicit exceptions. Hidden,
+reading. User-opened panels and end-of-book remain explicit exceptions. R1 adds a
+separate narrowly typed reminder exception for approved bedtime and eye-rest
+occurrences. `Presentation::Reminder` is always denied by generic `mayShow`,
+even if its position-consent boolean is true. Only a revision/source/owner-checked
+Library claim can create a move-only `ReminderPermit`; it cannot be copied into
+two draws. The permit rechecks visible lifetime, sleep, other modals, expiry and
+kind-specific clock/page eligibility immediately before its one initial draw.
+An invalidated permit cannot revive on A → B → A or clock recovery. Visible
+sheet input/error redraws are owned by the presenter, never by timer events.
+Interval claims remain page-only and use a non-reused session; time claims may
+also show over Home or menus. Both are separate from position consent, messages
+and user-opened panels. This exception grants no navigation, network, update,
+restart, notification, wake or sleep authority; only a fresh explicit Sleep
+response may request the existing checkpoint/sleep path. Hidden,
 closed and sleeping views cannot draw through the gate. It does not schedule a
 future repaint or queue a deferred screen.
 

@@ -86,6 +86,7 @@ class ActivityManager {
   void processPendingActivities();
   void captureSleepEvents();
   bool sleepCapturePrepared = false;
+  bool reminderOverlayVisible = false;
 
   // Pending activity to be launched on next loop iteration
   std::unique_ptr<Activity> pendingActivity;
@@ -122,6 +123,7 @@ class ActivityManager {
   // Set by requestUpdateAndWait(); read and cleared by the render task after render completes.
   // Note: only one waiting task is supported at a time
   TaskHandle_t waitingTaskHandle = nullptr;
+  std::atomic<bool>* waitingReminderRejected = nullptr;
   portMUX_TYPE renderStateMux = portMUX_INITIALIZER_UNLOCKED;
 
   // Mutex to protect rendering operations from race conditions
@@ -228,6 +230,13 @@ class ActivityManager {
   void endGlobalSettingsEdit();
   void notifyInputLockChanged(bool locked);
   void notifyUserInput();
+  struct ReminderContext {
+    bool visible = false, page = false, modal = true;
+  };
+  ReminderContext reminderContext() const;
+  void notifyReminderReadingInput();
+  bool checkpointReminderSleep();
+  bool connectReminderClock();
   bool skipLoopDelay() const;
   uint8_t inputPollDelayMs() const;
   std::string getCurrentBookPath() const;

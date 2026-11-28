@@ -1237,7 +1237,7 @@
     },
     "include/AppCapabilities.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover. F35a gates editor presentation to approved X4 profiles; X3 editor awaits approval.",
+      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover. F35a gates editor presentation to approved X4 profiles; X3 editor awaits approval. R1 enables only the approved Pro, Classic and C3 reminder profiles, with opt-in native UI scenarios.",
       "includes": [
         "BoardConfig.h"
       ]
@@ -3870,7 +3870,7 @@
     },
     "lib/I18n/translations/english.yaml": {
       "role": "retained-library",
-      "rationale": "Native engine/support library; exact include edges retained, not a product-layer escape.",
+      "rationale": "Native engine/support library; exact include edges retained, not a product-layer escape. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible.",
       "includes": []
     },
     "lib/I18n/translations/estonian.yaml": {
@@ -6921,7 +6921,7 @@
     },
     "src/SettingsList.h": {
       "role": "retained-runtime",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. R1 exposes the approved reminder entry or menu admission through the composition root.",
       "includes": [
         "CrossInkHalFrontlight.h",
         "CrossPointSettings.h",
@@ -7044,7 +7044,7 @@
     },
     "src/activities/Activity.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible.",
       "includes": [
         "ActivityManager.h",
         "ActivityResult.h",
@@ -7053,6 +7053,7 @@
         "Logging.h",
         "MappedInputManager.h",
         "RenderLock.h",
+        "booksync/system/ReminderFrame.h",
         "cassert",
         "cstdint",
         "memory",
@@ -7064,7 +7065,7 @@
     },
     "src/activities/ActivityManager.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owns boot/Home routing and offline Home regression coverage; F05 retires native writers while retaining local capture; F06 retains isolated publication probes. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission. R1 publishes already established clock provenance before foreground work; no I/O or draw is introduced. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk.",
+      "rationale": "F04 owns boot/Home routing and offline Home regression coverage; F05 retires native writers while retaining local capture; F06 retains isolated publication probes. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission. R1 publishes already established clock provenance before foreground work; no I/O or draw is introduced. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible.",
       "includes": [
         "ActivityManager.h",
         "CrossInkHalFrontlight.h",
@@ -7091,6 +7092,7 @@
         "booksync/system/Bootstrap.h",
         "booksync/system/ClockRuntime.h",
         "booksync/system/NetworkPhase.h",
+        "booksync/system/ReminderPresenter.h",
         "boot_sleep/SleepActivity.h",
         "components/TouchRegistry.h",
         "components/UITheme.h",
@@ -7106,6 +7108,7 @@
         "reader/EpubReaderActivity.h",
         "reader/GlobalReadingStats.h",
         "reader/ReaderActivity.h",
+        "settings/ClockSyncActivity.h",
         "settings/ReleaseNotesActivity.h",
         "settings/SettingsActivity.h",
         "util/BatteryDiagnosticLog.h",
@@ -7118,7 +7121,7 @@
     },
     "src/activities/ActivityManager.h": {
       "role": "retained-runtime",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible.",
       "includes": [
         "CrossPointSettings.h",
         "GfxRenderer.h",
@@ -8874,7 +8877,7 @@
     },
     "src/activities/reader/EpubReaderActivity.h": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible.",
       "includes": [
         "BackgroundBuildMemoryGuard.h",
         "BookLoadingFeedback.h",
@@ -9074,7 +9077,7 @@
     },
     "src/activities/reader/EpubReaderDrawerActivity.h": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review. R1 exposes the approved reminder entry or menu admission through the composition root.",
       "includes": [
         "AppCapabilities.h",
         "CrossPointSettings.h",
@@ -9859,7 +9862,7 @@
     },
     "src/activities/reader/TxtReaderActivity.cpp": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible.",
       "includes": [
         "BidiUtils.h",
         "CrossPointSettings.h",
@@ -9890,7 +9893,7 @@
     },
     "src/activities/reader/TxtReaderActivity.h": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible.",
       "includes": [
         "BookLoadingFeedback.h",
         "CrossPointSettings.h",
@@ -9959,7 +9962,7 @@
     },
     "src/activities/reader/XtcReaderActivity.h": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible.",
       "includes": [
         "BookLoadingFeedback.h",
         "BookReadingStats.h",
@@ -10036,7 +10039,7 @@
     },
     "src/activities/reader/XtcReaderMenuActivity.h": {
       "role": "retained-reader",
-      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review.",
+      "rationale": "Pinned reader behavior; exact native include edges retained for F09 bridge review. R1 exposes the approved reminder entry or menu admission through the composition root.",
       "includes": [
         "I18n.h",
         "activities/Activity.h",
@@ -11266,7 +11269,7 @@
     },
     "src/booksync/interface/Library.h": {
       "role": "interface",
-      "rationale": "Public bounded values and intent facade; no private includes or mutable handles. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O."
+      "rationale": "Public bounded values and intent facade; no private includes or mutable handles. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible."
     },
     "src/booksync/interface/Models.h": {
       "role": "interface",
@@ -11278,7 +11281,7 @@
     },
     "src/booksync/services/Library.cpp": {
       "role": "services",
-      "rationale": "Private policy contracts; only SyncOwner may mint the serial writer token. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O."
+      "rationale": "Private policy contracts; only SyncOwner may mint the serial writer token. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible."
     },
     "src/booksync/services/OfflineLibrary.h": {
       "role": "services",
@@ -12278,7 +12281,7 @@
     },
     "src/main.cpp": {
       "role": "retained-runtime",
-      "rationale": "F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk.",
+      "rationale": "F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible.",
       "includes": [
         "AppCapabilities.h",
         "AppVersion.h",
@@ -12336,6 +12339,7 @@
         "array",
         "booksync/system/Bootstrap.h",
         "booksync/system/NetworkPhase.h",
+        "booksync/system/ReminderPresenter.h",
         "booksync/system/SleepRuntime.h",
         "builtinFonts/all.h",
         "components/UITheme.h",
@@ -14976,7 +14980,7 @@
     },
     "src/booksync/system/Bootstrap.cpp": {
       "role": "system",
-      "rationale": "The X3 Settings entry owns only Home widgets and cannot root native SettingsActivity. F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F34 projects Library-only widget values into foreground drawing and mapped input; fonts prepare on entry, and snapshot/focus mutation is serialized by RenderLock. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O. F36a handles an explicit Library browse intent and restores the parent batch on return."
+      "rationale": "The X3 Settings entry owns only Home widgets and cannot root native SettingsActivity. F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F34 projects Library-only widget values into foreground drawing and mapped input; fonts prepare on entry, and snapshot/focus mutation is serialized by RenderLock. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O. F36a handles an explicit Library browse intent and restores the parent batch on return. R1 suppresses due overlays during the Home editor or activation notice."
     },
     "src/booksync/system/Bootstrap.h": {
       "role": "system",
@@ -15043,11 +15047,11 @@
     },
     "src/booksync/system/ReadingGate.h": {
       "role": "system",
-      "rationale": "F12 main-loop presentation policy and allocation-free one-shot delivery; public immutable ticket only, no UI, stores, protocol or transport."
+      "rationale": "F12 main-loop presentation policy and allocation-free one-shot delivery; public immutable ticket only, no UI, stores, protocol or transport. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible."
     },
     "src/booksync/system/ReadingGate.cpp": {
       "role": "system",
-      "rationale": "F12 main-loop presentation policy and allocation-free one-shot delivery; public immutable ticket only, no UI, stores, protocol or transport."
+      "rationale": "F12 main-loop presentation policy and allocation-free one-shot delivery; public immutable ticket only, no UI, stores, protocol or transport. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible."
     },
     "src/booksync/services/DeviceIndex.cpp": {
       "role": "services",
@@ -15793,15 +15797,15 @@
     },
     "src/booksync/interface/Reminders.h": {
       "role": "interface",
-      "rationale": "R1 bounded local reminder values, worker scheduling and validated atomic publication; no adapter, network or UI dependency. Fixed service and record scratch enforce C3 budgets."
+      "rationale": "R1 bounded local reminder values, worker scheduling and validated atomic publication; no adapter, network or UI dependency. Fixed service and record scratch enforce C3 budgets. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible."
     },
     "src/booksync/services/Reminders.h": {
       "role": "services",
-      "rationale": "R1 bounded local reminder values, worker scheduling and validated atomic publication; no adapter, network or UI dependency. Fixed service and record scratch enforce C3 budgets."
+      "rationale": "R1 bounded local reminder values, worker scheduling and validated atomic publication; no adapter, network or UI dependency. Fixed service and record scratch enforce C3 budgets. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible."
     },
     "src/booksync/services/Reminders.cpp": {
       "role": "services",
-      "rationale": "R1 bounded local reminder values, worker scheduling and validated atomic publication; no adapter, network or UI dependency. Fixed service and record scratch enforce C3 budgets."
+      "rationale": "R1 bounded local reminder values, worker scheduling and validated atomic publication; no adapter, network or UI dependency. Fixed service and record scratch enforce C3 budgets. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible."
     },
     "src/booksync/storage/RemindersStore.h": {
       "role": "storage",
@@ -15813,11 +15817,11 @@
     },
     "src/booksync/services/RemindersFacade.h": {
       "role": "services",
-      "rationale": "R1 single coalesced main-loop command slot behind Library; storage is drained outside paint, with bounded due publication and no UI callbacks."
+      "rationale": "R1 single coalesced main-loop command slot behind Library; storage is drained outside paint, with bounded due publication and no UI callbacks. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible."
     },
     "src/booksync/services/RemindersFacade.cpp": {
       "role": "services",
-      "rationale": "R1 single coalesced main-loop command slot behind Library; storage is drained outside paint, with bounded due publication and no UI callbacks."
+      "rationale": "R1 single coalesced main-loop command slot behind Library; storage is drained outside paint, with bounded due publication and no UI callbacks. R1 adds the typed, main-loop reminder overlay and explicit sleep preflight; unchanged reading behavior when no reminder is visible."
     },
     "src/booksync/system/RemindersRuntime.cpp": {
       "role": "system",
@@ -16066,6 +16070,73 @@
     "src/booksync/server/bookorbit/recovery.py": {
       "role": "server",
       "rationale": "F46b2a bounded read-only recovery inspector for private BPG1/BNS1 and F19 BPS1/BPS2 copied records. Validates complete framing/integrity/semantics, prints size/format metadata only, and never repairs, acknowledges, mutates or uses network."
+    },
+    "src/booksync/system/ReminderPresenter.cpp": {
+      "role": "system",
+      "rationale": "R1 bounded reminder presentation through Library; no data I/O, transport or native reader policy in UI.",
+      "includes": [
+        "../../../lib/hal/HalElapsed.h",
+        "AppCapabilities.h",
+        "CrossPointSettings.h",
+        "GfxRenderer.h",
+        "I18n.h",
+        "Logging.h",
+        "MappedInputManager.h",
+        "ReminderClaimRetry.h",
+        "ReminderPresenter.h",
+        "activities/Activity.h",
+        "activities/RenderLock.h",
+        "algorithm",
+        "atomic",
+        "booksync/services/LocalLibrary.h",
+        "booksync/services/OfflineLibrary.h",
+        "booksync/services/RemindersFormat.h",
+        "booksync/system/ClockRuntime.h",
+        "booksync/system/ReadingGate.h",
+        "booksync/system/RemindersRuntime.h",
+        "booksync/ui/reminders/DueSheet.h",
+        "components/UITheme.h",
+        "ctime",
+        "fontIds.h",
+        "optional"
+      ]
+    },
+    "src/booksync/system/ReminderPresenter.h": {
+      "role": "system",
+      "rationale": "R1 bounded reminder presentation through Library; no data I/O, transport or native reader policy in UI."
+    },
+    "src/booksync/services/RemindersFormat.cpp": {
+      "role": "services",
+      "rationale": "R1 bounded reminder presentation through Library; no data I/O, transport or native reader policy in UI."
+    },
+    "src/booksync/services/RemindersFormat.h": {
+      "role": "services",
+      "rationale": "R1 bounded reminder presentation through Library; no data I/O, transport or native reader policy in UI."
+    },
+    "src/booksync/ui/reminders/DueSheet.cpp": {
+      "role": "ui",
+      "rationale": "R1 bounded reminder presentation through Library; no data I/O, transport or native reader policy in UI."
+    },
+    "src/booksync/ui/reminders/DueSheet.h": {
+      "role": "ui",
+      "rationale": "R1 bounded reminder presentation through Library; no data I/O, transport or native reader policy in UI."
+    },
+    "lib/hal/HalElapsed.h": {
+      "role": "hal-wrapper",
+      "rationale": "R1 bounded reminder values through Library; main-loop presentation, no transport, filesystem access or native policy in UI.",
+      "includes": [
+        "chrono",
+        "cstdint",
+        "esp_timer.h"
+      ]
+    },
+    "src/booksync/system/ReminderClaimRetry.h": {
+      "role": "system",
+      "rationale": "R1 bounded occurrence-identity retry admission prevents repeated failed durable claims at input-loop frequency; no storage, scheduler task, UI, protocol or heap."
+    },
+    "src/booksync/system/ReminderFrame.h": {
+      "role": "system",
+      "rationale": "R1 native accepted-frame scalar publication: a render-owned outcome and lock-free visibility flag, no service/Library access from the render task, I/O, timer or heap. Navigation and modal draws block it."
     }
   },
   "generators": {
