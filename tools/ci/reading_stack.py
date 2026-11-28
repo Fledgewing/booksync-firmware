@@ -12,6 +12,8 @@ def bounded_reading_frame(node_env, node):
 
 env.AddBuildMiddleware(bounded_reading_frame, "*/PersonalReading.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/ReadingStats.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Library.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Lists.cpp")
 
 # F20 keeps payloads in borrowed worker storage; retain exact hardware frame
 # measurements separately from F39's stricter pure-projection gate.

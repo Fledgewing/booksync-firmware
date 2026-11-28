@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+
+#include "widgets/Collections.h"
 #if defined(SIMULATOR) && defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
 #elif defined(SIMULATOR)
@@ -295,6 +297,11 @@ struct ReadingLinkInput {
   booksync::ReadingValue watermark;
   uint64_t now;
   int64_t day, pick;
+  const booksync::LibraryWidgetInput* libraryWidget = nullptr;
+  booksync::LibraryWidgetValues* libraryWidgetOut = nullptr;
+  const booksync::ListsWidgetSource* listsWidget = nullptr;
+  booksync::ListsWidgetValues* listsWidgetOut = nullptr;
+  const booksync::CollectionAllowance* collectionAllowance = nullptr;
 };
 }  // namespace
 extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
@@ -304,5 +311,13 @@ extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
   input.stats.combine(input.remote, scope, true, input.day, input.out);
   input.personal.begin(input.kind, input.day, input.pick, scope);
   input.personal.card({}, scope, input.card);
-  return input.stats.tick() && input.personal.tick();
+  const bool personal = input.stats.tick() && input.personal.tick();
+  bool collections = true;
+  if (input.libraryWidget && input.libraryWidgetOut && input.collectionAllowance)
+    collections &= booksync::projectLibraryWidget(*input.libraryWidget, scope, *input.collectionAllowance,
+                                                  *input.libraryWidgetOut);
+  if (input.listsWidget && input.listsWidgetOut && input.collectionAllowance)
+    collections &=
+        booksync::projectListsWidget(*input.listsWidget, scope, *input.collectionAllowance, *input.listsWidgetOut);
+  return personal && collections;
 }

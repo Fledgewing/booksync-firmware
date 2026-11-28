@@ -15,6 +15,7 @@
 #include "../../test/simulator/FinishScenario.h"
 #include "../../test/simulator/LifecycleAnnotationsScenario.h"
 #include "../../test/simulator/PersonalReadingScenario.h"
+#include "../../test/simulator/CollectionWidgetsScenario.h"
 #include "../../test/simulator/DeliveryScenario.h"
 #include "../../test/simulator/AccountScenario.h"
 #include "../../test/simulator/CatalogScenario.h"
@@ -12226,6 +12227,7 @@ void prepareSimulatorSmokeState() {
   runFinishScenario();
   runLifecycleAnnotationsScenario();
   runNativePersonalScenario();
+  collectionWidgetsScenario::run();
   runPersonalReadingScenario();
   runSyncOwnerScenario();
   runLifecycleJournalScenario();

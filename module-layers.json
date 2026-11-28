@@ -13320,6 +13320,7 @@
         "../../test/simulator/CatalogScenario.h",
         "../../test/simulator/CatalogSurfaceScenario.h",
         "../../test/simulator/ClockScenario.h",
+        "../../test/simulator/CollectionWidgetsScenario.h",
         "../../test/simulator/CopyJobsScenario.h",
         "../../test/simulator/CoverJobsScenario.h",
         "../../test/simulator/CredentialsScenario.h",
@@ -16238,6 +16239,22 @@
     "src/booksync/services/PersonalWorker.cpp": {
       "role": "services",
       "rationale": "F40w production personal prerequisite: bounded original-native saved passage source and cached Library publication; exact identities, frozen generation, full row/byte budgets, no paint I/O or second writer."
+    },
+    "src/booksync/interface/CollectionWidgets.h": {
+      "role": "interface",
+      "rationale": "F40w bounded neutral Library counts/storage and saved-list identities, with explicit unknown/zero/scope/age values; no wire identifiers, rules, transport or mutable handles."
+    },
+    "src/booksync/services/widgets/Collections.h": {
+      "role": "services",
+      "rationale": "F40w Library and Lists worker projections preserve two-row Library accounting and one/three-row saved-list previews, frozen source rank/counts, independent states and retired account/generation guards; no acquisition, allocation or writer."
+    },
+    "src/booksync/services/widgets/Library.cpp": {
+      "role": "services",
+      "rationale": "F40w Library and Lists worker projections preserve two-row Library accounting and one/three-row saved-list previews, frozen source rank/counts, independent states and retired account/generation guards; no acquisition, allocation or writer."
+    },
+    "src/booksync/services/widgets/Lists.cpp": {
+      "role": "services",
+      "rationale": "F40w Library and Lists worker projections preserve two-row Library accounting and one/three-row saved-list previews, frozen source rank/counts, independent states and retired account/generation guards; no acquisition, allocation or writer."
     }
   },
   "generators": {
