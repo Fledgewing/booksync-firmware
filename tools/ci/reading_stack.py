@@ -65,3 +65,5 @@ for source in ("SourceFile.cpp", "ProgressCapture.cpp", "NativeCaptureGate.cpp",
 env.AddBuildMiddleware(bounded_reminder_frame, "*/ReminderPresenter.cpp")
 env.AddBuildMiddleware(bounded_reminder_frame, "*/DueSheet.cpp")
 env.AddBuildMiddleware(bounded_reminder_frame, "*/RemindersFormat.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/When.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Records.cpp")

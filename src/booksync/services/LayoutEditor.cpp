@@ -353,13 +353,17 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
                            : edit.widget == WidgetKind::Today   ? "today"
                            : edit.widget == WidgetKind::Pages   ? "pages-read"
                            : edit.widget == WidgetKind::Year    ? "year-in-reading"
+                           : edit.widget == WidgetKind::When    ? "when-you-read"
+                           : edit.widget == WidgetKind::Records ? "reading-records"
                            : edit.widget == WidgetKind::Monthly ? "monthly-reading"
                                                                 : nullptr;
       if (!widget) return LayoutEditStatus::Invalid;
       if (!std::strcmp(device, "x3") && isStatsWidget(edit.widget)) return LayoutEditStatus::Invalid;
       const uint8_t h = edit.widget == WidgetKind::Browse || isStatsWidget(edit.widget) ? 1 : 2;
-      const uint8_t w =
-          isStatsWidget(edit.widget) && edit.widget != WidgetKind::Year && edit.widget != WidgetKind::Monthly ? 1 : 2;
+      const uint8_t w = isStatsWidget(edit.widget) && edit.widget != WidgetKind::Year &&
+                                edit.widget != WidgetKind::Monthly && edit.widget != WidgetKind::Records
+                            ? 1
+                            : 2;
       uint8_t xs[3]{}, ys[3]{};
       static constexpr const char* classes[] = {"android-tablet", "x4", "x3"};
       for (unsigned i = 0; i < 3; ++i) {

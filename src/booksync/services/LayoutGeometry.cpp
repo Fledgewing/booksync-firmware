@@ -17,7 +17,7 @@ const Size* sizes(WidgetKind kind, unsigned& count) {
     count = 2;
     return calendarYear;
   }
-  if (kind == WidgetKind::Monthly) {
+  if ((kind == WidgetKind::Monthly || kind == WidgetKind::Records)) {
     count = 1;
     return calendarMonth;
   }

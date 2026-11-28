@@ -32,9 +32,11 @@
 #include "booksync/ui/WidgetHost.h"
 #include "booksync/ui/widgets/Monthly.h"
 #include "booksync/ui/widgets/Pages.h"
+#include "booksync/ui/widgets/Records.h"
 #include "booksync/ui/widgets/Streak.h"
 #include "booksync/ui/widgets/Today.h"
 #include "booksync/ui/widgets/Week.h"
+#include "booksync/ui/widgets/When.h"
 #include "booksync/ui/widgets/Year.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -191,6 +193,8 @@ class ShellActivity final : public Activity {
     }
   }
   const char* widgetTitle(WidgetKind kind) const {
+    if (kind == WidgetKind::When) return tr(STR_HOME_STATS_WHEN);
+    if (kind == WidgetKind::Records) return tr(STR_HOME_STATS_RECORDS);
     if (kind == WidgetKind::Today) return tr(STR_HOME_STATS_TODAY);
     if (kind == WidgetKind::Pages) return tr(STR_HOME_STATS_PAGES);
     if (kind == WidgetKind::Year) return tr(STR_HOME_YEAR_IN_READING);
@@ -366,10 +370,25 @@ class ShellActivity final : public Activity {
     auto stroke = [&](int x1, int y1, int x2, int y2) {
       renderer.drawLine(left + x1 * edge / 24, top + y1 * edge / 24, left + x2 * edge / 24, top + y2 * edge / 24);
     };
-    if (widgets->page().widgets[index].kind == WidgetKind::Today) {
+    if (widgets->page().widgets[index].kind == WidgetKind::Today ||
+        widgets->page().widgets[index].kind == WidgetKind::When) {
       renderer.drawRoundedRect(left + 2, top + 2, edge - 4, edge - 4, 1, (edge - 4) / 2, true);
       stroke(12, 6, 12, 12);
       stroke(12, 12, 16, 15);
+    } else if (widgets->page().widgets[index].kind == WidgetKind::Records) {
+      stroke(7, 3, 17, 3);
+      stroke(17, 3, 17, 10);
+      stroke(17, 10, 12, 16);
+      stroke(12, 16, 7, 10);
+      stroke(7, 10, 7, 3);
+      stroke(7, 5, 3, 5);
+      stroke(3, 5, 3, 10);
+      stroke(3, 10, 8, 13);
+      stroke(17, 5, 21, 5);
+      stroke(21, 5, 21, 10);
+      stroke(21, 10, 16, 13);
+      stroke(12, 16, 12, 21);
+      stroke(7, 22, 17, 22);
     } else if (widgets->page().widgets[index].kind == WidgetKind::Pages) {
       stroke(4, 4, 10, 4);
       stroke(10, 4, 12, 6);
@@ -476,6 +495,79 @@ class ShellActivity final : public Activity {
       paintStatText(UI_10_FONT_ID, r.x + 10, r.y + positions.footerY, text, r.width - 20, metadataScale);
     }
   }
+  void paintHoursStats(uint8_t index, const StatsCard& card) const {
+    const auto* hours = widgets->statsHours(index);
+    if (!hours) return;
+    const auto r = tileRect(index);
+    const int unit = std::min(r.height, 108), metadata = 160 * unit / 108;
+    char text[64];
+    if (hours->peakKnown)
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_HOUR_FORMAT), unsigned(hours->peakHour));
+    else
+      std::snprintf(text, sizeof(text), "?");
+    paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 28 * unit / 108, text, r.width / 3, 224 * unit / 108);
+    std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_AFTER18_FORMAT), unsigned(hours->after18));
+    paintStatText(UI_10_FONT_ID, r.x + r.width / 3, r.y + 32 * unit / 108, text, r.width * 2 / 3 - 10, metadata);
+    widgets::StatsMark mark;
+    for (unsigned hour = 0; hour < 24; ++hour) {
+      if (!widgets::When::hourColumn(card, *hours, widgetBox(index), hour, mark)) continue;
+      const int x = r.x + mark.x, y = r.y + mark.y;
+      if (!mark.known)
+        renderer.drawRect(x, y - 3, mark.width, 4);
+      else if (mark.active) {
+        if (mark.latestDay)
+          renderer.fillRect(x, y, mark.width, mark.height);
+        else
+          renderer.drawRect(x, y, mark.width, mark.height);
+      } else
+        renderer.drawLine(x, y, x + mark.width, y);
+      if (hour % 6 == 0) {
+        std::snprintf(text, sizeof(text), "%02u", hour);
+        paintStatText(UI_10_FONT_ID, x, r.y + (card.stale ? 73 : 90) * unit / 108, text, 24 * unit / 108, metadata);
+      }
+    }
+    if (card.stale) {
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_SAVED_AGE_FORMAT), (unsigned long long)card.ageDays);
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 90 * unit / 108, text, r.width - 20, metadata);
+    }
+  }
+  void paintRecordsStats(uint8_t index, const StatsCard& card) const {
+    const auto* records = widgets->statsRecords(index);
+    if (!records) return;
+    const auto r = tileRect(index);
+    const int unit = std::min(r.height, 108), metadata = 128 * unit / 108;
+    static constexpr StrId labels[] = {StrId::STR_HOME_STATS_RECORD_PAGES, StrId::STR_HOME_STATS_RECORD_SESSION,
+                                       StrId::STR_HOME_STATS_RECORD_DAY, StrId::STR_HOME_STATS_RECORD_BOOKS,
+                                       StrId::STR_HOME_STATS_RECORD_STREAK};
+    widgets::StatsMark cell;
+    for (unsigned column = 0; column < 5; ++column) {
+      if (!widgets::Records::recordCell(card, widgetBox(index), column, cell)) continue;
+      char number[32], text[48];
+      const auto value = records->values[column];
+      if (!value.known)
+        std::snprintf(text, sizeof(text), "?");
+      else if (column == 1)
+        std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_SESSION_FORMAT), (unsigned long long)(value.value / 3600),
+                      unsigned(value.value / 60 % 60));
+      else if (column == 4)
+        std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_STREAK_SHORT_FORMAT), (unsigned long long)value.value);
+      else {
+        formatStatsCount(value.value, number);
+        std::snprintf(text, sizeof(text), "%s", number);
+      }
+      paintStatText(UI_10_FONT_ID, r.x + cell.x, r.y + cell.y, text, cell.width, 224 * unit / 108);
+      paintStatText(UI_10_FONT_ID, r.x + cell.x, r.y + 54 * unit / 108, I18N.get(labels[column]), cell.width, metadata);
+    }
+    renderer.drawLine(r.x + 10, r.y + 74 * unit / 108, r.x + r.width - 10, r.y + 74 * unit / 108);
+    paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 84 * unit / 108,
+                  card.accountLinked ? tr(STR_HOME_STATS_RECORD_SOURCES) : tr(STR_HOME_STATS_RECORD_NATIVE),
+                  r.width - 20, 160 * unit / 108);
+    if (card.stale) {
+      char text[64];
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_SAVED_AGE_FORMAT), (unsigned long long)card.ageDays);
+      paintStatText(UI_10_FONT_ID, r.x + r.width - 182, r.y + 8, text, 142, 160 * unit / 108);
+    }
+  }
   void paintStatsWidget(uint8_t index) const {
     const auto r = tileRect(index);
     const auto kind = widgets->page().widgets[index].kind;
@@ -495,7 +587,9 @@ class ShellActivity final : public Activity {
     paintStatsHeaderIcon(index);
     if (view.viewState != WidgetState::Known || !card) {
       const char* message = view.viewState == WidgetState::Empty
-                                ? (kind == WidgetKind::Today     ? tr(STR_HOME_STATS_TODAY_EMPTY)
+                                ? (kind == WidgetKind::When      ? tr(STR_HOME_STATS_WHEN_EMPTY)
+                                   : kind == WidgetKind::Records ? tr(STR_HOME_STATS_RECORDS_EMPTY)
+                                   : kind == WidgetKind::Today   ? tr(STR_HOME_STATS_TODAY_EMPTY)
                                    : kind == WidgetKind::Pages   ? tr(STR_HOME_STATS_PAGES_EMPTY)
                                    : kind == WidgetKind::Year    ? tr(STR_HOME_STATS_YEAR_EMPTY)
                                    : kind == WidgetKind::Monthly ? tr(STR_HOME_STATS_MONTHLY_EMPTY)
@@ -512,6 +606,10 @@ class ShellActivity final : public Activity {
       }
       if (view.viewState == WidgetState::Oversize || view.viewState == WidgetState::Error)
         renderer.drawText(font, r.x + 10, r.y + r.height - line - 6, tr(STR_RETRY));
+    } else if (kind == WidgetKind::When) {
+      paintHoursStats(index, *card);
+    } else if (kind == WidgetKind::Records) {
+      paintRecordsStats(index, *card);
     } else if (kind == WidgetKind::Today || kind == WidgetKind::Pages) {
       paintDailyStats(index, *card, line, smallScale);
     } else if (kind == WidgetKind::Year || kind == WidgetKind::Monthly) {
@@ -921,7 +1019,10 @@ class ShellActivity final : public Activity {
       const int width = (safe.width - 56) / 2;
       return Rect{safe.x + 24 + (index - 11) * (width + 8), top + 8 * rowHeight, width, rowHeight};
     }
-    return Rect{safe.x + 24, header.y + header.height + line * 3 + 28 + index * height, safe.width - 48, height};
+    const int top = header.y + header.height + line * 3 + 28;
+    const int capacity = std::max(1, (safe.y + safe.height - 48 - top) / height);
+    const int first = editor.firstVisibleRow(uint8_t(capacity));
+    return Rect{safe.x + 24, top + (int(index) - first) * height, safe.width - 48, height};
   }
   Rect editorPageButton(uint8_t index) const {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
@@ -1128,6 +1229,9 @@ class ShellActivity final : public Activity {
         if (i < start || i >= start + 7) continue;
       }
       const auto r = editorRow(i);
+      if (panel == Panel::Add &&
+          (r.y < header.y + header.height + lineHeight * 3 + 28 || r.y + r.height > safe.y + safe.height - 48))
+        continue;
       renderer.drawRect(r.x, r.y, r.width, r.height, i == editor.focus() ? 3 : 1, true);
       paintFittedText(UI_10_FONT_ID, r.x + 12, r.y + 10, editorLabel(i), r.width - 24);
     }
@@ -1216,6 +1320,12 @@ class ShellActivity final : public Activity {
         if (editor.panel() == Panel::Add) editor.namePage(firstWidgetPageName(editor.focus()));
         editor.activateEditor();
       }
+    } else if (editor.panel() == Panel::Add && mappedInput.wasSwipe() != MappedInputManager::SwipeDir::None) {
+      const auto direction = mappedInput.wasSwipe();
+      if (direction == MappedInputManager::SwipeDir::Up)
+        editor.stepEditor(1);
+      else if (direction == MappedInputManager::SwipeDir::Down)
+        editor.stepEditor(-1);
     } else if (tapped) {
       if (editor.panel() == Panel::Select || editor.panel() == Panel::Selected) {
         if (editor.panel() == Panel::Selected) {
@@ -1267,6 +1377,10 @@ class ShellActivity final : public Activity {
       } else
         for (uint8_t i = 0; i < editor.rows(); ++i) {
           const auto r = editorRow(i);
+          if (editor.panel() == Panel::Add &&
+              (r.y < header.y + header.height + renderer.getLineHeight(UI_10_FONT_ID) * 3 + 28 ||
+               r.y + r.height > safe.y + safe.height - 48))
+            continue;
           if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) {
             if (editor.panel() == Panel::Add) editor.namePage(firstWidgetPageName(i));
             editor.chooseEditor(i);

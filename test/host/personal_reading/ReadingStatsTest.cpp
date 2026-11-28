@@ -379,3 +379,53 @@ TEST(ReadingStats, RequestedDayNeverReusesPriorDayPageVisits) {
   EXPECT_FALSE(out.nativeToday.known);
   EXPECT_EQ(out.recordedPages.value, 1);
 }
+
+TEST(ReadingStats, HourBucketsUnionOverlapAndClipAtWindow) {
+  Visits visits;
+  visits.add(199 * 86400 + 23 * 3600 + 3590, 20);
+  visits.add(200 * 86400 + 5, 15);
+  ReadingStats stats;
+  ASSERT_TRUE(stats.begin(visits.source(), Now, 0, {}));
+  finish(stats);
+  EXPECT_EQ(stats.local().hours[23], 10);
+  EXPECT_EQ(stats.local().hours[0], 20);
+  EXPECT_EQ(stats.local().hoursKnown, (1u << 23) | 1u);
+  EXPECT_FALSE(stats.local().hoursComplete);
+  StatsSnapshot out;
+  stats.combine(nullptr, {7, 2}, true, 200, out);
+  EXPECT_EQ(out.hours[0], 20);
+  EXPECT_TRUE(out.hoursAvailable);
+  stats.combine(nullptr, {7, 2}, true, 201, out);
+  EXPECT_FALSE(out.hoursAvailable);
+  EXPECT_EQ(out.hoursKnown, 0u);
+}
+TEST(ReadingStats, FullHourWindowCanProveZeroButPartialCoverageCannot) {
+  Visits visits;
+  auto source = visits.source();
+  source.since = 1;
+  ReadingStats stats;
+  ASSERT_TRUE(stats.begin(source, Now, 0, {}));
+  finish(stats);
+  EXPECT_EQ(stats.local().hoursKnown, 0u);  // before Unix day zero is outside this capture.
+  constexpr uint64_t later = 500 * 86400 + 1000;
+  source.through = later;
+  source.since = 100 * 86400;
+  ASSERT_TRUE(stats.begin(source, later, 0, {}));
+  finish(stats);
+  EXPECT_TRUE(stats.local().hoursComplete);
+  EXPECT_EQ(stats.local().hoursKnown, 0xffffffu);
+}
+TEST(ReadingStats, DayOnlyCalendarDoesNotPretendItsHoursAreUtc) {
+  Visits visits;
+  visits.add(Now - 100, 50);
+  auto day = [](void*, uint64_t stamp, StatsDaySlice& out) {
+    out.day = int64_t(stamp / 86400);
+    out.end = (out.day + 1) * 86400;
+    return true;
+  };
+  ReadingStats stats;
+  ASSERT_TRUE(stats.begin(visits.source(), Now, 0, {}, {day, nullptr}));
+  finish(stats);
+  EXPECT_EQ(stats.local().today.value, 50);
+  EXPECT_FALSE(stats.local().hoursAvailable);
+}

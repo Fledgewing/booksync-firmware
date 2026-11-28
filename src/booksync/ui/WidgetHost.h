@@ -30,6 +30,8 @@ class WidgetHost {
   const StatsCard* statsCard(uint8_t widget) const;
   const StatsYear* statsYear(uint8_t widget) const;
   const StatsMonths* statsMonths(uint8_t widget) const;
+  const StatsHours* statsHours(uint8_t widget) const;
+  const StatsRecords* statsRecords(uint8_t widget) const;
   auto widgetCell(uint8_t widget, WidgetBox itemBox, uint8_t itemIndex, WidgetCell& itemCell) const -> bool;
   uint8_t widgetRows(uint8_t widget, WidgetBox itemBox) const;
   uint8_t hitWidgetRow(uint8_t widget, WidgetBox itemBox, int x, int y) const;

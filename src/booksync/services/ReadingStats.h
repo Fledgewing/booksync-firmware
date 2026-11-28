@@ -58,17 +58,25 @@ struct StatsDaySlice {
   int64_t day = 0;
   uint64_t end = 0;
 };
+struct StatsHourSlice {
+  uint64_t end = 0;
+  uint8_t hour = 0;
+};
 struct StatsCalendar {
   // Device calendar supplies historical DST-aware local dates/boundaries. The
   // fallback is an explicit fixed offset, suitable for UTC/synthetic fixtures.
   bool (*split)(void*, uint64_t, StatsDaySlice&) = nullptr;
   void* context = nullptr;
+  bool (*hour)(void*, uint64_t, StatsHourSlice&) = nullptr;
 };
 struct LocalReadingStats {
   std::array<ReadingValue, RemoteReadingStats::Days> days{};
   ReadingCoverage coverage{};
   ReadingValue today{}, pendingToday{}, recordedPages{}, longestSession{}, streak{}, bestStreak{};
   ReadingValue includedThrough{}, todayPages{}, bestDayPages{};
+  std::array<uint64_t, 24> hours{};
+  uint32_t hoursKnown = 0;
+  bool hoursAvailable = false, hoursComplete = false;
   int64_t firstDay = 0;
 };
 enum class TodayMerge : uint8_t { LocalOnly, Separate, Watermarked };
@@ -79,6 +87,10 @@ struct StatsSnapshot {
   ReadingCoverage daysCoverage{}, streakCoverage{}, goalCoverage{}, finishedCoverage{}, recordsCoverage{},
       localTodayCoverage{}, nativeTodayCoverage{}, accountTodayCoverage{};
   int64_t firstDay = 0;
+  std::array<uint64_t, 24> hours{};
+  ReadingCoverage hoursCoverage{};
+  uint32_t hoursKnown = 0;
+  bool hoursAvailable = false;
   TodayMerge todayMerge = TodayMerge::LocalOnly;
   bool offline = false;
 };
@@ -106,6 +118,7 @@ class ReadingStats {
   int16_t offset_ = 0;
   bool busy_ = false;
   bool split(uint64_t, StatsDaySlice&) const;
+  bool splitHour(uint64_t, StatsHourSlice&) const;
   void markIncomplete();
 };
 static_assert(sizeof(ReadingStats) <= 13 * 1024);

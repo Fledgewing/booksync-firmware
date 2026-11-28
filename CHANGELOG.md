@@ -2,6 +2,8 @@
 
 ### Fixed
 
+- BookSync Home keeps every installed widget reachable in Add through Classic button focus and Pro touch scrolling.
+
 - BookSync captures reader progress before a bounded sleep drain even with plugins disabled, retires stale sleep presentation ownership on return, and preserves native sleep screens while new artwork awaits approval.
 - BookSync stats cards no longer reduce sibling shelves to too few books when a Home page contains many summaries; the combined C3 row budget stays bounded.
 
@@ -10,6 +12,8 @@
 - BookSync Home widgets no longer pulls the retired native Settings screen graph into button images; X3 uses a bounded Settings entry and X4 keeps its spatial editor. Physical symbol guards reject regressions.
 
 ### Added
+
+- BookSync Home adds compact When you read and Reading records widgets on X4 Pro and Classic, with local-hour history and explicit per-record source availability.
 
 - BookSync publishes timezone-aware clock and date values only after live or retained clock provenance is known; a persisted expiry floor cannot produce a Home clock.
 - BookSync adds compact Series pages and exact next-1–10 download review on X4 Pro touch, X4 Classic buttons and X3, with offline/Back behavior, frozen file choices and restart-safe account-scoped queues through Library.
