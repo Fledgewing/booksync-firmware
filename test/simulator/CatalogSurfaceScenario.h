@@ -40,7 +40,7 @@ inline bool tick() {
     if (touch) {
       const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
       const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
-      const int x = safe.x + safe.width - 80, y = header.y + header.height + 77;
+      const int x = safe.x + safe.width - 80, y = 181 * renderer.getScreenHeight() / 800;
       mappedInputManager.simulatorInjectTouchDown(x, y);
       mappedInputManager.simulatorInjectTouchRelease(x, y);
     }
@@ -69,6 +69,7 @@ inline bool tick() {
     if (controller->catalogPanel() != booksync::CatalogSurface::Panel::Groups ||
         controller->catalogFocus() != controller->catalogVisibleRows() + 3)
       std::_Exit(6);
+    controller->selectCatalogControl(0);
   }
   if (frame < 25) return true;
   const auto reads = library.reads;
@@ -87,6 +88,9 @@ inline bool tick() {
     for (int y = 0; y < renderer.getScreenHeight(); ++y)
       for (int x = 0; x < renderer.getScreenWidth(); ++x) std::fputc(renderer.isPixelBlack(x, y) ? 0 : 255, file);
     std::fclose(file);
+    const auto geometry =
+        std::filesystem::path(output) / (std::string(catalogFixture::names[scene]) + ".geometry.json");
+    if (!booksync::writeCatalogGeometry(geometry.c_str())) std::_Exit(8);
   }
   frame = 0;
   if (++scene == 30) {
