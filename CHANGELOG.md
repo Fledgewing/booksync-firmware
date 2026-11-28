@@ -5,6 +5,7 @@
 - BookSync captures bounded timestamped reading-page history and checkpoints stats batches through its sole sync owner, retaining explicit coverage gaps and reconciling uncertain uploads without counting reading time twice; live delivery remains deferred.
 - BookSync Home supports local add/remove/reset widget edits on X4 Pro and Classic, with revision checks and atomic saves. The X3 Settings-list editor remains pending design approval.
 - BookSync checkpoints read/unread/finished state and ratings through its single sync owner, preserving uncertain deliveries, explicit clears and deferred native writeback across restarts; validated against a fake server.
+- BookSync prepares verified same-path downloads with explicit Resume after interruption, progress and Cancel, space checks, and quiet completion for departed views; live download screens remain deferred.
 
 - BookSync activates retained credentials, Wi-Fi and Tailnet identity with recoverable checkpoints, preserves native reader and legacy files, and records a once-only pending upgrade notice through Library. The revised B2 screen remains unbuilt pending approval.
 

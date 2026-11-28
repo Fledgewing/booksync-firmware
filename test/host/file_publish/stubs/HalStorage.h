@@ -72,6 +72,7 @@ class HalFile {
     return n;
   }
   bool sync() {
+    if (card.dead) return false;
     if (!card.event("file-sync:before") || card.readOnly || card.full) return false;
     card.disk[path] = card.files[path];
     return card.event("file-sync:after");
@@ -112,7 +113,10 @@ class HalStorage {
     if (!card.event("open")) return {};
     if (flags & O_WRONLY) {
       if (card.readOnly || card.full) return {};
-      card.files[path].clear();
+      if (flags & O_TRUNC)
+        card.files[path].clear();
+      else if (!exists(path) && !(flags & O_CREAT))
+        return {};
       card.metadata();
     } else if (!exists(path))
       return {};
@@ -132,6 +136,7 @@ class HalStorage {
     return card.event("rename:after");
   }
   bool syncFilesystem() {
+    if (card.dead) return false;
     if (!card.event("fs-sync:before") || card.readOnly) return false;
     card.disk = card.files;
     return card.event("fs-sync:after");

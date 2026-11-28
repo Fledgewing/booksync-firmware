@@ -94,6 +94,7 @@ FilePublish::~FilePublish() {
 bool FilePublish::fail(const char* step) {
   LOG_ERR("BSP", "Publication failed: %s", step);
   failed_ = true;
+  active_ = false;
   if (file_ && !file_.close()) LOG_ERR("BSP", "Publication failure close failed");
   return false;
 }
@@ -123,6 +124,33 @@ bool FilePublish::begin(size_t expectedBytes) {
   failed_ = false;
   active_ = true;
   return true;
+}
+bool FilePublish::resume(size_t expectedBytes, size_t received) {
+  if (active_ || received > expectedBytes || !validPaths(paths_) || !validator_) return fail("resume bounds");
+  // One handle at a time, including on the constrained SD transport.
+  file_ = Storage.open(paths_.staging, O_RDONLY);
+  if (!file_) return fail("resume open");
+  const bool exact = file_.fileSize() == received;
+  const bool closed = file_.close();
+  if (!exact || !closed) return fail("resume length");
+  file_ = Storage.open(paths_.staging, O_WRONLY);
+  if (!file_ || !file_.seekSet(received)) return fail("resume seek");
+  remaining_ = expectedBytes - received;
+  failed_ = false;
+  active_ = true;
+  return true;
+}
+bool FilePublish::flush() {
+  if (!active_ || failed_) return fail("inactive flush");
+  if (!file_.sync() || !syncDirectory(paths_.current)) return fail("partial flush");
+  return true;
+}
+bool FilePublish::checkpoint() {
+  if (!active_ || failed_) return fail("inactive checkpoint");
+  active_ = false;
+  if (!file_.sync()) return fail("checkpoint sync");
+  if (!file_.close()) return fail("checkpoint close");
+  return syncDirectory(paths_.current) ? true : fail("checkpoint directory sync");
 }
 bool FilePublish::write(const void* bytes, size_t count) {
   if (!active_ || failed_) return fail("inactive write");

@@ -2687,3 +2687,29 @@ A complete validated BSR1 removal/dismissal receipt can resume a missing/torn
 current BSL1 record only by publishing Retired. It never authorizes Live, and
 an uncommitted staging receipt is never selected as data. Read-only/full-card
 failure keeps that scope unavailable and preserves every original/backup.
+
+## BookSync download job envelope (BSDL v1)
+
+F23 uses F06 publication for one active account-scoped selection per worker. The
+caller reserves a private journal path plus `.tmp`/`.bak`; recovery selects a
+complete current or backup without writing. The exact 782-byte, little-endian
+record has no C++ padding: magic `BSDL`, version byte 1 and three zero bytes (8),
+run ID (u64), canceled flag (u8), canonical book UUID (16), edition UUID (16),
+source SHA-256 (32), five NUL-terminated 64-byte fields (server token, account
+token, opaque book alias, file alias, variant), frozen absolute SD path (240),
+expected length (u64), known-length flag (u8), strong revision validator (128),
+and FNV-1a-32 of the preceding 778 bytes (u32). Flags accept only 0/1. Unknown,
+torn, mismatched-scope and malformed records are retained and block work.
+Credentials, acquisition URLs and expiring locators are never persisted here.
+
+The book's exact `.tmp` sibling holds unpublished bytes. The worker reuses its
+open HAL handle and flushes every 256 KiB and at pause/completion. Restart may
+lose the last unflushed chunk group; the actual retained length is used only
+with the saved strong validator and exact offset response. A declined range
+restarts safely; malformed/changed range evidence is rejected. Full-file SHA-256
+and canonical edition/revision verification precede atomic rename and idempotent
+durable identity linking. A link failure or cut after rename reuses verified
+complete bytes on explicit Resume. The final book and reader sidecars are never
+removed by Cancel. Unrelated destination collisions fail; F24 owns replacement.
+A durable canceled flag precedes staging removal. Restart never starts transport,
+links a file or creates an automatic-open intent.
