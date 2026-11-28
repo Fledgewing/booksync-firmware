@@ -242,6 +242,11 @@ TEST(EditorAddRemove, AddRemoveCompletionFocusAndStaleSelection) {
   EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Error);
   EXPECT_EQ(ui.editorFailure(), LayoutEditStatus::Stale);
   EXPECT_EQ(lib.writes, 2u);
+  ui.back();  // Error recovery adopts the currently published revision.
+  ui.chooseEditor(3);
+  ui.chooseEditor(2);
+  EXPECT_EQ(lib.captured.revision, 4u);
+  EXPECT_EQ(lib.writes, 3u);
 }
 TEST(EditorAddRemove, X3PresentationIsNotEnabledWithoutApproval) {
   EditorFixture lib;

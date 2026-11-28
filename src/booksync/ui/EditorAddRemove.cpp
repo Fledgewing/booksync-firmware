@@ -29,6 +29,8 @@ void EditorAddRemove::back() {
   // Accepted work finishes atomically; Back retires only this presentation.
   if (panel_ == Panel::Select || panel_ == Panel::Waiting)
     panel_ = Panel::Closed;
+  else if (panel_ == Panel::Error)
+    enter();
   else if (panel_ != Panel::Closed) {
     panel_ = Panel::Select;
     focus_ = 0;
