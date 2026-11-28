@@ -264,6 +264,13 @@ TEST_F(LifecycleStatsTest, SnapshotCannotGrowBetweenPartialCheckpoints) {
   EXPECT_EQ(read().acknowledged, 1);
 }
 TEST_F(LifecycleStatsTest, MissingStatsAndAmbiguousMetadataDoNotFabricateTime) {
+  PageJournal unread{"/unrecovered"};
+  adapter.evidence.input.history = &unread;
+  adapter.evidence.input.end = 0;
+  EXPECT_EQ(step(), SyncResult::Unavailable);
+  EXPECT_EQ(read().acknowledged, 1);
+  adapter.evidence.input.history = &history;
+  adapter.evidence.input.end = history.count();
   adapter.evidence.input.metadataAmbiguous = true;
   ASSERT_EQ(step(), SyncResult::Advanced);
   EXPECT_EQ(read().acknowledged, 3);

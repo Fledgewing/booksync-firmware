@@ -24,6 +24,7 @@ class PageJournal {
   JournalResult read(uint32_t row, PageEvent& event);
   uint32_t count() const { return count_; }
   bool capped() const { return capped_; }
+  bool available() const { return ready_; }
 
  private:
   const char* directory_;

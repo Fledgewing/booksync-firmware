@@ -59,8 +59,9 @@ PhaseOutcome LifecycleStats::run(const SyncWriterToken& token, const PhaseReques
       capacity_ < HeaderBytes + matched.size() || !LifecycleMatch::decode(matched, match) ||
       !evidence_.load(request.entry, input) || input.syncOwner != account.syncOwner ||
       input.scope.server != request.entry.adapter || input.scope.account != request.entry.owner ||
-      input.source != match.source || !input.history || !input.open || !input.capturedAt || input.begin > input.end ||
-      input.end > input.history->count() || (input.history->capped() && input.end == input.history->count()))
+      input.source != match.source || !input.history || !input.history->available() || !input.open ||
+      !input.capturedAt || input.begin > input.end || input.end > input.history->count() ||
+      (input.history->capped() && input.end == input.history->count()))
     return unavailable();
   if (resumed) {
     if (begin != input.begin || end != input.end || open != input.open || captured != input.capturedAt)
