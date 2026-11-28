@@ -13,6 +13,7 @@ struct WidgetView {
 struct WidgetBox {
   int width = 0, height = 0, line = 0;
   bool textOnly = false, touch = false;
+  uint8_t titleLines = 1;
 };
 struct WidgetCell {
   int x = 0, y = 0, width = 0, height = 0;
@@ -39,6 +40,7 @@ class WidgetHost {
   uint8_t hitWidgetRow(uint8_t widget, WidgetBox itemBox, int x, int y) const;
   auto retryWidget(uint8_t widget) -> bool;
   CommandStatus dispatchWidget(uint8_t widget, uint8_t itemIndex = 0);
+  const ContinueValues& continueValues() const { return data_.resume; }
   const HomePage& page() const { return page_; }
 
  private:

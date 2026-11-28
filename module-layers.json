@@ -13547,6 +13547,7 @@
         "../../test/simulator/CatalogScenario.h",
         "../../test/simulator/CatalogSurfaceScenario.h",
         "../../test/simulator/ClockScenario.h",
+        "../../test/simulator/ContinueScenario.h",
         "../../test/simulator/CopyJobsScenario.h",
         "../../test/simulator/CoverJobsScenario.h",
         "../../test/simulator/CredentialsScenario.h",
@@ -15163,6 +15164,26 @@
       "role": "retained-resource",
       "rationale": "Native portal source; scanned alongside generated output for backend leakage.",
       "includes": []
+    },
+    "src/booksync/interface/ContinueValues.h": {
+      "role": "interface",
+      "rationale": "F40w Continue reading: bounded F39 projection and pure drawing port; Library owns the page batch, no transport, storage or allocation during paint."
+    },
+    "src/booksync/services/widgets/Continue.h": {
+      "role": "services",
+      "rationale": "F40w Continue reading: bounded F39 projection and pure drawing port; Library owns the page batch, no transport, storage or allocation during paint."
+    },
+    "src/booksync/services/widgets/Continue.cpp": {
+      "role": "services",
+      "rationale": "F40w Continue reading: bounded F39 projection and pure drawing port; Library owns the page batch, no transport, storage or allocation during paint."
+    },
+    "src/booksync/ui/widgets/Canvas.h": {
+      "role": "ui",
+      "rationale": "F40w Continue reading: bounded F39 projection and pure drawing port; Library owns the page batch, no transport, storage or allocation during paint."
+    },
+    "src/booksync/ui/CompactGrid.h": {
+      "role": "ui",
+      "rationale": "F40w compact six-row geometry preserves stored grids and reserves the shared footer once on both X4 profiles; pure Library presentation values only."
     }
   },
   "pinned": {

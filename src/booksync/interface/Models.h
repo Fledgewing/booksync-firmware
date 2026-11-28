@@ -3,6 +3,8 @@
 #include <array>
 #include <cstdint>
 
+#include "booksync/interface/ContinueValues.h"
+
 namespace booksync {
 // Presentation values, never wire IDs, credentials or mutable store handles.
 // Identity bytes come from F08 evidence; unknown values remain explicit.
@@ -83,6 +85,7 @@ struct BookRow {
 };
 enum class FileAvailability : uint8_t { Unknown, OnCard, ServerOnly };
 struct LibraryWindow {
+  ContinueValues resume{};
   uint64_t publication = 0;  // Non-reused in-process content revision, independent of catalog/capture IDs.
   Provenance provenance{};
   WindowRequest request{};

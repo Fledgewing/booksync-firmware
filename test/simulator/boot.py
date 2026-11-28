@@ -96,6 +96,7 @@ subprocess.run([sys.executable, 'test/simulator/calendar_widgets.py', profile], 
 subprocess.run([sys.executable, 'test/simulator/daily_widgets.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/records_widgets.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/goal_widgets.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/continue_widget.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/credentials.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/version.py', profile], cwd=root, env=env, check=True)
 

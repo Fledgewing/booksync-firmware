@@ -1,0 +1,17 @@
+{
+  "reference": "f40w-widgets--03-continue-reading.png",
+  "normalizedTile": [
+    456,
+    224
+  ],
+  "crop": [
+    12,
+    26,
+    128,
+    200
+  ],
+  "width": 128,
+  "height": 192,
+  "blackBit": 0,
+  "sha256": "d594a9733bacaf0603bd16f11ae5cfaec651bf202d767dde2b4bf8c708d37b36"
+}

@@ -123,7 +123,41 @@ WidgetView WidgetHost::view(uint8_t widget) const {
     return {mapped, nullptr, 0, 0, statsValue->stale};
   }
   if (widget >= data_.windowCount) return {};
-  const auto viewValue = boundedWidget(data_, data_.windows[widget], batch_.windows[widget]);
+  auto viewValue = boundedWidget(data_, data_.windows[widget], batch_.windows[widget]);
+  if (page_.widgets[widget].kind == WidgetKind::Continue && data_.resume.supplied && widget < data_.windowCount &&
+      data_.windows[widget].bytes <
+          sizeof(WindowSpan) + data_.windows[widget].count * sizeof(BookRow) + sizeof(ContinueValues))
+    return {WidgetState::Error};
+  if (page_.widgets[widget].kind == WidgetKind::Continue && data_.resume.supplied &&
+      (viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty)) {
+    if ((data_.resume.progressKnown && data_.resume.progressPercent > 100) ||
+        (data_.resume.finishDayKnown && data_.resume.finishWeekday > 6) ||
+        (data_.resume.timeLeftKnown && data_.resume.timeLeftUnit > ContinueTimeUnit::Hours))
+      return {WidgetState::Error};
+    if (data_.resume.seriesLabel.back() || data_.resume.chapterLabel.back()) return {WidgetState::Error};
+    switch (data_.resume.state) {
+      case ContinueState::Ready:
+        break;
+      case ContinueState::Empty:
+        viewValue = {WidgetState::Empty};
+        break;
+      case ContinueState::Unsupported:
+        viewValue = {WidgetState::Unsupported};
+        break;
+      case ContinueState::Error:
+        viewValue = {WidgetState::Error};
+        break;
+      case ContinueState::Oversize:
+        viewValue = {WidgetState::Oversize};
+        break;
+      case ContinueState::Off:
+        viewValue = {WidgetState::Off};
+        break;
+      default:
+        viewValue = {WidgetState::NotSaved};
+        break;
+    }
+  }
   const auto kind = page_.widgets[widget].kind;
   return kind == WidgetKind::Continue ? widgets::Continue::view(viewValue)
          : kind == WidgetKind::Shelf  ? widgets::Shelf::view(viewValue)
