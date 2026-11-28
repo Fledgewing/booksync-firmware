@@ -2,15 +2,19 @@
 #include <SecureHttpClient.h>
 #include <gtest/gtest.h>
 
+#include "../../../../lib/hal/HalHttp.h"
 #include "booksync/server/bookorbit/LiveAdapter.h"
+#include "booksync/server/bookorbit/TransportTrust.h"
 #include "booksync/system/NetworkPhase.h"
 
 // Use the pinned SDK's scripted socket to fault the production HTTP parser;
 // production body spooling, framing and admission checks remain linked.
+unsigned insecureCalls = 0;
+const char* observedRoots = nullptr;
 namespace freeink {
 SecureClient::~SecureClient() = default;
-void SecureClient::setCACert(const char*) {}
-void SecureClient::setInsecure() {}
+void SecureClient::setCACert(const char* roots) { observedRoots = roots; }
+void SecureClient::setInsecure() { ++insecureCalls; }
 int SecureClient::connect(IPAddress ip, uint16_t port) { return _transport.connect(ip, port); }
 int SecureClient::connect(const char* host, uint16_t port) { return _transport.connect(host, port); }
 size_t SecureClient::write(uint8_t b) { return _transport.write(b); }
@@ -43,6 +47,8 @@ class HttpTest : public testing::Test {
   HttpLogin login;
   void SetUp() override {
     http.close();
+    insecureCalls = 0;
+    observedRoots = nullptr;
     card = {};
     FakeNet::requests().clear();
     FakeNet::replies().clear();
@@ -152,4 +158,21 @@ TEST_F(HttpTest, UnauthorizedBodyRetainsItsStatusAndCannotBecomeAnEmptySuccess) 
   char out[8];
   EXPECT_EQ(http.read(out, sizeof(out)), 2);
   EXPECT_EQ(http.finish(), 401);
+}
+
+TEST_F(HttpTest, HttpsUsesTheRetainedRootsWithoutAnInsecureFallback) {
+  strcpy(login.origin.data(), "https://synthetic");
+  response("ok");
+  ASSERT_EQ(http.open(login, "GET", "/catalog", {}, 1024), 200);
+  EXPECT_EQ(insecureCalls, 0u);
+  EXPECT_EQ(observedRoots, defaultTransportRoots());
+}
+TEST_F(HttpTest, HalRefusesHttpsWithoutExplicitVerificationRoots) {
+  HalHttp cursor;
+  response("ok");
+  EXPECT_EQ(cursor.open(
+                "https://synthetic", "GET", {}, nullptr, 0, "/spool", 1024,
+                [] { return networkAdmission().permitted(); }, nullptr),
+            0);
+  EXPECT_TRUE(FakeNet::requests().empty());
 }

@@ -21,9 +21,14 @@ class HalHttp final {
   using Permitted = bool (*)();
   ~HalHttp() { reset(); }
   int open(const std::string& url, const char* method, std::string_view payload, const HalHttpHeader* headers,
-           size_t count, const char* spool, size_t maximum, Permitted permitted) {
+           size_t count, const char* spool, size_t maximum, Permitted permitted, const char* trustedRoots) {
     close();
     if (!permitted || !permitted() || !spool || !maximum || maximum > 4 * 1024 * 1024 || count > 8) return 0;
+    const bool secure = url.rfind("https://", 0) == 0;
+    if ((!secure && url.rfind("http://", 0) != 0) || (secure && (!trustedRoots || !*trustedRoots))) {
+      LOG_ERR("HTTP", "Verified transport trust unavailable");
+      return 0;
+    }
     if (!http_) {
       // <=2 KiB SDK control object, too large for the task stack. Reused for all
       // requests in this worker session; reset releases it before reading.
@@ -42,8 +47,7 @@ class HalHttp final {
     http_->setTimeout(15000);
     http_->setFollowRedirects(0);
     http_->setReuse(false);
-    // Retain the existing downloader/SecureNet policy: no platform CA bundle.
-    http_->setInsecure();
+    http_->setCACert(trustedRoots);
     http_->setUserAgent("BookSync");
     for (size_t i = 0; i < count; ++i) http_->addHeader(std::string(headers[i].name), std::string(headers[i].value));
     body_ = Storage.open(spool, O_WRONLY | O_CREAT | O_TRUNC);

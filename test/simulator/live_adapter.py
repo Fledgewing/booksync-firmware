@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 import socket
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -55,15 +56,42 @@ try:
     with tempfile.TemporaryDirectory(prefix='booksync-live-adapter-', dir=out) as directory:
         sd = Path(directory) / 'fs_'
         sd.mkdir()
-        modes = ('success', 'auth') if external else ('success', 'auth', 'offline')
+        modes = ('success', 'auth') if external else ('success', 'auth', 'offline', 'untrusted')
         for mode in modes:
             state['mode'] = mode
+            active_origin = origin
+            tls = None
+            before_requests = state['requests']
+            if mode == 'untrusted':
+                config = Path(directory) / 'tls.cnf'
+                certificate = Path(directory) / 'tls.pem'
+                private_key = Path(directory) / 'tls.key'
+                address = socket.gethostbyname('localhost')
+                config.write_text('[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n'
+                                  '[dn]\nCN=' + address + '\n[ext]\nsubjectAltName=IP:' + address +
+                                  '\nbasicConstraints=critical,CA:TRUE\n'
+                                  'keyUsage=digitalSignature,keyEncipherment,keyCertSign\n'
+                                  'extendedKeyUsage=serverAuth\n')
+                subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
+                                '-config', str(config), '-keyout', str(private_key), '-out', str(certificate)],
+                               check=True, capture_output=True)
+                tls = ThreadingHTTPServer((address, 0), Handler)
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                context.load_cert_chain(certificate, private_key)
+                tls.socket = context.wrap_socket(tls.socket, server_side=True)
+                threading.Thread(target=tls.serve_forever, daemon=True).start()
+                active_origin = 'https://' + address + ':' + str(tls.server_port)
             env = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy',
-                       BOOKSYNC_LIVE_ADAPTER_SCENARIO=mode, BOOKSYNC_LIVE_ORIGIN=origin,
+                       BOOKSYNC_LIVE_ADAPTER_SCENARIO=mode, BOOKSYNC_LIVE_ORIGIN=active_origin,
                        BOOKSYNC_LIVE_USER=user, BOOKSYNC_LIVE_KEY=('0' * 32 if mode == 'auth' else key),
                        CROSSPOINT_SIM_SD=str(sd))
             result = subprocess.run([str(root / '.pio/build' / profile / 'program')], cwd=directory,
                                     env=env, capture_output=True, text=True, timeout=90)
+            if tls:
+                tls.shutdown()
+                tls.server_close()
+                if state['requests'] != before_requests:
+                    raise SystemExit('Untrusted TLS peer received an authenticated HTTP request')
             log = result.stdout + result.stderr
             (out / f'live-adapter-{mode}.log').write_text(log)
             if result.returncode or 'BookSync live adapter scenario PASS' not in log:

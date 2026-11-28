@@ -15696,6 +15696,14 @@
         "string",
         "string_view"
       ]
+    },
+    "src/booksync/server/bookorbit/TransportTrust.h": {
+      "role": "server",
+      "rationale": "F46a retains the existing public ISRG root trust policy inside the adapter; unknown/self-signed peers fail closed. No insecure TLS or confirmation UI is introduced."
+    },
+    "src/booksync/server/bookorbit/TransportTrust.cpp": {
+      "role": "server",
+      "rationale": "F46a retains the existing public ISRG root trust policy inside the adapter; unknown/self-signed peers fail closed. No insecure TLS or confirmation UI is introduced."
     }
   },
   "generators": {

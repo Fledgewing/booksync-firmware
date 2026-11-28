@@ -15,6 +15,7 @@ gtest_discover_tests(BookSyncLiveAdapterTest)
 
 add_executable(BookSyncHttpTest HttpTest.cpp
   ${REPO_ROOT}/src/booksync/server/bookorbit/Http.cpp
+  ${REPO_ROOT}/src/booksync/server/bookorbit/TransportTrust.cpp
   ${REPO_ROOT}/src/booksync/system/Admission.cpp
   ${REPO_ROOT}/tailnet/shim/TailnetNetPhase.cpp
   ${REPO_ROOT}/src/booksync/services/Account.cpp)

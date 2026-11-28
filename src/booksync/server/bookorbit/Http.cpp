@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../../../../lib/hal/HalHttp.h"
 #include "LiveAdapter.h"
+#include "TransportTrust.h"
 #include "booksync/system/NetworkPhase.h"
 
 namespace booksync::server {
@@ -24,6 +25,9 @@ class DeviceHttp final : public HttpPort {
     }
     std::string url(login.origin.data());
     if (url.find("://") == url.npos) url.insert(0, "https://");
+    const auto schemeEnd = url.find("://");
+    for (size_t i = 0; i < schemeEnd; ++i)
+      if (url[i] >= 'A' && url[i] <= 'Z') url[i] += 'a' - 'A';
     while (!url.empty() && url.back() == '/') url.pop_back();
     if (url.find_first_of("?#@") != url.npos) return 0;
     constexpr std::string_view suffix = "/api/v1/koreader";
@@ -44,7 +48,8 @@ class DeviceHttp final : public HttpPort {
       headers[count++] = {"CF-Access-Client-Secret", login.authorizationSecret.data()};
     }
     if (!payload.empty()) headers[count++] = {"Content-Type", "application/json"};
-    return http_.open(url, method, payload, headers, count, "/.booksync/http.body.tmp", maximum, permitted);
+    return http_.open(url, method, payload, headers, count, "/.booksync/http.body.tmp", maximum, permitted,
+                      defaultTransportRoots());
   }
   int read(char* out, size_t size) override { return http_.read(out, size); }
   int finish() override { return http_.finish(); }
