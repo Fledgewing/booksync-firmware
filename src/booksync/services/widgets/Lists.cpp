@@ -33,7 +33,8 @@ bool projectListsWidget(ListsWidgetSource source, ReadingScope current, Collecti
                         ListsWidgetValues& out) {
   out.clear();
   constexpr uint32_t HeaderBytes = sizeof(ListsWidgetValues) - sizeof(ListsWidgetValues::entries);
-  if (!allowance.rows || allowance.rows > 8 || allowance.bytes > LibraryBytes || allowance.bytes < HeaderBytes)
+  if (!allowance.rows || allowance.rows == 2 || allowance.rows > 8 || allowance.bytes > LibraryBytes ||
+      allowance.bytes < HeaderBytes)
     return rejectListsWidget(out, CollectionWidgetState::Oversize, "Lists preview allowance exceeds widget budget");
   if (!source.peek) return true;
   const auto meta = source.peek(source.context);

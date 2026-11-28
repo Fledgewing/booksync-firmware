@@ -274,3 +274,10 @@ TEST(ListsWidget, StaleAndNativeSnapshotsPreserveTheirOwnCountsAndIdentity) {
   EXPECT_EQ(out.ageDays, 2);
   EXPECT_EQ(out.entries[0].key.provenance.owner, 0);
 }
+
+TEST(CollectionWidgets, APartialOptionalAllowanceCannotConcealItsMissingThirdRow) {
+  ListsWidgetValues out;
+  EXPECT_FALSE(projectListsWidget({}, {}, {LibraryBytes, 2}, out));
+  EXPECT_EQ(out.state, CollectionWidgetState::Oversize);
+  EXPECT_EQ(out.count, 0);
+}
