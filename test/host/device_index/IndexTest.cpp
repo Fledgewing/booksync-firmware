@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <gtest/gtest.h>
 
+#include "booksync/interface/PersonalWidgets.h"
 #include "booksync/services/DeviceIndex.h"
 #include "booksync/services/LocalLibrary.h"
 #include "booksync/services/OfflineLibrary.h"
@@ -562,5 +563,57 @@ TEST(ReadModel, StatsBatchChargesItsFixedPayloadAndRejectsUnknownKinds) {
   batch.bytes += sizeof(StatsWidgetBatch);
   EXPECT_TRUE(ReadModel::accepts(batch));
   batch.statsWidgets = 1u << StatsWidgetCount;
+  EXPECT_FALSE(ReadModel::accepts(batch));
+}
+TEST_F(IndexTest, PersonalBudgetCountsFourDiscoverRowsAndRejectsBeforeStorage) {
+  WindowBatchRequest batch;
+  batch.count = 1;
+  batch.windows[0] = {0, 1, LibraryBytes, WindowSource::OnDevice};
+  batch.personalWidgets = 8;
+  batch.rows = 5;
+  constexpr uint32_t metadata = sizeof(LibraryWindow) - sizeof(BookRow) * LibraryRows;
+  batch.bytes = metadata + sizeof(BookRow) + personalWidgetBytes(8);
+  EXPECT_TRUE(ReadModel::accepts(batch));
+  batch.rows = 4;
+  card.events.clear();
+  ReadModel model(index);
+  EXPECT_FALSE(model.materializeBatch(batch));
+  EXPECT_TRUE(card.events.empty());
+  batch.rows = 5;
+  --batch.bytes;
+  EXPECT_FALSE(model.materializeBatch(batch));
+  EXPECT_TRUE(card.events.empty());
+  batch.bytes = LibraryBytes;
+  batch.personalWidgets = 16;
+  EXPECT_FALSE(ReadModel::accepts(batch));
+  batch.personalWidgets = 8;
+  batch.personalPick = 1000000001;
+  EXPECT_FALSE(ReadModel::accepts(batch));
+}
+TEST_F(IndexTest, NewPersonalRequestsStayOffOnX3) {
+  leaveLocalLibrary();
+  enterLocalLibrary();
+  WindowBatchRequest batch;
+  batch.count = 1;
+  batch.windows[0] = {0, 1, LibraryBytes, WindowSource::OnDevice};
+  batch.personalWidgets = 1;
+  EXPECT_FALSE(offlineLibrary().requestBatch(batch));
+  leaveLocalLibrary();
+}
+
+TEST(ReadModel, CombinedStatsAndPersonalChargeBothConcretePayloads) {
+  WindowBatchRequest batch;
+  batch.count = 1;
+  batch.windows[0].limit = 1;
+  batch.rows = 2;
+  batch.statsWidgets = statsWidgetBit(StatsWidget::Week);
+  batch.personalWidgets = 1;
+  constexpr uint32_t metadata = sizeof(LibraryWindow) - sizeof(BookRow) * LibraryRows;
+  batch.bytes = metadata + sizeof(BookRow) + sizeof(StatsWidgetBatch) + personalWidgetBytes(1);
+  EXPECT_TRUE(ReadModel::accepts(batch));
+  --batch.bytes;
+  EXPECT_FALSE(ReadModel::accepts(batch));
+  ++batch.bytes;
+  batch.rows = 1;
   EXPECT_FALSE(ReadModel::accepts(batch));
 }

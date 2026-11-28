@@ -11,6 +11,12 @@
 #if defined(SIMULATOR) && defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
 #elif defined(SIMULATOR)
+// Retain the allocation-free streaming SHA context in the native simulator.
+// OpenSSL 3 deprecates this ABI in favor of opaque heap-owned EVP contexts;
+// its supported compatibility macro scopes that choice to this translation unit.
+#ifndef OPENSSL_SUPPRESS_DEPRECATED
+#define OPENSSL_SUPPRESS_DEPRECATED
+#endif
 #include <openssl/sha.h>
 #else
 #include <mbedtls/sha256.h>
@@ -137,10 +143,9 @@ bool PersonalReading::rank() {
   CC_SHA256_Final(digest_.data(), &hash);
 #elif defined(SIMULATOR)
   SHA256_CTX hash;
-  SHA256_Init(&hash);
-  SHA256_Update(&hash, day, size_t(n));
-  SHA256_Update(&hash, record_.identity.data(), size);
-  SHA256_Final(digest_.data(), &hash);
+  if (SHA256_Init(&hash) != 1 || SHA256_Update(&hash, day, size_t(n)) != 1 ||
+      SHA256_Update(&hash, record_.identity.data(), size) != 1 || SHA256_Final(digest_.data(), &hash) != 1)
+    return fail();
 #else
   mbedtls_sha256_context hash;
   mbedtls_sha256_init(&hash);

@@ -17,6 +17,7 @@
 #include "booksync/interface/Series.h"
 #include "booksync/interface/SeriesFlow.h"
 #include "booksync/interface/StatsWidgets.h"
+#include "booksync/interface/PersonalWidgets.h"
 
 namespace booksync {
 // UI reads bounded published values. No scans, writes, parsing or transport in
@@ -43,6 +44,7 @@ class Library {
   virtual ReminderAuthorization remindersAuthorize(ReminderClaim) { return {}; }
   virtual Snapshot snapshot() const = 0;
   virtual SleepView sleepView() const { return {}; }
+  virtual void readPersonalWidgets(PersonalWidgetBatch& out) const { out.clear(); }
   virtual ClockStatus clockStatus() const { return {}; }
   virtual AccountView accountView() const { return {}; }
   virtual CommandStatus accountAction(AccountFormRequest) { return CommandStatus::Unavailable; }

@@ -50,6 +50,7 @@
 #include "../../test/simulator/EditorScenario.h"
 #include "../../test/simulator/AccountSurfaceScenario.h"
 #include "../../test/simulator/UpgradeNoticeScenario.h"
+#include "../../test/simulator/NativePersonalScenario.h"
 
 #include <Epub.h>
 #include <Epub/WordSpacing.h>
@@ -12224,6 +12225,7 @@ void prepareSimulatorSmokeState() {
   runLifecycleProgressScenario();
   runFinishScenario();
   runLifecycleAnnotationsScenario();
+  runNativePersonalScenario();
   runPersonalReadingScenario();
   runSyncOwnerScenario();
   runLifecycleJournalScenario();

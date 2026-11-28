@@ -103,6 +103,7 @@ class HalFile {
     offset = position;
     return true;
   }
+  size_t position() const { return offset; }
   size_t fileSize() const { return card.reportedSize ? card.reportedSize : card.files.at(path).size(); }
 };
 using FsFile = HalFile;

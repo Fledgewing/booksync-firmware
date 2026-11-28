@@ -5,6 +5,7 @@
 #include "LayoutGeometry.h"
 #include "LocalLibrary.h"
 #include "NativeHistory.h"
+#include "PersonalWorker.h"
 #include "OfflineLibrary.h"
 #include "Queries.h"
 #include "RemindersFacade.h"
@@ -42,6 +43,8 @@ struct LocalState {
   std::unique_ptr<LocalQueryState> query;
   std::unique_ptr<StatsWorker> stats;
   ServerAdapter* savedStatsSource = nullptr;  // Borrowed Home-lifetime provider; Bootstrap owns it.
+  std::unique_ptr<PersonalWorker> personal;
+  bool personalPending = false;
   bool queryChanged = false;
   uint64_t queryRequestId = 0;
   bool requested = false, rescan = false, resolveOpen = false, openReady = false;
@@ -75,6 +78,9 @@ class OfflineLibrary final : public Library {
   BookRow lastBook{};
   SleepView sleepView() const override { return currentSleep; }
   ClockStatus clockStatus() const override { return currentClock; }
+  void readPersonalWidgets(PersonalWidgetBatch& out) const override {
+    if (local && local->personal) out = local->personal->result(); else out.clear();
+  }
   Capabilities capabilities() const override {
     ReminderCapabilities support{reminders != nullptr};
     support.sleep = reminders && reminders->sleepAvailable();
@@ -177,6 +183,7 @@ class OfflineLibrary final : public Library {
   }
   bool requestBatch(WindowBatchRequest batch) override {
     if (!local || !ReadModel::accepts(batch)) return false;
+    if (std::string_view(Layout::deviceClass()) == "x3" && batch.personalWidgets) return false;
     local->pending = batch;
     local->requested = true;
     return true;
@@ -298,11 +305,28 @@ Library& offlineLibrary() { return shellLibrary(); }
 void publishSleepView(SleepView value) { currentSleep = value; }
 void bindReminderConnect(void (*callback)()) { reminderConnectHook = callback; }
 void bindReminderActivity(void (*callback)(ReminderActivity)) { reminderActivityHook = callback; }
-void publishClockStatus(ClockStatus value) { currentClock = value; }
+void publishClockStatus(ClockStatus value) {
+  const bool changedDay = currentClock.hasDateTime() != value.hasDateTime() ||
+      currentClock.local.year != value.local.year || currentClock.local.month != value.local.month ||
+      currentClock.local.day != value.local.day;
+  currentClock = value;
+  if (changedDay && local && local->pending.personalWidgets) {
+    if (local->personal) local->personal->retire();
+    local->personalPending = true;
+    local->model.notifyQueryPublication();
+  }
+}
 void bindReminders(RemindersFacade& facade) { reminders = &facade; }
 void publishAccountView(AccountView value) {
   value.serviceLabel.back() = 0;
+  const bool ownerChanged = value.ticket.owner != accountPresentation.ticket.owner ||
+      value.ticket.epoch != accountPresentation.ticket.epoch || value.selectedService != accountPresentation.selectedService;
   accountPresentation = value;
+  if (ownerChanged && local && local->pending.personalWidgets) {
+    if (local->personal) local->personal->retire();
+    local->personalPending = true;
+    local->model.notifyQueryPublication();
+  }
 }
 void publishUpgradeState(bool pending, bool recovery, bool (*dismiss)()) {
   noticePending = pending;
@@ -419,7 +443,7 @@ void workLocalLibrary() {
   if (scanning && !state.worker.tick()) state.source.close();
   if (scanning && !state.worker.busy()) {
     state.source.close();
-    state.requested = state.pending.count != 0;
+    state.requested = state.pending.count != 0 || state.pending.personalWidgets;
   }
   if (state.requested) {
     state.requested = false;
@@ -440,6 +464,8 @@ void workLocalLibrary() {
       }
     }
     if (!state.pending.statsWidgets && state.stats) state.stats->retire();
+    state.personalPending = state.pending.personalWidgets != 0;
+    if (!state.personalPending) state.personal.reset();
     state.model.setContinue(shellLibrary().lastBook, shellLibrary().available);
     if (state.model.materializeBatch(state.pending) && state.model.availability() == Availability::Ready &&
         state.history.start())
@@ -447,6 +473,21 @@ void workLocalLibrary() {
   }
   if (state.stats && state.stats->tick(currentClock)) state.model.notifyQueryPublication();
   if (state.model.historyBusy()) state.model.historyTick(DeviceIndex::Batch);
+  if (!state.worker.busy() && state.personalPending) {
+    state.personalPending = false;
+    if (!state.personal) {
+      // Optional requested-Home workspace <=16 KiB plus source's bounded 80 KiB
+      // index. Both exceed the task stack and are released before reader entry.
+      state.personal = makeUniqueNoThrow<PersonalWorker>(state.index);
+      if (!state.personal) LOG_ERR("BSP", "Cannot allocate personal worker");
+    }
+    if (state.personal) state.personal->begin(state.pending.personalWidgets, state.pending.personalPick, currentClock);
+    state.model.notifyQueryPublication();
+  }
+  if (!state.worker.busy() && state.personal && state.personal->busy()) {
+    state.personal->tick();
+    if (!state.personal->busy()) state.model.notifyQueryPublication();
+  }
   if (state.query && state.query->worker.busy()) {
     state.query->worker.tick();
     if (!state.query->worker.busy()) state.queryChanged = true;
@@ -471,7 +512,8 @@ void invalidateLocalCapture() {
       local->query->worker.invalidate();
       local->queryChanged = true;
     }
-    local->requested = local->pending.count != 0;
+    if (local->personal) local->personal->retire();
+    local->requested = local->pending.count != 0 || local->pending.personalWidgets;
   }
 }
 }  // namespace booksync

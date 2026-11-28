@@ -64,6 +64,8 @@ struct WindowBatchRequest {
   uint16_t rows = LibraryRows;
   uint8_t count = 0;
   uint16_t statsWidgets = 0;
+  uint8_t personalWidgets = 0;
+  uint32_t personalPick = 0;
 };
 struct WindowSpan {
   WindowRequest request{};
