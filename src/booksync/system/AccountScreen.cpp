@@ -80,6 +80,7 @@ class ServiceChoiceActivity final : public Activity {
       requestUpdate();
   }
   void render(RenderLock&&) override {
+    if (!choice.live()) return;  // A queued draw cannot revive a retired presentation.
 #ifdef SIMULATOR
     ++paints;
 #endif
