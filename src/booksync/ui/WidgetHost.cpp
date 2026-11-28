@@ -186,3 +186,15 @@ const StatsMonths* WidgetHost::statsMonths(uint8_t widget) const {
                                                                                                         : nullptr;
 }
 }  // namespace booksync
+
+namespace booksync {
+const StatsHours* WidgetHost::statsHours(uint8_t widget) const {
+  return widget < page_.count && page_.widgets[widget].kind == WidgetKind::When && statsCard(widget) ? &stats_.hours
+                                                                                                     : nullptr;
+}
+const StatsRecords* WidgetHost::statsRecords(uint8_t widget) const {
+  return widget < page_.count && page_.widgets[widget].kind == WidgetKind::Records && statsCard(widget)
+             ? &stats_.records
+             : nullptr;
+}
+}  // namespace booksync

@@ -25,6 +25,14 @@ bool ReadingStats::split(uint64_t t, StatsDaySlice& slice) const {
   slice.end = uint64_t((slice.day + 1) * 86400 - int64_t(offset_) * 60);
   return slice.end > t;
 }
+bool ReadingStats::splitHour(uint64_t stamp, StatsHourSlice& out) const {
+  if (calendar_.hour) return calendar_.hour(calendar_.context, stamp, out) && out.hour < 24 && out.end > stamp;
+  const int64_t local = int64_t(stamp) + int64_t(offset_) * 60;
+  const int64_t hour = local / 3600 - (local < 0 && local % 3600 != 0);
+  out.hour = uint8_t((hour % 24 + 24) % 24);
+  out.end = uint64_t((hour + 1) * 3600 - int64_t(offset_) * 60);
+  return out.end > stamp;
+}
 bool ReadingStats::begin(StatsSource source, uint64_t now, int16_t offset, ReadingValue watermark,
                          StatsCalendar calendar) {
   busy_ = false;
@@ -51,6 +59,7 @@ bool ReadingStats::begin(StatsSource source, uint64_t now, int16_t offset, Readi
                        true,
                        source.complete && source.since > 0 && source.since <= now && source.through >= now};
   pending_.includedThrough = watermark;
+  pending_.hoursAvailable = !calendar_.split || calendar_.hour;
   pending_.recordedPages = {0, true};
   pending_.bestDayPages = {0, true};
   pending_.longestSession = {0, true};
@@ -101,6 +110,9 @@ bool ReadingStats::tick(uint16_t allowance) {
       return false;
     }
     if (step == StatsStep::End) {
+      pending_.hoursComplete = pending_.hoursAvailable && pending_.coverage.complete &&
+                               (sinceDay_ < pending_.firstDay || (sinceDay_ == pending_.firstDay && sinceMidnight_));
+      if (pending_.hoursComplete) pending_.hoursKnown = 0xffffffu;
       pending_.today = pending_.days.back();
       const auto today = pending_.firstDay + Days - 1;
       const bool active = lastReadDay_ == today || lastReadDay_ == today - 1;
@@ -177,6 +189,21 @@ bool ReadingStats::tick(uint16_t allowance) {
         auto& day = pending_.days[size_t(index)];
         day.value += stop - t;
         day.known = true;
+        if (pending_.hoursAvailable) {
+          uint64_t hourStart = t;
+          while (hourStart < stop) {
+            StatsHourSlice hour;
+            if (!splitHour(hourStart, hour)) {
+              LOG_ERR("BSRS", "Stats hour calendar failed; partial result discarded");
+              busy_ = false;
+              return false;
+            }
+            const auto hourEnd = std::min(stop, hour.end);
+            pending_.hours[hour.hour] += hourEnd - hourStart;
+            pending_.hoursKnown |= 1u << hour.hour;
+            hourStart = hourEnd;
+          }
+        }
       }
       t = stop;
     }
@@ -206,6 +233,10 @@ void ReadingStats::combine(const RemoteReadingStats* remote, ReadingScope curren
   // Aggregate assignment materializes a >6 KiB temporary with the ESP32
   // compiler. Reset bounded members directly; output is caller-owned storage.
   out.days.fill({});
+  out.hours.fill(0);
+  out.hoursKnown = 0;
+  out.hoursAvailable = false;
+  out.hoursCoverage = {};
   out.today = out.localToday = out.streak = out.bestStreak = out.target = out.year = out.finished =
       out.includedThrough = out.recordedPages = out.longestSession = out.nativeToday = out.accountToday =
           out.todayPages = out.bestDayPages = {};
@@ -228,6 +259,13 @@ void ReadingStats::combine(const RemoteReadingStats* remote, ReadingScope curren
     out.daysCoverage = out.recordsCoverage = published_.coverage;
     out.recordedPages = published_.recordedPages;
     out.longestSession = published_.longestSession;
+    if (published_.firstDay == out.firstDay) {
+      out.hours = published_.hours;
+      out.hoursKnown = published_.hoursKnown;
+      out.hoursAvailable = published_.hoursAvailable;
+      out.hoursCoverage = published_.coverage;
+      out.hoursCoverage.complete = published_.hoursComplete;
+    }
     out.streak = published_.streak;
     out.bestStreak = published_.bestStreak;
     out.streakCoverage = published_.coverage;

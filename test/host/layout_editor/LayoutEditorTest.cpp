@@ -921,7 +921,7 @@ TEST(LayoutPages, FirstWidgetNamesNewPageButManualNamesStay) {
 }
 
 TEST(LayoutGeometry, CompactStatsHaveOnlyTheirApprovedMainSize) {
-  for (auto kind : {WidgetKind::Week, WidgetKind::Streak, WidgetKind::Today, WidgetKind::Pages}) {
+  for (auto kind : {WidgetKind::Week, WidgetKind::Streak, WidgetKind::Today, WidgetKind::Pages, WidgetKind::When}) {
     EXPECT_TRUE(supportedGeometry(kind, 1, 1));
     EXPECT_FALSE(supportedGeometry(kind, 2, 1));
     EXPECT_FALSE(supportedGeometry(kind, 2, 2));
@@ -930,7 +930,7 @@ TEST(LayoutGeometry, CompactStatsHaveOnlyTheirApprovedMainSize) {
 
 TEST(LayoutEditor, NewStatsAreHiddenOnX3) {
   for (auto kind : {WidgetKind::Week, WidgetKind::Streak, WidgetKind::Year, WidgetKind::Monthly, WidgetKind::Today,
-                    WidgetKind::Pages}) {
+                    WidgetKind::Pages, WidgetKind::When, WidgetKind::Records}) {
     card = {};
     storage::LayoutStore store(paths, "x4");
     ASSERT_EQ(store.load(), storage::LayoutSource::Default);
@@ -946,7 +946,8 @@ TEST(LayoutEditor, NewStatsAreHiddenOnX3) {
     HomePage after;
     ASSERT_TRUE(store.project(0, after));
     ASSERT_EQ(after.count, before.count + 1);
-    EXPECT_EQ(after.widgets[after.count - 1].w, kind == WidgetKind::Year || kind == WidgetKind::Monthly ? 2 : 1);
+    EXPECT_EQ(after.widgets[after.count - 1].w,
+              kind == WidgetKind::Year || kind == WidgetKind::Monthly || kind == WidgetKind::Records ? 2 : 1);
     EXPECT_EQ(after.widgets[after.count - 1].h, 1);
     storage::LayoutStore x3(paths, "x3");
     ASSERT_EQ(x3.load(), storage::LayoutSource::Current);
@@ -962,7 +963,7 @@ TEST(LayoutEditor, NewStatsAreHiddenOnX3) {
       const auto& tile = after.widgets[i];
       move.geometry[i] = {tile.x, tile.y, tile.w, tile.h};
     }
-    const bool wide = kind == WidgetKind::Year || kind == WidgetKind::Monthly;
+    const bool wide = kind == WidgetKind::Year || kind == WidgetKind::Monthly || kind == WidgetKind::Records;
     move.geometry[move.index].x = 1;
     if (wide) {
       EXPECT_NE(store.edit(worker, move), LayoutEditStatus::Saved);

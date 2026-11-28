@@ -1,4 +1,8 @@
-add_executable(StatsWidgetsTest StatsWidgetsTest.cpp CalendarTest.cpp TodayPagesTest.cpp
+add_executable(StatsWidgetsTest StatsWidgetsTest.cpp CalendarTest.cpp TodayPagesTest.cpp WhenRecordsTest.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/When.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Records.cpp
+  ${REPO_ROOT}/src/booksync/ui/widgets/When.cpp
+  ${REPO_ROOT}/src/booksync/ui/widgets/Records.cpp
   ${REPO_ROOT}/src/booksync/services/widgets/Year.cpp
   ${REPO_ROOT}/src/booksync/services/widgets/Monthly.cpp
   ${REPO_ROOT}/src/booksync/services/widgets/Today.cpp

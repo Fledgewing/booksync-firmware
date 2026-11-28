@@ -4,10 +4,24 @@
 #include "booksync/interface/StatsWidgets.h"
 namespace booksync {
 constexpr uint8_t HomeWidgets = LibraryBatchRequests;
-enum class WidgetKind : uint8_t { Continue, Shelf, Browse, Week, Streak, Year, Monthly, Today, Pages };
+enum class WidgetKind : uint8_t {
+  Continue,
+  Shelf,
+  Browse,
+  Week,
+  Streak,
+  Year,
+  Monthly,
+  Today,
+  Pages,
+  When,
+  Records,
+  Count
+};
 constexpr bool isStatsWidget(WidgetKind kind) {
   return kind == WidgetKind::Week || kind == WidgetKind::Streak || kind == WidgetKind::Year ||
-         kind == WidgetKind::Monthly || kind == WidgetKind::Today || kind == WidgetKind::Pages;
+         kind == WidgetKind::Monthly || kind == WidgetKind::Today || kind == WidgetKind::Pages ||
+         kind == WidgetKind::When || kind == WidgetKind::Records;
 }
 constexpr StatsWidget statsWidgetKind(WidgetKind kind) {
   return kind == WidgetKind::Week      ? StatsWidget::Week
@@ -15,7 +29,9 @@ constexpr StatsWidget statsWidgetKind(WidgetKind kind) {
          : kind == WidgetKind::Year    ? StatsWidget::Year
          : kind == WidgetKind::Monthly ? StatsWidget::Monthly
          : kind == WidgetKind::Today   ? StatsWidget::Today
-                                       : StatsWidget::Pages;
+         : kind == WidgetKind::Pages   ? StatsWidget::Pages
+         : kind == WidgetKind::When    ? StatsWidget::When
+                                       : StatsWidget::Records;
 }
 struct WidgetPlacement {
   WidgetKind kind = WidgetKind::Continue;

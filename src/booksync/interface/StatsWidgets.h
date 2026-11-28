@@ -2,7 +2,7 @@
 #pragma once
 #include "Models.h"
 namespace booksync {
-enum class StatsWidget : uint8_t { Week, Streak, Year, Monthly, Today, Pages, Count };
+enum class StatsWidget : uint8_t { Week, Streak, Year, Monthly, Today, Pages, When, Records, Count };
 constexpr unsigned StatsWidgetCount = unsigned(StatsWidget::Count);
 enum class StatsCardState : uint8_t { NotSaved, Ready, Empty, Off, Unsupported, Unavailable, Oversize };
 enum class StatsCardSource : uint8_t { Unknown, Reader, Account };
@@ -46,10 +46,21 @@ struct StatsMonths {
   uint16_t year = 0;
   uint8_t currentMonth = 0;
 };
+struct StatsHours {
+  std::array<StatsMetric, 24> totals{};
+  uint8_t peakHour = 0, after18 = 0;
+  bool peakKnown = false;
+};
+struct StatsRecords {
+  std::array<StatsMetric, 5> values{};  // visits, session seconds, best-day visits, books, streak.
+  std::array<StatsCardSource, 5> sources{};
+};
 struct StatsWidgetBatch {
   std::array<StatsCard, StatsWidgetCount> cards{};
   StatsYear year{};
   StatsMonths months{};
+  StatsHours hours{};
+  StatsRecords records{};
   uint16_t requested = 0;
 };
 constexpr uint16_t statsWidgetBit(StatsWidget id) { return 1u << unsigned(id); }

@@ -30,6 +30,35 @@ bool StatsWorker::split(void*, uint64_t t, StatsDaySlice& out) {
   out.end = uint64_t(end);
   return true;
 }
+bool StatsWorker::splitHour(void*, uint64_t stamp, StatsHourSlice& out) {
+  if (stamp > uint64_t(INT64_MAX - 3600)) return false;
+  const time_t instant = time_t(stamp);
+  tm date{};
+  if (!localtime_r(&instant, &date) || date.tm_min < 0 || date.tm_min > 59 || date.tm_sec < 0 || date.tm_sec > 59)
+    return false;
+  auto sameHour = [&](uint64_t sample) {
+    const time_t value = time_t(sample);
+    tm mapped{};
+    return localtime_r(&value, &mapped) && mapped.tm_year == date.tm_year && mapped.tm_yday == date.tm_yday &&
+           mapped.tm_hour == date.tm_hour;
+  };
+  uint64_t end = stamp + 3600 - unsigned(date.tm_min) * 60 - unsigned(date.tm_sec);
+  // UTC candidates avoid mktime's ambiguous repeated-hour choice. An unusual
+  // in-hour zone transition is located only when the ordinary boundary fails.
+  if (!sameHour(end - 1)) {
+    uint64_t low = stamp + 1, high = end - 1;
+    while (low < high) {
+      const auto mid = low + (high - low) / 2;
+      if (sameHour(mid))
+        low = mid + 1;
+      else
+        high = mid;
+    }
+    end = low;
+  }
+  out = {end, uint8_t(date.tm_hour)};
+  return end > stamp;
+}
 bool StatsWorker::begin(uint16_t requested, Provenance provenance, bool clockKnown, ServerAdapter* adapter) {
   busy_ = false;
   published_.requested = requested;
@@ -51,7 +80,7 @@ bool StatsWorker::begin(uint16_t requested, Provenance provenance, bool clockKno
   options_.availability = StatsCardState::Ready;
   // Recovery and oldest row do not prove uninterrupted capture. Native rows
   // remain account-independent; no upload watermark is inferred from them.
-  busy_ = stats_.begin(cursor_.freeze({}, 0, uint64_t(now), false), uint64_t(now), 0, {}, {split, nullptr});
+  busy_ = stats_.begin(cursor_.freeze({}, 0, uint64_t(now), false), uint64_t(now), 0, {}, {split, nullptr, splitHour});
   if (!busy_) {
     options_.availability = StatsCardState::Unavailable;
     publish();
@@ -60,6 +89,7 @@ bool StatsWorker::begin(uint16_t requested, Provenance provenance, bool clockKno
 }
 void StatsWorker::publish() {
   const auto now = std::time(nullptr);
+  options_.now = now > 0 ? uint64_t(now) : 0;
   stats_.combine(remoteReady_ ? &remote_ : nullptr, scope_, true, today_, snapshot_);
   if (published_.requested & statsWidgetBit(StatsWidget::Week)) {
     statsFreshness(options_, snapshot_.daysCoverage, now > 0 ? uint64_t(now) : 0);
@@ -82,6 +112,14 @@ void StatsWorker::publish() {
   if (published_.requested & statsWidgetBit(StatsWidget::Monthly)) {
     statsFreshness(options_, snapshot_.daysCoverage, now > 0 ? uint64_t(now) : 0);
     projectMonthly(snapshot_, options_, published_.cards[unsigned(StatsWidget::Monthly)], published_.months);
+  }
+  if (published_.requested & statsWidgetBit(StatsWidget::When)) {
+    statsFreshness(options_, snapshot_.hoursCoverage, options_.now);
+    projectWhen(snapshot_, options_, published_.cards[unsigned(StatsWidget::When)], published_.hours);
+  }
+  if (published_.requested & statsWidgetBit(StatsWidget::Records)) {
+    statsFreshness(options_, snapshot_.recordsCoverage, options_.now);
+    projectRecords(snapshot_, options_, published_.cards[unsigned(StatsWidget::Records)], published_.records);
   }
   if (published_.requested & statsWidgetBit(StatsWidget::Streak)) {
     statsFreshness(options_, snapshot_.streakCoverage, now > 0 ? uint64_t(now) : 0);
