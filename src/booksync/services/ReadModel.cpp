@@ -5,7 +5,19 @@
 
 #include "booksync/interface/PersonalWidgets.h"
 #include "booksync/interface/StatsWidgets.h"
+#include "widgets/Continue.h"
 namespace booksync {
+void ReadModel::setContinue(const BookRow& row, bool available, const PersonalCard* resolved) {
+  continue_ = row;
+  continueAvailable_ = available;
+  // Native title-only evidence supplies no measured pace/date. F39 values may
+  // enrich this projection only when a registered provider has saved evidence.
+  const PersonalCard unknown{};
+  continueProgressResolved_ = resolved && resolved->progress.known;
+  projectContinue(available, PersonalState::Ready, resolved ? *resolved : unknown, false, 0, window_.resume, nullptr,
+                  false, &row);
+}
+
 bool ReadModel::accepts(const WindowBatchRequest& batch) {
   constexpr uint32_t Metadata = sizeof(LibraryWindow) - sizeof(BookRow) * LibraryRows;
   if ((!batch.count && !batch.personalWidgets) || batch.personalWidgets > 15 || batch.personalPick > 1000000000 ||
@@ -21,6 +33,9 @@ bool ReadModel::accepts(const WindowBatchRequest& batch) {
     if (!request.limit || request.limit > LibraryRows || request.bytes > LibraryBytes ||
         request.bytes < sizeof(WindowSpan) + request.limit * sizeof(BookRow))
       return false;
+    if (request.source == WindowSource::Continue &&
+        request.bytes < sizeof(WindowSpan) + request.limit * sizeof(BookRow) + sizeof(ContinueValues))
+      return false;
     rows += request.limit;
   }
   return rows <= batch.rows && Metadata + (rows - personalWidgetRows(batch.personalWidgets)) * sizeof(BookRow) +
@@ -35,6 +50,22 @@ bool ReadModel::materialize(WindowRequest request) {
   batch.count = 1;
   return materializeBatch(batch);
 }
+namespace {
+BookListMeta nativeListMeta(void* context, WindowSource) {
+  const auto& index = *static_cast<storage::Index*>(context);
+  BookListMeta meta;
+  meta.provenance = index.provenance();
+  meta.total = meta.saved = index.count();
+  meta.state = index.ready() ? PersonalState::Ready : PersonalState::NotSaved;
+  meta.countKnown = meta.complete = index.ready();
+  return meta;
+}
+FileAvailability nativeListFile(void*, WindowSource, uint32_t) { return FileAvailability::OnCard; }
+bool nativeListRow(void* context, WindowSource, uint32_t rank, BookRow& row) {
+  auto& index = *static_cast<storage::Index*>(context);
+  return index.summary({index.provenance(), rank}, row);
+}
+}  // namespace
 bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
   if (!accepts(batch)) return false;  // Entire batch rejected before opening any file.
   constexpr uint32_t Metadata = sizeof(LibraryWindow) - sizeof(BookRow) * LibraryRows;
@@ -59,6 +90,7 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
     span.bytes = sizeof(WindowSpan);
     span.availability = window_.availability;
     if (span.request.source == WindowSource::Continue) {
+      span.bytes += sizeof(ContinueValues);  // Charge all summary/context fields to this caller.
       span.availability = Availability::Ready;
       span.total = continueAvailable_ ? 1 : 0;
       if (continueAvailable_) {
@@ -67,6 +99,10 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
         span.bytes += sizeof(BookRow);
         window_.bytes += sizeof(BookRow);
       }
+      continue;
+    }
+    if (bookListSource_.peek || span.request.presentation == WindowPresentation::Preview) {
+      if (!materializeList(span)) ok = false;
       continue;
     }
     if (span.request.source != WindowSource::OnDevice) {
@@ -95,15 +131,134 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
   publishChanged();
   return ok;
 }
+bool ReadModel::materializeList(WindowSpan& span) {
+  const bool registered = bookListSource_.peek != nullptr && span.request.source != WindowSource::OnDevice;
+  const auto provenance = index_.provenance();
+  const auto source = registered ? bookListSource_
+                      : span.request.source == WindowSource::OnDevice
+                          ? BookListSource{&index_, nativeListMeta, nativeListRow, nativeListFile}
+                          : BookListSource{};
+  const auto scope = registered ? bookListScope_ : ReadingScope{provenance.owner, provenance.accountEpoch};
+  span.total = 0;
+  if (span.request.presentation == WindowPresentation::Preview) {
+    if (!bookListScratch_) {
+      LOG_ERR("BSBL", "Preview workspace unavailable");
+      span.availability = Availability::Unavailable;
+      return false;
+    }
+    const bool projected = projectBookList(source, span.request, scope, bookListYear_, *bookListScratch_);
+    const auto& preview = *bookListScratch_;
+    span.total = preview.total;
+    span.stale = preview.stale;
+    span.ageKnown = preview.ageKnown;
+    span.ageDays = preview.ageDays;
+    span.year = preview.year;
+    span.availability = preview.state == PersonalState::NotSaved      ? Availability::NotSaved
+                        : preview.state == PersonalState::Unsupported ? Availability::Unsupported
+                        : preview.state == PersonalState::Off         ? Availability::Off
+                        : projected                                   ? Availability::Ready
+                                                                      : Availability::Unavailable;
+    if (!projected) {
+      if (preview.state == PersonalState::Oversized) span.bytes = span.request.bytes + 1;
+      return false;
+    }
+    for (uint16_t i = 0; i < preview.count; ++i) {
+      window_.fileAvailability[window_.count] = preview.files[i];
+      window_.rows[window_.count++] = preview.books[i];
+      ++span.count;
+      span.bytes += sizeof(BookRow);
+      window_.bytes += sizeof(BookRow);
+    }
+    return true;
+  }
+  if (!source.peek) {
+    span.availability = Availability::NotSaved;
+    return true;
+  }
+  const auto meta = source.peek(source.context, span.request.source);
+  span.availability = Availability::NotSaved;
+  if (meta.provenance.owner && (meta.provenance.owner != scope.owner || meta.provenance.accountEpoch != scope.epoch))
+    return true;
+  if (meta.state != PersonalState::Ready && meta.state != PersonalState::Empty) {
+    span.availability = meta.state == PersonalState::Off           ? Availability::Off
+                        : meta.state == PersonalState::Unsupported ? Availability::Unsupported
+                        : meta.state == PersonalState::NotSaved    ? Availability::NotSaved
+                                                                   : Availability::Unavailable;
+    if (meta.state == PersonalState::Oversized) span.bytes = span.request.bytes + 1;
+    return span.availability != Availability::Unavailable;
+  }
+  if (!meta.countKnown || (!meta.total && !meta.complete) ||
+      (span.request.source == WindowSource::FinishedYear &&
+       (!bookListYear_ || bookListYear_ > 9999 || meta.year != bookListYear_)))
+    return true;
+  if (meta.bytes > span.request.bytes) {
+    LOG_ERR("BSBL", "Saved source page exceeds byte allowance");
+    span.bytes = span.request.bytes + 1;
+    span.availability = Availability::Unavailable;
+    return false;
+  }
+  if (!meta.saved && meta.total) return true;
+  if (meta.saved > meta.total || (meta.state == PersonalState::Empty && (meta.saved || meta.total)) ||
+      (meta.saved && !source.read)) {
+    LOG_ERR("BSBL", "Saved source page metadata invalid");
+    span.availability = Availability::Unavailable;
+    return false;
+  }
+  for (uint32_t rank = span.request.offset; rank < meta.saved && span.count < span.request.limit; ++rank) {
+    auto& book = window_.rows[window_.count];
+    bool accepted = source.read(source.context, span.request.source, rank, book) && !book.title.back() &&
+                    book.key.provenance == meta.provenance;
+    for (uint16_t i = span.first; i < window_.count && accepted; ++i)
+      if (window_.rows[i].key == book.key) accepted = false;
+    if (!accepted) {
+      LOG_ERR("BSBL", "Saved source page invalid");
+      book = {};
+      for (uint16_t i = span.first; i < window_.count; ++i) window_.rows[i] = {};
+      window_.count = span.first;
+      span.count = 0;
+      span.availability = Availability::Unavailable;
+      return false;
+    }
+    window_.fileAvailability[window_.count] =
+        source.file ? source.file(source.context, span.request.source, rank) : FileAvailability::Unknown;
+    ++window_.count;
+    ++span.count;
+    span.bytes += sizeof(BookRow);
+    window_.bytes += sizeof(BookRow);
+  }
+  if (!(source.peek(source.context, span.request.source) == meta)) {
+    for (uint16_t i = span.first; i < window_.count; ++i) window_.rows[i] = {};
+    window_.count = span.first;
+    span.count = 0;
+    return true;
+  }
+  span.availability = Availability::Ready;
+  span.total = meta.total;
+  if (window_.windowCount == 1) {
+    window_.provenance = meta.provenance;
+    window_.total = meta.total;
+    window_.stale = meta.stale;
+  }
+  span.stale = meta.stale;
+  span.ageKnown = meta.ageKnown;
+  span.ageDays = meta.ageKnown ? meta.ageDays : 0;
+  span.year = meta.year;
+  return true;
+}
 void ReadModel::invalidate(Invalidation reason) {
   historyBusy_ = false;
   window_.stale = true;
   if (reason == Invalidation::Account) {
+    bookListSource_ = {};
+    bookListScope_ = {};
+    bookListYear_ = 0;
     // Account retirement clears counts/provenance as well as row contents; a
     // cached source total must not escape into the next account's snapshot.
     window_.rows.fill({});
     window_.fileAvailability.fill(FileAvailability::Unknown);
     window_.windows.fill({});
+    window_.resume = {};
+    continueProgressResolved_ = false;
     window_.provenance = {};
     window_.request = {};
     window_.total = window_.bytes = 0;
@@ -121,8 +276,8 @@ uint64_t pathHash(std::string_view value) {
 }
 }  // namespace
 bool ReadModel::beginHistory(HistorySource source) {
-  if (!source.next || window_.availability != Availability::Ready || source.owner != index_.provenance().owner ||
-      source.accountEpoch != index_.provenance().accountEpoch)
+  if (!source.next || (window_.availability != Availability::Ready && !window_.count) ||
+      source.owner != index_.provenance().owner || source.accountEpoch != index_.provenance().accountEpoch)
     return false;
   historyBusy_ = false;
   historyEnded_ = false;
@@ -185,6 +340,12 @@ bool ReadModel::historyTick(uint16_t allowance) {
         row.readingKnown = v.known;
         row.statsKnown = v.statsKnown;
       }
+      if (!continueProgressResolved_)
+        for (uint8_t i = 0; i < window_.windowCount; ++i) {
+          const auto& span = window_.windows[i];
+          if (span.request.source == WindowSource::Continue && span.count)
+            projectContinuePosition(window_.rows[span.first], window_.resume);
+        }
       window_.provenance.capture = historyRevision_;
       window_.stale = false;
       publishChanged();

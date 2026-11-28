@@ -53,7 +53,8 @@ struct Fake final : Library {
       s.first = data.count;
       s.availability = Availability::Ready;
       s.count = 1;
-      s.bytes = sizeof(WindowSpan) + sizeof(BookRow);
+      s.bytes = sizeof(WindowSpan) + sizeof(BookRow) +
+                (page.widgets[i].kind == WidgetKind::Continue ? sizeof(ContinueValues) : 0);
       data.rows[data.count++].title[0] = 'A';
     }
   }
@@ -197,13 +198,13 @@ TEST(WidgetHost, ShelfHitSelectsTheDisplayedBookWithoutAnotherRead) {
   }
   h.pollWidgets();
   const WidgetBox box{450, 180, 24, false, true};
-  EXPECT_EQ(h.widgetRows(0, box), 3);
+  EXPECT_EQ(h.widgetRows(0, box), 4);
   WidgetCell cell;
   ASSERT_TRUE(h.widgetCell(0, box, 1, cell));
   EXPECT_GE(cell.width, 50);
   EXPECT_GE(cell.height, 50);
   const auto row = h.hitWidgetRow(0, box, cell.x + cell.width / 2, cell.y + cell.height / 2);
-  EXPECT_EQ(row, 1);
+  EXPECT_EQ(row, 2);
   EXPECT_EQ(h.dispatchWidget(0, row), CommandStatus::Accepted);
   EXPECT_EQ(f.opened.ordinal, 21u);
   EXPECT_EQ(h.hitWidgetRow(0, box, 20, 5), 255);
@@ -229,6 +230,60 @@ TEST(WidgetHost, TextShelfFocusStopsAtTheLastVisibleRow) {
   ASSERT_TRUE(h.widgetCell(0, box, 0, cell));
   EXPECT_FALSE(cell.cover);
   EXPECT_FALSE(h.widgetCell(0, box, 1, cell));
+}
+class ContinueAvailability : public testing::TestWithParam<ContinueState> {};
+TEST_P(ContinueAvailability, UnavailableSummaryNeverOpensTheBook) {
+  Fake f;
+  WidgetHost h(f);
+  h.enter();
+  h.pollWidgets();
+  f.publish();
+  f.data.resume.supplied = true;
+  f.data.resume.state = GetParam();
+  h.pollWidgets();
+  EXPECT_EQ(h.dispatchWidget(0), CommandStatus::Unavailable);
+  EXPECT_EQ(f.opens, 0u);
+  EXPECT_EQ(h.view(2).viewState, WidgetState::Known);
+}
+INSTANTIATE_TEST_SUITE_P(IndependentContinueStates, ContinueAvailability,
+                         testing::Values(ContinueState::Empty, ContinueState::NotSaved, ContinueState::Off,
+                                         ContinueState::Unsupported, ContinueState::Error, ContinueState::Oversize));
+TEST(WidgetHost, MalformedContinueContextCannotEscapeItsBoundary) {
+  Fake f;
+  WidgetHost h(f);
+  h.enter();
+  h.pollWidgets();
+  f.publish();
+  f.data.resume.supplied = true;
+  f.data.resume.state = ContinueState::Ready;
+  f.data.resume.seriesLabel.fill('x');
+  h.pollWidgets();
+  EXPECT_EQ(h.view(0).viewState, WidgetState::Error);
+  EXPECT_EQ(h.dispatchWidget(0), CommandStatus::Unavailable);
+  EXPECT_EQ(h.view(2).viewState, WidgetState::Known);
+}
+TEST(WidgetHost, MalformedContinueScalarsCannotPaintOutsideTheirCardOrOpen) {
+  Fake f;
+  WidgetHost host(f);
+  host.enter();
+  host.pollWidgets();
+  f.publish();
+  f.data.resume.supplied = true;
+  f.data.resume.state = ContinueState::Ready;
+  f.data.resume.progressKnown = true;
+  f.data.resume.progressPercent = 255;
+  host.pollWidgets();
+  EXPECT_EQ(host.view(0).viewState, WidgetState::Error);
+  EXPECT_EQ(host.dispatchWidget(0), CommandStatus::Unavailable);
+  EXPECT_EQ(host.view(2).viewState, WidgetState::Known);
+  f.publish();
+  f.data.resume.supplied = true;
+  f.data.resume.state = ContinueState::Ready;
+  f.data.resume.finishDayKnown = true;
+  f.data.resume.finishWeekday = 7;
+  host.pollWidgets();
+  EXPECT_EQ(host.view(0).viewState, WidgetState::Error);
+  EXPECT_EQ(host.dispatchWidget(0), CommandStatus::Unavailable);
 }
 }  // namespace
 

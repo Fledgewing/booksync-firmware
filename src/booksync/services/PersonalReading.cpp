@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+
+#include "widgets/BookList.h"
 #if defined(SIMULATOR) && defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
 #elif defined(SIMULATOR)
@@ -285,6 +287,10 @@ namespace {
 // This link-only descriptor is never instantiated or invoked by runtime.
 struct ReadingLinkInput {
   booksync::PersonalReading& personal;
+  booksync::BookListSource& bookListSource;
+  booksync::BookListProjection& bookList;
+  booksync::WindowRequest& bookListRequest;
+  uint16_t bookListYear;
   booksync::ReadingStats& stats;
   booksync::StatsSource& source;
   booksync::PageStatsSource& pages;
@@ -296,8 +302,9 @@ struct ReadingLinkInput {
   uint64_t now;
   int64_t day, pick;
 };
-}  // namespace
-extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
+// Keep the link-only selector/stats calls in their original bounded frame.
+// No runtime caller or additional workspace is introduced.
+__attribute__((noinline)) bool selectLinkedReading(ReadingLinkInput& input) {
   const auto scope = input.source.scope;
   input.source = input.pages.freeze(scope, input.source.since, input.source.through, input.source.complete);
   input.stats.begin(input.source, input.now, 0, input.watermark);
@@ -305,4 +312,10 @@ extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
   input.personal.begin(input.kind, input.day, input.pick, scope);
   input.personal.card({}, scope, input.card);
   return input.stats.tick() && input.personal.tick();
+}
+}  // namespace
+extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
+  const auto scope = input.source.scope;
+  return selectLinkedReading(input) && booksync::projectBookList(input.bookListSource, input.bookListRequest, scope,
+                                                                 input.bookListYear, input.bookList);
 }

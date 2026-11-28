@@ -11,11 +11,16 @@ bool catalogTextValid(const Text& value) {
 }  // namespace
 CatalogSurface::State CatalogSurface::catalogAvailabilityState(Availability value, uint16_t rows) {
   if (value == Availability::NotSaved) return State::NotSaved;
-  if (value == Availability::Unsupported) return State::Unsupported;
+  if (value == Availability::Unsupported || value == Availability::Off) return State::Unsupported;
   if (value == Availability::Unavailable) return State::Error;
   return rows ? State::Ready : State::Empty;
 }
-void CatalogSurface::enterCatalog(bool textOnly) {
+void CatalogSurface::enterCatalog(bool textOnly, CatalogRoute entry) {
+  sourceAccount_ = library_.accountView().ticket;
+  sourceCursorCount_ = 0;
+  sourceOpenPending_ = false;
+  entry_ = entry;
+  entry_.caption.back() = 0;
   accountEpoch_ = library_.snapshot().accountEpoch;
   textOnly_ = textOnly;
   depth_ = retainedCount_ = retainedShelfRows_ = 0;
@@ -30,10 +35,18 @@ void CatalogSurface::enterCatalog(bool textOnly) {
     summary_.stale = true;
   }
   summary_.sourceLabel.back() = 0;
+  if (entry_.destination == CatalogDestination::BookList) {
+    current_.root = CatalogRoot::All;
+    panel_ = Panel::Books;
+    focus_ = 0;
+  }
   requestCatalogPage();
 }
 void CatalogSurface::retireCatalog() {
+  if (sourceOpenPending_) library_.retireOpen(selected_.key);
+  sourceOpenPending_ = false;
   if (catalogLive() && request_.requestId) library_.retireQuery(request_.requestId);
+  entry_ = {};
   panel_ = Panel::Closed;
   dialog_ = Dialog::None;
   autoOpen_ = connecting_ = preparing_ = false;
@@ -42,7 +55,10 @@ void CatalogSurface::retireCatalog() {
   bitmapCount_ = 0;
 }
 bool CatalogSurface::catalogKeyValid(BookKey key) const {
-  return catalogLive() && key.provenance.accountEpoch == accountEpoch_;
+  if (!catalogLive()) return false;
+  if (entry_.destination == CatalogDestination::BookList && key.provenance.owner)
+    return key.provenance.owner == sourceAccount_.owner && key.provenance.accountEpoch == sourceAccount_.epoch;
+  return key.provenance.accountEpoch == accountEpoch_;
 }
 bool CatalogSurface::pushCatalogLocation() {
   if (depth_ == 4) return false;
@@ -52,6 +68,8 @@ bool CatalogSurface::pushCatalogLocation() {
   return true;
 }
 void CatalogSurface::requestCatalogPage() {
+  if (sourceOpenPending_) library_.retireOpen(selected_.key);
+  sourceOpenPending_ = false;
   pending_ = true;
   queryAccepted_ = false;
   state_ = State::Loading;
@@ -100,6 +118,18 @@ void CatalogSurface::requestCatalogPage() {
     request_.limit = catalogPageRows();
     request_.kind = panel_ == Panel::Groups ? QueryKind::Groups : QueryKind::Books;
     result_.clear();
+    if (entry_.destination == CatalogDestination::BookList) {
+      WindowRequest sourceRequest;
+      sourceRequest.source = entry_.source;
+      sourceRequest.offset = current_.offset;
+      sourceRequest.limit = catalogPageRows();
+      queryAccepted_ = library_.requestWindow(sourceRequest);
+      if (!queryAccepted_) {
+        pending_ = false;
+        state_ = State::Unsupported;
+      }
+      return;
+    }
     queryAccepted_ = library_.requestQuery(request_);
   }
   if (!queryAccepted_) {
@@ -246,6 +276,23 @@ bool CatalogSurface::pageCatalog(int direction) {
   if (!catalogLive() || dialog_ != Dialog::None ||
       (panel_ != Panel::Sources && panel_ != Panel::Books && panel_ != Panel::Groups))
     return false;
+  if (entry_.destination == CatalogDestination::BookList) {
+    if (direction > 0) {
+      if (!catalogHasMore() || !result_.count || current_.offset > UINT32_MAX - result_.count) return false;
+      if (sourceCursorCount_ == sourceCursors_.size()) {
+        for (uint8_t i = 1; i < sourceCursorCount_; ++i) sourceCursors_[i - 1] = sourceCursors_[i];
+        --sourceCursorCount_;
+      }
+      sourceCursors_[sourceCursorCount_++] = current_.offset;
+      current_.offset += result_.count;
+    } else {
+      if (!sourceCursorCount_) return false;
+      current_.offset = sourceCursors_[--sourceCursorCount_];
+    }
+    focus_ = 0;
+    requestCatalogPage();
+    return true;
+  }
   const uint32_t limit = panel_ == Panel::Sources ? CatalogSourceRows : catalogPageRows();
   if (direction > 0) {
     if (!catalogHasMore() || current_.offset > UINT32_MAX - limit) return false;
@@ -284,7 +331,10 @@ void CatalogSurface::loadCatalogCovers() {
 }
 bool CatalogSurface::pollCatalog() {
   if (!catalogLive()) return false;
-  if (library_.snapshot().accountEpoch != accountEpoch_) {
+  const auto currentSourceAccount = library_.accountView().ticket;
+  if (library_.snapshot().accountEpoch != accountEpoch_ ||
+      (entry_.destination == CatalogDestination::BookList &&
+       (currentSourceAccount.owner != sourceAccount_.owner || currentSourceAccount.epoch != sourceAccount_.epoch))) {
     retireCatalog();
     return true;
   }
@@ -386,7 +436,40 @@ bool CatalogSurface::pollCatalog() {
         retainedCount_ = uint8_t(result_.count);
         for (uint8_t i = 0; i < retainedCount_; ++i) retained_[i] = result_.entries[i];
       }
-      library_.readQuery(result_);
+      if (entry_.destination == CatalogDestination::BookList) {
+        // Reuse the existing dashboard window, then feed the approved book-list
+        // renderer. Saved ordering and membership remain Library-owned.
+        library_.readWindow(covers_);
+        result_.clear();
+        result_.requestId = request_.requestId;
+        result_.publication = covers_.publication;
+        if (covers_.windowCount == 1) {
+          const auto& sourceSpan = covers_.windows[0];
+          const bool sourceValid =
+              sourceSpan.request.source == entry_.source &&
+              sourceSpan.request.presentation == WindowPresentation::Full &&
+              sourceSpan.request.offset == current_.offset && sourceSpan.request.limit == catalogPageRows() &&
+              sourceSpan.count <= catalogPageRows() && sourceSpan.first <= covers_.count &&
+              sourceSpan.count <= covers_.count - sourceSpan.first && covers_.count <= LibraryRows &&
+              covers_.bytes <= LibraryBytes && sourceSpan.bytes <= LibraryBytes;
+          result_.availability = sourceValid ? sourceSpan.availability : Availability::Unavailable;
+          result_.provenance = covers_.provenance;
+          result_.matchedBooks = sourceSpan.total;
+          if (sourceValid && sourceSpan.availability == Availability::Ready) {
+            result_.count = sourceSpan.count;
+            result_.bytes = result_.count * sizeof(QueryEntry);
+            result_.hasMore = current_.offset < sourceSpan.total && result_.count < sourceSpan.total - current_.offset;
+            for (uint16_t i = 0; i < result_.count; ++i) {
+              result_.entries[i].book = covers_.rows[sourceSpan.first + i];
+              const auto local = covers_.fileAvailability[sourceSpan.first + i];
+              result_.entries[i].onDevice = local == FileAvailability::OnCard       ? QueryTruth::Yes
+                                            : local == FileAvailability::ServerOnly ? QueryTruth::No
+                                                                                    : QueryTruth::Unknown;
+            }
+          }
+        }
+      } else
+        library_.readQuery(result_);
       if (result_.requestId != request_.requestId) {
         // A nested catalog owner used the one worker window. Restore this
         // parent's exact query/cursor with a fresh correlation on return.
@@ -396,7 +479,7 @@ bool CatalogSurface::pollCatalog() {
         state_ = queryAccepted_ ? State::Loading : State::Error;
         return true;
       }
-      if ((result_.availability == Availability::Ready && result_.provenance.accountEpoch != accountEpoch_) ||
+      if ((result_.availability == Availability::Ready && !catalogKeyValid({result_.provenance, 0})) ||
           result_.count > catalogPageRows() || result_.bytes > LibraryBytes ||
           result_.bytes < result_.count * sizeof(QueryEntry)) {
         result_.count = 0;
@@ -416,7 +499,7 @@ bool CatalogSurface::pollCatalog() {
           }
       }
     }
-    if (state_ == State::Error && retainedCount_ && retainedProvenance_.accountEpoch == accountEpoch_ &&
+    if (state_ == State::Error && retainedCount_ && catalogKeyValid({retainedProvenance_, 0}) &&
         current_.root == retainedLocation_.root && current_.offset == retainedLocation_.offset &&
         current_.scope == retainedLocation_.scope && current_.author == retainedLocation_.author &&
         current_.series == retainedLocation_.series && current_.withoutSeries == retainedLocation_.withoutSeries &&
@@ -565,13 +648,20 @@ CommandStatus CatalogSurface::activateCatalogShelfBook(uint8_t index) {
 CommandStatus CatalogSurface::selectCatalogBook(const BookRow& book, QueryTruth localState) {
   if (!catalogKeyValid(book.key)) return CommandStatus::Unavailable;
   autoOpen_ = connecting_ = preparing_ = false;
+  if (sourceOpenPending_) library_.retireOpen(selected_.key);
+  sourceOpenPending_ = false;
   selected_ = book;
   availabilityUnknown_ = localState == QueryTruth::Unknown;
   if (availabilityUnknown_) {
     selected_ = book;
     return CommandStatus::Unavailable;
   }
-  if (localState == QueryTruth::Yes) return library_.open(book.key);
+  if (localState == QueryTruth::Yes) {
+    if (sourceOpenPending_) library_.retireOpen(selected_.key);
+    const auto status = library_.open(book.key);
+    sourceOpenPending_ = entry_.destination == CatalogDestination::BookList && status == CommandStatus::Accepted;
+    return status;
+  }
   returnFocus_ = focus_;
   selected_ = book;
   job_ = library_.bookDownloadStatus(selected_.key);

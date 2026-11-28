@@ -1,0 +1,26 @@
+{
+  "reference": "f40w-widgets--37-finished.png",
+  "referenceSha256": "0430bd8e0b066b6414f8c769834182251cff173ef78329eaee3a3025f3a91aa7",
+  "referenceTileCrop": [
+    27,
+    160,
+    437,
+    362
+  ],
+  "normalizedTile": [
+    456,
+    224
+  ],
+  "crop": [
+    122,
+    52,
+    224,
+    196
+  ],
+  "resample": "LANCZOS",
+  "threshold": 160,
+  "width": 128,
+  "height": 180,
+  "blackBit": 0,
+  "sha256": "ddccd102d4ab23ea2753d43b7b1ed2de45f438f17433e213b488e17eb772cc53"
+}

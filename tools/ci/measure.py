@@ -54,7 +54,7 @@ def main():
     # Hardware compiler gate emits per-function frame evidence for F39. Keep it
     # separate from unavailable runtime task high-water measurements.
     frames = []
-    for name in ('PersonalReading', 'ReadingStats'):
+    for name in ('PersonalReading', 'ReadingStats', 'widgets/Continue', 'widgets/BookList'):
         paths = list((build / 'src/booksync/services').glob(name + '*.su'))
         if not paths:
             raise SystemExit(f'missing reading stack evidence: {name}')

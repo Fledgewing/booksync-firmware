@@ -552,9 +552,10 @@ bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePa
           uint32_t styleValue = 0;
           if (style.type && number(style, 0, 1, styleValue)) out.style = styleValue;
           if (source.type && text(source, text_)) {
-            if (!std::strcmp(text_, "device"))
+            if (!std::strcmp(text_, "device") || !std::strcmp(text_, "on-device"))
               out.source = WindowSource::OnDevice;
-            else if (!std::strcmp(text_, "up-next"))
+            else if (!std::strcmp(text_, "up-next") || !std::strcmp(text_, "upnext") ||
+                     !std::strcmp(text_, "series-next"))
               out.source = WindowSource::UpNext;
             else if ((!std::strcmp(text_, "want-to-read") || !std::strcmp(text_, "wtr")))
               out.source = WindowSource::WantToRead;
@@ -562,10 +563,17 @@ bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePa
               out.source = WindowSource::Unopened;
             else if (!std::strcmp(text_, "random"))
               out.source = WindowSource::Random;
-            else if (!std::strcmp(text_, "finished-this-year"))
+            else if (!std::strcmp(text_, "finished-this-year") || !std::strcmp(text_, "year") ||
+                     !std::strcmp(text_, "finished-year"))
               out.source = WindowSource::FinishedYear;
-            else if (!std::strcmp(text_, "pick-back-up"))
+            else if (!std::strcmp(text_, "pick-back-up") || !std::strcmp(text_, "pickup"))
               out.source = WindowSource::PickBackUp;
+            else if (std::strcmp(device, "x3") &&
+                     (!std::strcmp(text_, "reading") || !std::strcmp(text_, "also-reading")))
+              out.source = WindowSource::AlsoReading;
+            else if (std::strcmp(device, "x3") &&
+                     (!std::strcmp(text_, "finished") || !std::strcmp(text_, "all-finished")))
+              out.source = WindowSource::AllFinished;
             else if (!std::strcmp(text_, "recent") || !std::strcmp(text_, "recently-added"))
               out.source = WindowSource::Recent;
             else {

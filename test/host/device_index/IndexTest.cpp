@@ -6,6 +6,7 @@
 #include "booksync/services/DeviceIndex.h"
 #include "booksync/services/LocalLibrary.h"
 #include "booksync/services/OfflineLibrary.h"
+#include "booksync/services/PersonalReading.h"
 #include "booksync/services/ReadModel.h"
 using namespace booksync;
 using namespace booksync::storage;
@@ -260,7 +261,18 @@ TEST_F(IndexTest, AccountInvalidationErasesRowsAndOldLifetimeStaysRetired) {
   ReadModel old{index};
   ASSERT_TRUE(old.materialize({0, 2, 16384}));
   auto subscription = old.subscribe();
+  BookRow current;
+  current.title[0] = 'A';
+  PersonalCard resolved;
+  resolved.progress = {0, true};
+  resolved.timeLeft = {3600, true};
+  old.setContinue(current, true, &resolved);
+  EXPECT_TRUE(old.window().resume.timeLeftKnown);
   old.invalidate(Invalidation::Account);
+  EXPECT_FALSE(old.window().resume.supplied);
+  EXPECT_FALSE(old.window().resume.progressKnown);
+  EXPECT_FALSE(old.window().resume.timeLeftKnown);
+  EXPECT_EQ(old.window().resume.timeLeftAmount, 0u);
   EXPECT_EQ(old.window().count, 0);
   EXPECT_EQ(old.window().rows[0].title[0], 0);
   ReadModel next{index};
@@ -460,6 +472,92 @@ TEST_F(IndexTest, UncertainFinalBarrierReconcilesVisibleGenerationBeforeRetry) {
   EXPECT_TRUE(retry.begin({3, 1, 7, 12}));
   retry.cancel();
 }
+
+struct SavedSelection {
+  BookListMeta meta{{9, 4, 17, 7}, 37, 15, 0, 2, 2026, PersonalState::Ready, true, false, true, true};
+  uint32_t reads = 0;
+  bool change = false, bad = false;
+  static BookListMeta peek(void* ctx, WindowSource) {
+    auto& f = *static_cast<SavedSelection*>(ctx);
+    auto m = f.meta;
+    if (f.change && f.reads) m.provenance.capture++;
+    return m;
+  }
+  static bool read(void* ctx, WindowSource, uint32_t rank, BookRow& book) {
+    auto& f = *static_cast<SavedSelection*>(ctx);
+    ++f.reads;
+    book = {};
+    book.key = {f.meta.provenance, rank};
+    book.title[0] = 'S';
+    if (f.bad) book.title.fill('x');
+    return true;
+  }
+  BookListSource source() { return {this, peek, read}; }
+};
+TEST_F(IndexTest, RegisteredBookListSharesOneSnapshotWithNativeAndPagesItsOwnMembership) {
+  publish(2);
+  ReadModel model{index};
+  BookListProjection scratch;
+  SavedSelection saved;
+  model.setBookListScratch(&scratch);
+  model.setBookListSource(saved.source(), {17, 4}, 2026);
+  WindowBatchRequest batch;
+  batch.count = 2;
+  batch.windows[0] = {0, 4, LibraryBytes, WindowSource::Recent, WindowPresentation::Preview};
+  batch.windows[1] = {0, 3, LibraryBytes, WindowSource::OnDevice, WindowPresentation::Preview};
+  ASSERT_TRUE(model.materializeBatch(batch));
+  const auto preview = model.window();
+  EXPECT_EQ(preview.windows[0].total, 37u);
+  EXPECT_EQ(preview.windows[0].count, 4);
+  EXPECT_TRUE(preview.windows[0].ageKnown);
+  EXPECT_EQ(preview.windows[0].ageDays, 2u);
+  EXPECT_EQ(preview.windows[1].total, 2u);
+  EXPECT_EQ(preview.rows[4].key.provenance, index.provenance());
+  ASSERT_TRUE(model.materialize({12, 12, LibraryBytes, WindowSource::Recent}));
+  const auto full = model.window();
+  EXPECT_EQ(full.count, 3);
+  EXPECT_EQ(full.total, 37u);
+  EXPECT_EQ(full.provenance, saved.meta.provenance);
+  EXPECT_EQ(full.windows[0].total, 37u);
+  EXPECT_EQ(full.rows[0].key.ordinal, 12u);
+  model.invalidate(Invalidation::Account);
+  ASSERT_TRUE(model.materialize({0, 4, LibraryBytes, WindowSource::Recent, WindowPresentation::Preview}));
+  EXPECT_EQ(model.window().windows[0].availability, Availability::NotSaved);
+}
+TEST_F(IndexTest, PublishedBookListYearSurvivesTheWindowAndRetiresWithItsSource) {
+  publish(2);
+  ReadModel model{index};
+  BookListProjection scratch;
+  SavedSelection saved;
+  model.setBookListScratch(&scratch);
+  model.setBookListSource(saved.source(), {17, 4}, 2026);
+  ASSERT_TRUE(model.materialize({0, 4, LibraryBytes, WindowSource::FinishedYear, WindowPresentation::Preview}));
+  EXPECT_EQ(model.window().windows[0].year, 2026);
+  model.invalidate(Invalidation::Account);
+  ASSERT_TRUE(model.materialize({0, 4, LibraryBytes, WindowSource::FinishedYear, WindowPresentation::Preview}));
+  EXPECT_EQ(model.window().windows[0].year, 0);
+}
+TEST_F(IndexTest, ChangedOrMalformedSourceClearsItsPageWithoutSuppressingNativeSibling) {
+  publish(2);
+  ReadModel model{index};
+  SavedSelection saved;
+  model.setBookListSource(saved.source(), {17, 4}, 2026);
+  saved.change = true;
+  ASSERT_TRUE(model.materialize({0, 12, LibraryBytes, WindowSource::Recent}));
+  EXPECT_EQ(model.window().count, 0);
+  EXPECT_EQ(model.window().windows[0].total, 0u);
+  saved.change = false;
+  saved.bad = true;
+  WindowBatchRequest batch;
+  batch.count = 2;
+  batch.windows[0] = {0, 12, LibraryBytes, WindowSource::Recent};
+  batch.windows[1] = {0, 2, LibraryBytes, WindowSource::OnDevice};
+  EXPECT_FALSE(model.materializeBatch(batch));
+  const auto snapshot = model.window();
+  EXPECT_EQ(snapshot.windows[0].count, 0);
+  EXPECT_EQ(snapshot.windows[1].count, 2);
+  EXPECT_EQ(snapshot.rows[0].key.provenance, index.provenance());
+}
 }  // namespace
 
 TEST_F(IndexTest, WidgetBatchPreservesIndependentContinueMissingShelfAndLocalFailure) {
@@ -494,6 +592,10 @@ TEST_F(IndexTest, WidgetBatchPreservesIndependentContinueMissingShelfAndLocalFai
   EXPECT_EQ(value.windows[0].count, 1);
   EXPECT_EQ(value.windows[1].availability, Availability::NotSaved);
   EXPECT_EQ(value.windows[2].availability, Availability::Unavailable);
+  ASSERT_TRUE(model.beginHistory({[](void*, ReadingVisit&) { return HistoryStep::End; }, nullptr, 7, 1}));
+  ASSERT_TRUE(model.historyTick());
+  EXPECT_TRUE(model.window().rows[0].readingKnown);
+  EXPECT_EQ(model.window().rows[0].page, 42);
 }
 
 TEST(LibraryUpgradeNotice, CachedReadsNeverCheckpointAndDismissalRunsOnlyOnWorker) {
@@ -616,4 +718,52 @@ TEST(ReadModel, CombinedStatsAndPersonalChargeBothConcretePayloads) {
   ++batch.bytes;
   batch.rows = 1;
   EXPECT_FALSE(ReadModel::accepts(batch));
+}
+
+TEST(ContinueBudget, SummaryAndContextAreChargedToCaller) {
+  booksync::WindowBatchRequest request;
+  request.count = 1;
+  auto& window = request.windows[0];
+  window.source = booksync::WindowSource::Continue;
+  window.limit = 1;
+  window.bytes = sizeof(booksync::WindowSpan) + sizeof(booksync::BookRow);
+  EXPECT_FALSE(booksync::ReadModel::accepts(request));
+  window.bytes += sizeof(booksync::ContinueValues);
+  EXPECT_TRUE(booksync::ReadModel::accepts(request));
+}
+
+TEST_F(IndexTest, CompactNativeBookListUsesBoundedProjectionAndFullListRemainsUnchanged) {
+  publish(100);
+  ReadModel model{index};
+  booksync::BookListProjection scratch;
+  model.setBookListScratch(&scratch);
+  WindowBatchRequest batch;
+  batch.count = 1;
+  batch.windows[0] = {0, 3, booksync::LibraryBytes, WindowSource::OnDevice, booksync::WindowPresentation::Preview};
+  ASSERT_TRUE(model.materializeBatch(batch));
+  auto result = model.window();
+  EXPECT_EQ(result.windows[0].count, 3);
+  EXPECT_EQ(result.windows[0].total, 100);
+  EXPECT_EQ(scratch.count, 3);
+  batch.windows[0] = {0, 12, booksync::LibraryBytes, WindowSource::OnDevice};
+  model.setBookListScratch(nullptr);
+  ASSERT_TRUE(model.materializeBatch(batch));
+  EXPECT_EQ(model.window().count, 12);
+}
+TEST_F(IndexTest, FailedPreviewWorkspaceLeavesContinueSiblingUsable) {
+  publish(4);
+  ReadModel model{index};
+  BookRow recent;
+  recent.title[0] = 'A';
+  model.setContinue(recent, true);
+  WindowBatchRequest batch;
+  batch.count = 2;
+  batch.windows[0] = {0, 1, booksync::LibraryBytes, WindowSource::Continue};
+  batch.windows[1] = {0, 3, booksync::LibraryBytes, WindowSource::OnDevice, booksync::WindowPresentation::Preview};
+  EXPECT_FALSE(model.materializeBatch(batch));
+  const auto result = model.window();
+  EXPECT_EQ(result.windows[0].availability, Availability::Ready);
+  EXPECT_EQ(result.windows[0].count, 1);
+  EXPECT_EQ(result.windows[1].availability, Availability::Unavailable);
+  EXPECT_EQ(result.windows[1].count, 0);
 }

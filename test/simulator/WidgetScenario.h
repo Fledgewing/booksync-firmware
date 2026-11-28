@@ -80,9 +80,9 @@ inline bool tick() {
     fixture.batches = fixture.reads = 0;
     showHomeScene(renderer, mappedInputManager, fixture);
   }
-  if (scene == 0 && (frame == 15 || frame == 18))
+  if (scene == 0 && (frame == 15 || frame == 18 || (!fixture.page.textOnly && frame == 20)))
     mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Down));
-  if (scene == 0 && frame == 21) mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
+  if (scene == 0 && frame == 23) mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
   if (frame < 40) return true;
   if (scene == 0 && fixture.opened != 3) {
     LOG_ERR("BSW", "Shelf focus selected %u instead of second book", unsigned(fixture.opened));
