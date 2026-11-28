@@ -82,7 +82,7 @@ struct WindowBatchRequest {
 struct WindowSpan {
   WindowRequest request{};
   uint32_t total = 0, bytes = 0, ageDays = 0;
-  uint16_t first = 0, count = 0;
+  uint16_t first = 0, count = 0, year = 0;
   Availability availability = Availability::NotSaved;
   bool stale = false, ageKnown = false;
 };

@@ -19,6 +19,9 @@ enum class Label : uint8_t {
   SavedUnknown,
   OversizedData,
   ShelfTitle,
+  UnopenedMeaning,
+  UnopenedSavedAge,
+  UnopenedSavedData,
   AllBooks,
   EmptyShelf,
   BookProgress

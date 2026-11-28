@@ -61,8 +61,10 @@ class Fixture final : public Library {
     ++coverCopies;
     const auto ordinal = reference.id - 1;
     const auto rank = ordinal % 100;
-    const bool reading = ordinal / 100 == static_cast<uint8_t>(WindowSource::AlsoReading);
-    return approvedWidgetCovers::copy(1 + (rank + (reading ? 1 : 0)) % 4, out);
+    const auto source = static_cast<WindowSource>(ordinal / 100);
+    const bool rows = source == WindowSource::AlsoReading || source == WindowSource::OnDevice;
+    const bool personal = source == WindowSource::WantToRead || source == WindowSource::UpNext;
+    return approvedWidgetCovers::copy((personal ? 5 : 1) + (rank + (rows ? 1 : 0)) % 4, out);
   }
   CommandStatus requestCover(BookKey) override {
     ++coverIntents;
@@ -95,8 +97,12 @@ class Fixture final : public Library {
     out = {};
     out.key = {{4, 3, 17, 0}, static_cast<uint32_t>(source) * 100 + rank};
     constexpr const char* names[] = {"The Orchard Map", "Paper Horizons", "The Slow Road", "Blue Harbour"};
-    const bool reading = source == WindowSource::AlsoReading;
-    std::snprintf(out.title.data(), out.title.size(), "%s", names[(rank + (reading ? 1 : 0)) % 4]);
+    const bool reading = source == WindowSource::AlsoReading || source == WindowSource::OnDevice;
+    constexpr const char* personal[] = {"Northbound", "The Quiet Lake", "Winter Signal", "Open Water"};
+    const auto* title = source == WindowSource::WantToRead || source == WindowSource::UpNext
+                            ? personal[rank % 4]
+                            : names[(rank + (reading ? 1 : 0)) % 4];
+    std::snprintf(out.title.data(), out.title.size(), "%s", title);
     out.readingKnown = true;
     constexpr uint32_t positions[] = {38, 81, 12};
     out.page = positions[rank % 3];
@@ -110,8 +116,10 @@ class Fixture final : public Library {
     data.windowCount = 1;
     data.provenance = {4, 3, 17, 0};
     projectBookList({this, meta, book,
-                     [](void*, WindowSource, uint32_t rank) {
-                       return rank % 2 ? FileAvailability::ServerOnly : FileAvailability::OnCard;
+                     [](void*, WindowSource source, uint32_t rank) {
+                       if (source == WindowSource::OnDevice) return FileAvailability::OnCard;
+                       return source == WindowSource::Recent && rank % 2 == 0 ? FileAvailability::OnCard
+                                                                              : FileAvailability::Unknown;
                      }},
                     batch.windows[0], {17, 3}, 2026, preview);
     auto& span = data.windows[0];
@@ -122,6 +130,7 @@ class Fixture final : public Library {
     span.stale = preview.stale;
     span.ageKnown = preview.ageKnown;
     span.ageDays = preview.ageDays;
+    span.year = preview.year;
     span.availability = preview.state == PersonalState::NotSaved      ? Availability::NotSaved
                         : preview.state == PersonalState::Off         ? Availability::Off
                         : preview.state == PersonalState::Unsupported ? Availability::Unsupported
@@ -180,7 +189,7 @@ inline bool tick() {
   const unsigned preset = text || cancelProbe ? 8 : cycle / 8, state = text || cancelProbe ? 0 : cycle % 8;
   auto& fixture = fixtures[cycle % 2];
   if (frame++ == 0) {
-    approvedWidgetCovers::load(1, 4);
+    approvedWidgetCovers::load(1, 8);
     fixture.page = {};
     fixture.page.revision = 1;
     fixture.page.count = 1;

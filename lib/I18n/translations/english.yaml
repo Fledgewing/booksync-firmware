@@ -1540,4 +1540,9 @@ STR_HOME_SOURCE_COUNT_FORMAT: "%lu books"
 
 STR_HOME_UP_NEXT_IN_SERIES: "Up next in series"
 
-STR_HOME_UNOPENED_WIDGET: "Unopened"
+STR_HOME_UNOPENED_WIDGET: "Unopened on this reader"
+
+STR_HOME_FINISHED_IN_YEAR_FORMAT: "Finished in %u"
+STR_HOME_UNOPENED_MEANING: "No saved opening record"
+STR_HOME_UNOPENED_SAVED_DATA: "No saved opening record · saved data"
+STR_HOME_UNOPENED_SAVED_AGE_FORMAT: "No saved opening record · Saved %lu days ago"

@@ -152,6 +152,7 @@ bool ReadModel::materializeList(WindowSpan& span) {
     span.stale = preview.stale;
     span.ageKnown = preview.ageKnown;
     span.ageDays = preview.ageDays;
+    span.year = preview.year;
     span.availability = preview.state == PersonalState::NotSaved      ? Availability::NotSaved
                         : preview.state == PersonalState::Unsupported ? Availability::Unsupported
                         : preview.state == PersonalState::Off         ? Availability::Off
@@ -241,6 +242,7 @@ bool ReadModel::materializeList(WindowSpan& span) {
   span.stale = meta.stale;
   span.ageKnown = meta.ageKnown;
   span.ageDays = meta.ageKnown ? meta.ageDays : 0;
+  span.year = meta.year;
   return true;
 }
 void ReadModel::invalidate(Invalidation reason) {
