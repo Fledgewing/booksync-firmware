@@ -2,7 +2,7 @@
 #include <SecureHttpClient.h>
 #include <gtest/gtest.h>
 
-#include "../../../../lib/hal/HalHttp.h"
+#include "../../../lib/hal/HalHttp.h"
 #include "booksync/server/bookorbit/LiveAdapter.h"
 #include "booksync/server/bookorbit/TransportTrust.h"
 #include "booksync/system/NetworkPhase.h"

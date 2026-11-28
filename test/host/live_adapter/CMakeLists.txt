@@ -25,3 +25,7 @@ target_include_directories(BookSyncHttpTest PRIVATE ../file_publish/stubs
   ${REPO_ROOT}/src ${REPO_ROOT}/tailnet/shim ${REPO_ROOT}/lib/Memory)
 target_link_libraries(BookSyncHttpTest PRIVATE GTest::gtest_main)
 gtest_discover_tests(BookSyncHttpTest)
+
+# Other retained host suites install simplified Memory stubs globally. This
+# production HAL test needs the real fallible allocation helpers.
+target_include_directories(BookSyncHttpTest BEFORE PRIVATE ${REPO_ROOT}/lib/Memory)
