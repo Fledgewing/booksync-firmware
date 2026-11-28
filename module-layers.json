@@ -13331,6 +13331,7 @@
         "../../test/simulator/LifecycleStatsScenario.h",
         "../../test/simulator/LiveAdapterScenario.h",
         "../../test/simulator/LocatorScenario.h",
+        "../../test/simulator/NativeEvidenceScenario.h",
         "../../test/simulator/PersonalReadingScenario.h",
         "../../test/simulator/PositionPolicyScenario.h",
         "../../test/simulator/QueriesScenario.h",
@@ -14935,9 +14936,17 @@
       "role": "storage",
       "rationale": "F08 worker-only identity evidence and raw native locator inspection; allocation-free, no UI or transport. Locator delegates EPUB decoding to the retained pure ProgressRecord codec."
     },
+    "src/booksync/storage/SourceAuthority.h": {
+      "role": "storage",
+      "rationale": "F46b1 create-only source identity authority with independent entropy-issued UUIDs, exact revision and scope; current-only validation forbids rollback/reissue on corruption."
+    },
     "src/booksync/storage/Identity.cpp": {
       "role": "storage",
       "rationale": "F08 worker-only identity evidence and raw native locator inspection; allocation-free, no UI or transport. Locator delegates EPUB decoding to the retained pure ProgressRecord codec."
+    },
+    "src/booksync/storage/SourceAuthority.cpp": {
+      "role": "storage",
+      "rationale": "F46b1 create-only source identity authority with independent entropy-issued UUIDs, exact revision and scope; current-only validation forbids rollback/reissue on corruption."
     },
     "src/booksync/reader/Locator.h": {
       "role": "reader",
@@ -14990,6 +14999,10 @@
     "src/booksync/reader/Capture.cpp": {
       "role": "reader",
       "rationale": "F09 main-task local reader capture into F07; bounded native observations, no transport or presentation. Rendering is excluded by the native reader RenderLock."
+    },
+    "src/booksync/reader/CaptureBinding.cpp": {
+      "role": "reader",
+      "rationale": "F46b1 neutral immutable capture codec; opaque adapter proof and verified source/account evidence prepared before opening, no transport or path-derived identity. Fallible cold-open workspace is bounded to 2512 bytes."
     },
     "src/booksync/reader/Bridge.h": {
       "role": "reader",
@@ -15362,7 +15375,7 @@
     },
     "scripts/booksync_version.py": {
       "role": "build-tool",
-      "rationale": "F31: shared product/source identity and pure update selection; no network, writer, UI or installer. F19 retains the complete dormant position-policy/store budget root in physical images.",
+      "rationale": "F31: shared product/source identity and pure update selection; no network, writer, UI or installer. F19 retains the complete dormant position-policy/store budget root in physical images. F46b1 retains the dormant native provider/source-authority budget root using linker-only flags; no startup activation.",
       "includes": []
     },
     "src/booksync/storage/PageJournal.h": {
@@ -15385,9 +15398,17 @@
       "role": "server",
       "rationale": "F18b private companion-compatible page-stats mapping, scoped F18a evidence and F15 auth/epoch gates; only F17 token can call transport. Fixed batch and checkpoint output, no UI or writer activation."
     },
+    "src/booksync/server/bookorbit/NativeEvidence.h": {
+      "role": "server",
+      "rationale": "F46b1 private native match/stats providers read immutable captured source/account proof and frozen page windows; no current-path rebinding, legacy import, UI, network or writer activation."
+    },
     "src/booksync/server/bookorbit/LifecycleStats.cpp": {
       "role": "server",
       "rationale": "F18b private companion-compatible page-stats mapping, scoped F18a evidence and F15 auth/epoch gates; only F17 token can call transport. Fixed batch and checkpoint output, no UI or writer activation."
+    },
+    "src/booksync/server/bookorbit/NativeEvidence.cpp": {
+      "role": "server",
+      "rationale": "F46b1 private native match/stats providers read immutable captured source/account proof and frozen page windows; no current-path rebinding, legacy import, UI, network or writer activation."
     },
     "src/booksync/interface/LayoutEdit.h": {
       "role": "interface",

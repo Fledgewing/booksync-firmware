@@ -2838,3 +2838,59 @@ retained; valid backup selection is read-only if the primary is damaged.
 F20 adds the versioned `BSFI` v1 payload inside the unchanged LifecycleJournal v2
 envelope. See [finish journal](booksync-f20-finish.md#format-and-resource-use) for
 field offsets, phase bits, cancellation marker and conservative recovery rules.
+
+## BookSync bound native observations (F46b1)
+
+Existing `BSO1` opens and 116-byte `BSC1` native checkpoints remain readable and
+unbound. They are never assigned to the current account using a reused path.
+A `BSO2` open stores immutable source/account evidence prepared before opening:
+
+| Offset | Bytes | Value |
+| --- | --- | --- |
+| 0 | 4 | `BSO2` |
+| 4 | 2 | Native format, nonzero, little endian |
+| 6 | 2 | Path length, 1–1024 |
+| 8 | 2 | Opaque server scope length, 1–128 |
+| 10 | 2 | Opaque account scope length, 1–128 |
+| 12 | 2 | Adapter proof length, 1–1152 |
+| 14 | 2 | Reserved, zero |
+| 16 | 16 | Independently issued canonical book UUID |
+| 32 | 16 | Independently issued edition UUID |
+| 48 | 32 | Verified complete source SHA-256 |
+| 80 | variable | Path, server scope, account scope, opaque proof, in that order |
+
+Text fields exclude NUL; proof bytes may include it. There is no terminator or
+trailing extension. The enclosing lifecycle journal supplies integrity and atomic
+publication. Unknown versions, incomplete fields and zero identities cannot bind.
+The outer native journal routing remains `native` / `local-unbound`, so local
+history is preserved independently of delivery. A delivery projection must retain
+the complete payload and its captured scope; changing routing grants no identity.
+
+A bound `BSC2` checkpoint is 140 bytes. Bytes 4–115 retain the `BSC1` layout.
+Little-endian fields at 116/120 hold the frozen half-open page-history range
+(begin/end, 4 bytes each), at 124 the observation Unix time (8 bytes), and at 132
+the original native open ID (8 bytes). The native ID survives a different delivery
+journal's numbering. A closed bound capture cannot be changed or reopened. Unknown
+time does not become upload evidence. Match/stats providers require a closed
+bound sample and validate the exact source, account and captured page interval.
+
+The private `BOE1` adapter proof contains magic (4), partial protocol digest
+(32 ASCII hex), title/author lengths (2 each, little endian), then complete title
+and author text (up to 512 bytes each). This digest is protocol evidence only;
+it never supplies a canonical UUID or exact source revision.
+
+## BookSync source identity authority (`BSID`, version 1)
+
+One immutable 334-byte record belongs to a source candidate in a private lookup
+index. The lookup path/digest is not an identifier seed. Header bytes are `BSID`,
+version 1 (2 bytes little endian), then two reserved zero bytes. Offsets 8/24
+hold independently entropy-issued version-4 UUIDs for book/edition; offset 40 is
+the verified full SHA-256 (32 bytes). Offsets 72/201 hold server/account scope in
+129-byte zero-padded NUL-terminated fields. Offset 330 contains the little-endian
+32-bit FNV-1a checksum of bytes 0–329 (basis 2166136261, multiplier 16777619).
+
+Only validated current authority may be used. Existing current or backup bytes,
+including unknown/corrupt records, block reissuance; fallback cannot roll an
+identity backward. Initial publication uses create-only FilePublish. A staging
+file is never authority. Callers must validate source revision on their worker
+and provide independent entropy, never a path/backend/account-derived UUID.
