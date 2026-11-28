@@ -13542,11 +13542,16 @@
         "../../test/simulator/AccountScenario.h",
         "../../test/simulator/AccountSurfaceScenario.h",
         "../../test/simulator/ActivationScenario.h",
+        "../../test/simulator/BookListProjectionScenario.h",
+        "../../test/simulator/BookListScenario.h",
         "../../test/simulator/CalendarWidgetScenario.h",
         "../../test/simulator/CatalogJobsScenario.h",
         "../../test/simulator/CatalogScenario.h",
         "../../test/simulator/CatalogSurfaceScenario.h",
         "../../test/simulator/ClockScenario.h",
+        "../../test/simulator/CollectionCardsScenario.h",
+        "../../test/simulator/CollectionWidgetsScenario.h",
+        "../../test/simulator/ContinueScenario.h",
         "../../test/simulator/CopyJobsScenario.h",
         "../../test/simulator/CoverJobsScenario.h",
         "../../test/simulator/CredentialsScenario.h",
@@ -15163,6 +15168,74 @@
       "role": "retained-resource",
       "rationale": "Native portal source; scanned alongside generated output for backend leakage.",
       "includes": []
+    },
+    "src/booksync/interface/ContinueValues.h": {
+      "role": "interface",
+      "rationale": "F40w Continue reading: bounded F39 projection and pure drawing port; Library owns the page batch, no transport, storage or allocation during paint."
+    },
+    "src/booksync/services/widgets/Continue.h": {
+      "role": "services",
+      "rationale": "F40w Continue reading: bounded F39 projection and pure drawing port; Library owns the page batch, no transport, storage or allocation during paint."
+    },
+    "src/booksync/services/widgets/Continue.cpp": {
+      "role": "services",
+      "rationale": "F40w Continue reading: bounded F39 projection and pure drawing port; Library owns the page batch, no transport, storage or allocation during paint."
+    },
+    "src/booksync/ui/widgets/Canvas.h": {
+      "role": "ui",
+      "rationale": "F40w Continue reading: bounded F39 projection and pure drawing port; Library owns the page batch, no transport, storage or allocation during paint."
+    },
+    "src/booksync/ui/CompactGrid.h": {
+      "role": "ui",
+      "rationale": "F40w compact six-row geometry preserves stored grids and reserves the shared footer once on both X4 profiles; pure Library presentation values only."
+    },
+    "src/booksync/services/widgets/BookList.h": {
+      "role": "services",
+      "rationale": "F40w Book list worker projection: at most four frozen indexed records, independent preset order/count/year/scope evidence, fixed caller-owned output and no UI, transport, allocation or writer."
+    },
+    "src/booksync/services/widgets/BookList.cpp": {
+      "role": "services",
+      "rationale": "F40w Book list worker projection: at most four frozen indexed records, independent preset order/count/year/scope evidence, fixed caller-owned output and no UI, transport, allocation or writer."
+    },
+    "src/booksync/system/ArtworkCache.h": {
+      "role": "system",
+      "rationale": "F40w foreground native paint/input glue for approved source lists and thumbnails; X4 PSRAM cache is fallible, page bounded and prepared after paint, with no additional framebuffer or reader policy."
+    },
+    "src/booksync/interface/CollectionWidgets.h": {
+      "role": "interface",
+      "rationale": "F40w bounded neutral Library counts/storage and saved-list identities, with explicit unknown/zero/scope/age values; no wire identifiers, rules, transport or mutable handles."
+    },
+    "src/booksync/interface/Identity.h": {
+      "role": "interface",
+      "rationale": "F40w Library/Lists compact main and optional drawing over the single immutable Library publication; neutral identities, no source selection, acquisition or allocation during paint."
+    },
+    "src/booksync/services/widgets/Collections.h": {
+      "role": "services",
+      "rationale": "F40w Library and Lists worker projections preserve two-row Library accounting and one/three-row saved-list previews, frozen source rank/counts, independent states and retired account/generation guards; no acquisition, allocation or writer."
+    },
+    "src/booksync/services/widgets/Library.cpp": {
+      "role": "services",
+      "rationale": "F40w Library and Lists worker projections preserve two-row Library accounting and one/three-row saved-list previews, frozen source rank/counts, independent states and retired account/generation guards; no acquisition, allocation or writer."
+    },
+    "src/booksync/services/widgets/Lists.cpp": {
+      "role": "services",
+      "rationale": "F40w Library and Lists worker projections preserve two-row Library accounting and one/three-row saved-list previews, frozen source rank/counts, independent states and retired account/generation guards; no acquisition, allocation or writer."
+    },
+    "src/booksync/ui/widgets/Library.cpp": {
+      "role": "ui",
+      "rationale": "F40w Library/Lists compact main and optional drawing over the single immutable Library publication; neutral identities, no source selection, acquisition or allocation during paint."
+    },
+    "src/booksync/ui/widgets/Library.h": {
+      "role": "ui",
+      "rationale": "F40w Library/Lists compact main and optional drawing over the single immutable Library publication; neutral identities, no source selection, acquisition or allocation during paint."
+    },
+    "src/booksync/ui/widgets/Lists.cpp": {
+      "role": "ui",
+      "rationale": "F40w Library/Lists compact main and optional drawing over the single immutable Library publication; neutral identities, no source selection, acquisition or allocation during paint."
+    },
+    "src/booksync/ui/widgets/Lists.h": {
+      "role": "ui",
+      "rationale": "F40w Library/Lists compact main and optional drawing over the single immutable Library publication; neutral identities, no source selection, acquisition or allocation during paint."
     }
   },
   "pinned": {

@@ -10,7 +10,7 @@ class Activity;
 class GfxRenderer;
 class MappedInputManager;
 namespace booksync {
-std::unique_ptr<Activity> createCatalogScreen(GfxRenderer&, MappedInputManager&, Library&);
+std::unique_ptr<Activity> createCatalogScreen(GfxRenderer&, MappedInputManager&, Library&, CatalogRoute entry = {});
 #ifdef SIMULATOR
 CatalogSurface* catalogSceneController();
 void showCatalogScene(GfxRenderer&, MappedInputManager&, Library&);

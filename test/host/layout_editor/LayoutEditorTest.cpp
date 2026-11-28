@@ -48,7 +48,7 @@ TEST(LayoutEditor, AddRemoveResetAndRestart) {
     ASSERT_EQ(restarted.load(), storage::LayoutSource::Current);
     ASSERT_TRUE(restarted.project(0, page));
     EXPECT_EQ(page.count, 3);
-    EXPECT_EQ(page.widgets[1].kind, WidgetKind::Browse);
+    EXPECT_EQ(page.widgets[1].kind, !std::strcmp(device, "x3") ? WidgetKind::Browse : WidgetKind::Library);
     raw = card.files[paths.current];
     edit = request(LayoutEditKind::Reset, 3);
     ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), device, edit), LayoutEditStatus::Saved);
@@ -253,7 +253,7 @@ TEST(EditorAddRemove, AddRemoveCompletionFocusAndStaleSelection) {
   ui.chooseEditor(3);
   ui.chooseEditor(2);
   EXPECT_EQ(lib.captured.kind, LayoutEditKind::Add);
-  EXPECT_EQ(lib.captured.widget, WidgetKind::Browse);
+  EXPECT_EQ(lib.captured.widget, WidgetKind::Library);
   lib.page.count = 4;
   lib.page.revision = 2;
   lib.result.status = LayoutEditStatus::Saved;
@@ -415,7 +415,7 @@ TEST(LayoutEditor, EscapedNullCannotAliasAnInstalledWidget) {
   EXPECT_NE(changed.find(R"(continue-reading\u0000future)"), std::string::npos);
   ASSERT_TRUE(parser.project(LayoutInput::memory(changed.data(), changed.size()), "x4", 0, page));
   ASSERT_EQ(page.count, 1);
-  EXPECT_EQ(page.widgets[0].kind, WidgetKind::Browse);
+  EXPECT_EQ(page.widgets[0].kind, WidgetKind::Library);
 }
 
 TEST(LayoutGeometry, BandSwapResizeAndCancelValues) {
@@ -429,8 +429,8 @@ TEST(LayoutGeometry, BandSwapResizeAndCancelValues) {
   EXPECT_EQ(moved.page.widgets[1].y, 0);
   EXPECT_EQ(page.widgets[0].y, before.widgets[0].y);
   auto resized = previewGeometry(page, 0, LayoutStep::Size);
-  ASSERT_EQ(resized.status, LayoutEditStatus::Saved);
-  EXPECT_EQ(resized.page.widgets[0].w, 1);
+  EXPECT_EQ(resized.status, LayoutEditStatus::NoSpace);
+  EXPECT_EQ(resized.page.widgets[0].w, 2);
   EXPECT_EQ(resized.page.widgets[0].h, 2);
   EXPECT_EQ(previewGeometry(page, 0, LayoutStep::Up).status, LayoutEditStatus::NoSpace);
   EXPECT_EQ(previewGeometry(page, 99, LayoutStep::Size).status, LayoutEditStatus::Invalid);
@@ -1001,7 +1001,7 @@ TEST(EditorAddRemove, EveryInstalledAddEntryHasAVisibleFocusedViewport) {
   ui.enter();
   ui.chooseEditor(3);
   ASSERT_EQ(ui.panel(), EditorAddRemove::Panel::Add);
-  ASSERT_EQ(ui.rows(), uint8_t(WidgetKind::Count));
+  ASSERT_EQ(ui.rows(), uint8_t(WidgetKind::Count) - 1);
   for (uint8_t index = 0; index < ui.rows(); ++index) {
     ASSERT_EQ(ui.focus(), index);
     for (uint8_t capacity : {uint8_t(1), uint8_t(7), uint8_t(10)}) {
@@ -1012,5 +1012,26 @@ TEST(EditorAddRemove, EveryInstalledAddEntryHasAVisibleFocusedViewport) {
     ui.stepEditor(1);
   }
   ui.activateEditor();
-  EXPECT_EQ(lib.captured.widget, WidgetKind(uint8_t(WidgetKind::Count) - 1));
+  EXPECT_EQ(lib.captured.widget, WidgetKind::Forecast);
+}
+
+TEST(LayoutGeometry, ContinueOffersOnlyApprovedSizeAndCanNormalizeLegacySize) {
+  EXPECT_TRUE(supportedGeometry(WidgetKind::Continue, 2, 2));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Continue, 1, 2));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Continue, 2, 3));
+  HomePage page;
+  page.cols = 2;
+  page.rows = 6;
+  page.count = 1;
+  page.widgets[0] = {WidgetKind::Continue, WindowSource::Continue, 0, 0, 1, 2};
+  const auto resized = previewGeometry(page, 0, LayoutStep::Size);
+  EXPECT_EQ(resized.status, LayoutEditStatus::Saved);
+  EXPECT_EQ(resized.page.widgets[0].w, 2);
+  EXPECT_EQ(resized.page.widgets[0].h, 2);
+}
+
+TEST(LayoutGeometry, BookListOffersOnlyItsApprovedTwoByTwoSize) {
+  EXPECT_TRUE(supportedGeometry(WidgetKind::Shelf, 2, 2));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Shelf, 1, 2));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Shelf, 2, 3));
 }

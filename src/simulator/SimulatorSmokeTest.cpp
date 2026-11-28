@@ -15,6 +15,7 @@
 #include "../../test/simulator/FinishScenario.h"
 #include "../../test/simulator/LifecycleAnnotationsScenario.h"
 #include "../../test/simulator/PersonalReadingScenario.h"
+#include "../../test/simulator/BookListProjectionScenario.h"
 #include "../../test/simulator/DeliveryScenario.h"
 #include "../../test/simulator/AccountScenario.h"
 #include "../../test/simulator/CatalogScenario.h"
@@ -47,6 +48,8 @@
 #include "../../test/simulator/DailyWidgetScenario.h"
 #include "../../test/simulator/RecordsWidgetScenario.h"
 #include "../../test/simulator/GoalWidgetScenario.h"
+#include "../../test/simulator/ContinueScenario.h"
+#include "../../test/simulator/BookListScenario.h"
 #include "../../test/simulator/EditorScenario.h"
 #include "../../test/simulator/AccountSurfaceScenario.h"
 #include "../../test/simulator/UpgradeNoticeScenario.h"
@@ -74,6 +77,8 @@
 #include <exception>
 #include <filesystem>
 
+#include "../../test/simulator/CollectionCardsScenario.h"
+#include "../../test/simulator/CollectionWidgetsScenario.h"
 #include "AssetDownloadSmokeTest.h"
 #include "BookFontSystem.h"
 #include "BookSyncAdmissionSmokeTest.h"
@@ -12198,7 +12203,7 @@ void runSimulatorSmokeTestTick() {
   if (reminderUiScenario::tick()) return;
   if (!catalogSurfaceScenario::tick() && !seriesSurfaceScenario::tick() && !upgradeNoticeScenario::tick() &&
       !accountSurfaceScenario::tick() && !editorScenario::tick() &&
-      !goalWidgetScenario::tick() && !recordsWidgetScenario::tick() && !dailyWidgetScenario::tick() && !calendarWidgetScenario::tick() && !statsWidgetScenario::tick() && !widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() &&
+      !goalWidgetScenario::tick() && !recordsWidgetScenario::tick() && !dailyWidgetScenario::tick() && !calendarWidgetScenario::tick() && !statsWidgetScenario::tick() && !collectionCardsScenario::tick() && !bookListScenario::tick() && !continueScenario::tick() && !widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() &&
       !EpubReaderCompletionSmokeTest::sleepScenarioTick() &&
       !EpubReaderCompletionSmokeTest::readerCaptureScenarioTick() &&
       !EpubReaderCompletionSmokeTest::locatorScenarioTick())
@@ -12230,6 +12235,8 @@ void prepareSimulatorSmokeState() {
   runFinishScenario();
   runLifecycleAnnotationsScenario();
   runNativePersonalScenario();
+  collectionWidgetsScenario::run();
+  bookListProjectionScenario::run();
   runPersonalReadingScenario();
   runSyncOwnerScenario();
   runLifecycleJournalScenario();

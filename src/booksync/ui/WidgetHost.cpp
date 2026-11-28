@@ -3,6 +3,8 @@
 
 #include "booksync/ui/widgets/Browse.h"
 #include "booksync/ui/widgets/Continue.h"
+#include "booksync/ui/widgets/Library.h"
+#include "booksync/ui/widgets/Lists.h"
 #include "booksync/ui/widgets/Shelf.h"
 namespace booksync {
 void WidgetHost::enter(uint8_t page) {
@@ -27,6 +29,14 @@ bool WidgetHost::pollWidgets() {
   bool changed = false;
   if (pending_ || layout.revision != page_.revision || layout.page != page_.page) {
     page_ = layout;
+    if (page_.textOnly) {
+      uint8_t retained = 0;
+      for (uint8_t i = 0; i < page_.count; ++i)
+        if (page_.widgets[i].kind == WidgetKind::Continue || page_.widgets[i].kind == WidgetKind::Shelf ||
+            page_.widgets[i].kind == WidgetKind::Browse)
+          page_.widgets[retained++] = page_.widgets[i];
+      page_.count = retained;
+    }
     statsAccount_ = accountTicket;
     batch_ = {};
     stats_.requested = 0;
@@ -39,8 +49,12 @@ bool WidgetHost::pollWidgets() {
         continue;
       }
       batch_.windows[i] = p.kind == WidgetKind::Continue ? widgets::Continue::request()
-                          : p.kind == WidgetKind::Shelf  ? widgets::Shelf::request(p.source)
+                          : p.kind == WidgetKind::Shelf  ? widgets::Shelf::request(p.source, page_.textOnly)
                                                          : widgets::Browse::request();
+      if (p.kind == WidgetKind::Library) batch_.windows[i] = {0, 2, LibraryBytes, WindowSource::LibrarySummary};
+      if (p.kind == WidgetKind::Lists)
+        batch_.windows[i] = {0, static_cast<uint16_t>(p.w >= 2 && p.h >= 2 ? 3 : 1), LibraryBytes,
+                             WindowSource::ListsPreview};
     }
     // Unsupported/summary placeholders reserve one descriptor row, but do not
     // count as book consumers when sharing the remaining C3 publication budget.
@@ -90,6 +104,7 @@ WidgetView boundedWidget(const LibraryWindow& batchValue, const WindowSpan& span
     return {WidgetState::Error};
   if (span.availability == Availability::Unavailable) return {WidgetState::Error};
   if (span.availability == Availability::Unsupported) return {WidgetState::Unsupported};
+  if (span.availability == Availability::Off) return {WidgetState::Off};
   if (span.availability == Availability::NotSaved) return {WidgetState::NotSaved};
   for (uint16_t i = 0; i < span.count; ++i) {
     bool terminated = false;
@@ -100,8 +115,15 @@ WidgetView boundedWidget(const LibraryWindow& batchValue, const WindowSpan& span
       }
     if (!terminated) return {WidgetState::Error};
   }
-  return {span.count ? WidgetState::Known : WidgetState::Empty, span.count ? &batchValue.rows[span.first] : nullptr,
-          span.total, span.count, batchValue.stale};
+  return {span.count ? WidgetState::Known : WidgetState::Empty,
+          span.count ? &batchValue.rows[span.first] : nullptr,
+          span.total,
+          span.count,
+          batchValue.stale || span.stale,
+          span.ageDays,
+          span.ageKnown,
+          span.count ? &batchValue.fileAvailability[span.first] : nullptr,
+          span.year};
 }
 WidgetView WidgetHost::view(uint8_t widget) const {
   if (widget >= page_.count) return {WidgetState::Error};
@@ -123,7 +145,80 @@ WidgetView WidgetHost::view(uint8_t widget) const {
     return {mapped, nullptr, 0, 0, statsValue->stale};
   }
   if (widget >= data_.windowCount) return {};
-  const auto viewValue = boundedWidget(data_, data_.windows[widget], batch_.windows[widget]);
+  auto viewValue = boundedWidget(data_, data_.windows[widget], batch_.windows[widget]);
+  if (page_.widgets[widget].kind == WidgetKind::Library || page_.widgets[widget].kind == WidgetKind::Lists) {
+    const bool isLibrary = page_.widgets[widget].kind == WidgetKind::Library;
+    const auto& span = data_.windows[widget];
+    if (viewValue.viewState == WidgetState::Error || viewValue.viewState == WidgetState::Oversize) return viewValue;
+    const auto state = isLibrary ? data_.librarySummary.state : listsValues(widget).state;
+    const auto payloadBytes = isLibrary ? data_.librarySummary.bytes : listsValues(widget).bytes;
+    const auto materializedRows = isLibrary ? data_.librarySummary.rows : listsValues(widget).count;
+    if (span.materializedRows > batch_.windows[widget].limit || span.materializedRows != materializedRows ||
+        span.bytes < sizeof(WindowSpan) + payloadBytes)
+      return {WidgetState::Error};
+    if (!isLibrary) {
+      if (listsValues(widget).count > ListsWidgetValues::MaxRows ||
+          listsValues(widget).count > batch_.windows[widget].limit)
+        return {WidgetState::Error};
+      for (uint8_t i = 0; i < listsValues(widget).count; ++i)
+        if (!listsValues(widget).entries[i].name[0] || listsValues(widget).entries[i].name.back())
+          return {WidgetState::Error};
+    }
+    if (isLibrary && data_.librarySummary.storageUsedPercent > 100) return {WidgetState::Error};
+    switch (state) {
+      case CollectionWidgetState::Ready:
+        viewValue.viewState = WidgetState::Known;
+        break;
+      case CollectionWidgetState::Empty:
+        viewValue.viewState = WidgetState::Empty;
+        break;
+      case CollectionWidgetState::Off:
+        return {WidgetState::Off};
+      case CollectionWidgetState::Unsupported:
+        return {WidgetState::Unsupported};
+      case CollectionWidgetState::Error:
+        return {WidgetState::Error};
+      case CollectionWidgetState::Oversize:
+        return {WidgetState::Oversize};
+      default:
+        return {WidgetState::NotSaved};
+    }
+    return viewValue;
+  }
+  if (page_.widgets[widget].kind == WidgetKind::Continue && data_.resume.supplied && widget < data_.windowCount &&
+      data_.windows[widget].bytes <
+          sizeof(WindowSpan) + data_.windows[widget].count * sizeof(BookRow) + sizeof(ContinueValues))
+    return {WidgetState::Error};
+  if (page_.widgets[widget].kind == WidgetKind::Continue && data_.resume.supplied &&
+      (viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty)) {
+    if ((data_.resume.progressKnown && data_.resume.progressPercent > 100) ||
+        (data_.resume.finishDayKnown && data_.resume.finishWeekday > 6) ||
+        (data_.resume.timeLeftKnown && data_.resume.timeLeftUnit > ContinueTimeUnit::Hours))
+      return {WidgetState::Error};
+    if (data_.resume.seriesLabel.back() || data_.resume.chapterLabel.back()) return {WidgetState::Error};
+    switch (data_.resume.state) {
+      case ContinueState::Ready:
+        break;
+      case ContinueState::Empty:
+        viewValue = {WidgetState::Empty};
+        break;
+      case ContinueState::Unsupported:
+        viewValue = {WidgetState::Unsupported};
+        break;
+      case ContinueState::Error:
+        viewValue = {WidgetState::Error};
+        break;
+      case ContinueState::Oversize:
+        viewValue = {WidgetState::Oversize};
+        break;
+      case ContinueState::Off:
+        viewValue = {WidgetState::Off};
+        break;
+      default:
+        viewValue = {WidgetState::NotSaved};
+        break;
+    }
+  }
   const auto kind = page_.widgets[widget].kind;
   return kind == WidgetKind::Continue ? widgets::Continue::view(viewValue)
          : kind == WidgetKind::Shelf  ? widgets::Shelf::view(viewValue)
@@ -136,28 +231,44 @@ const StatsCard* WidgetHost::statsCard(uint8_t widget) const {
   return &stats_.cards[unsigned(id)];
 }
 bool WidgetHost::widgetCell(uint8_t widget, WidgetBox itemBox, uint8_t itemIndex, WidgetCell& itemCell) const {
-  if (widget >= page_.count || page_.widgets[widget].kind != WidgetKind::Shelf) return false;
+  if (widget >= page_.count || (page_.widgets[widget].kind != WidgetKind::Shelf)) return false;
   itemBox.textOnly = page_.textOnly;
   return widgets::Shelf::shelfCell(view(widget), page_.widgets[widget].style, itemBox, itemIndex, itemCell);
 }
 uint8_t WidgetHost::widgetRows(uint8_t widget, WidgetBox itemBox) const {
   if (widget >= page_.count) return 0;
   const auto viewValue = view(widget);
-  if (page_.widgets[widget].kind != WidgetKind::Shelf || viewValue.viewState != WidgetState::Known) return 1;
+  if (page_.widgets[widget].kind == WidgetKind::Library)
+    return viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty
+               ? (page_.widgets[widget].w >= 2 && page_.widgets[widget].h >= 2 ? 4 : 1)
+               : 1;
+  if (page_.widgets[widget].kind == WidgetKind::Lists)
+    return viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty
+               ? 1 + listsValues(widget).count
+               : 1;
+  if (page_.widgets[widget].kind != WidgetKind::Shelf) return 1;
+  if (!page_.textOnly && viewValue.viewState == WidgetState::Empty) return 1;
+  if (viewValue.viewState != WidgetState::Known) return 1;
   WidgetCell itemCell;
   uint8_t rows = 0;
   while (rows < viewValue.count && widgetCell(widget, itemBox, rows, itemCell)) ++rows;
-  return rows;
+  return rows + (page_.textOnly ? 0 : 1);
 }
 uint8_t WidgetHost::hitWidgetRow(uint8_t widget, WidgetBox itemBox, int x, int y) const {
   if (widget >= page_.count) return 255;
+  if (page_.widgets[widget].kind == WidgetKind::Library) return widgets::LibraryCard{}.hitLibrary(itemBox, x, y);
+  if (page_.widgets[widget].kind == WidgetKind::Lists) return widgets::ListsCard{}.hitLists(itemBox, x, y);
   if (page_.widgets[widget].kind != WidgetKind::Shelf) return 0;
   const auto viewValue = view(widget);
+  const auto all = widgets::allHeaderBox(itemBox.width);
+  if (!page_.textOnly && (viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty) &&
+      x >= all.x && x < all.x + all.w && y >= all.y && y < all.y + all.h)
+    return 0;
   WidgetCell itemCell;
   for (uint8_t itemIndex = 0; itemIndex < viewValue.count && widgetCell(widget, itemBox, itemIndex, itemCell);
        ++itemIndex)
     if (x >= itemCell.x && x < itemCell.x + itemCell.width && y >= itemCell.y && y < itemCell.y + itemCell.height)
-      return itemIndex;
+      return itemIndex + (page_.textOnly ? 0 : 1);
   return 255;
 }
 bool WidgetHost::retryWidget(uint8_t widget) {
@@ -169,9 +280,33 @@ bool WidgetHost::retryWidget(uint8_t widget) {
 CommandStatus WidgetHost::dispatchWidget(uint8_t widget, uint8_t itemIndex) {
   if (pending_ || widget >= page_.count) return CommandStatus::Unavailable;
   const auto viewValue = view(widget);
+  const auto kind = page_.widgets[widget].kind;
+  const bool saved = viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty;
+  if (kind == WidgetKind::Library && saved) {
+    if (itemIndex > 3 || (itemIndex && (page_.widgets[widget].w < 2 || page_.widgets[widget].h < 2)))
+      return CommandStatus::Unavailable;
+    constexpr CatalogDestination destinations[] = {CatalogDestination::Library, CatalogDestination::Authors,
+                                                   CatalogDestination::Series, CatalogDestination::Collections};
+    return library_.browseCatalog({destinations[itemIndex]});
+  }
+  if (kind == WidgetKind::Lists && saved) {
+    if (!itemIndex) return library_.browseCatalog({CatalogDestination::Lists});
+    const auto& lists = listsValues(widget);
+    if (itemIndex > lists.count) return CommandStatus::Unavailable;
+    CatalogRoute route{CatalogDestination::SavedList, lists.entries[itemIndex - 1].key};
+    route.caption = lists.entries[itemIndex - 1].name;
+    return library_.browseCatalog(route);
+  }
+  if (kind == WidgetKind::Browse && saved)
+    return page_.textOnly ? library_.submit(Intent::BrowseOnDevice) : library_.browseSource(WindowSource::OnDevice);
+  if (kind == WidgetKind::Shelf && !page_.textOnly && saved) {
+    if (!itemIndex) return library_.browseSource(page_.widgets[widget].source);
+    --itemIndex;
+    if (page_.widgets[widget].style == 1 && itemIndex >= 3) return CommandStatus::Unavailable;
+  }
   if (viewValue.viewState != WidgetState::Known || itemIndex >= viewValue.count) return CommandStatus::Unavailable;
   if (page_.widgets[widget].kind == WidgetKind::Continue) return library_.submit(Intent::OpenLastBook);
-  if (page_.widgets[widget].kind == WidgetKind::Shelf) return library_.open(viewValue.rows[itemIndex].key);
+  if (kind == WidgetKind::Shelf) return library_.open(viewValue.rows[itemIndex].key);
   return library_.submit(Intent::BrowseLibrary);
 }
 }  // namespace booksync

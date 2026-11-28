@@ -133,7 +133,7 @@ bool LayoutEditor::geometry(Layout::Span root, Layout::Span pg, const char* devi
       const auto& g = edit.geometry[installed];
       const auto kind = page_.widgets[installed++].kind;
       if (g.x != old.x || g.y != old.y || g.w != old.w || g.h != old.h) {
-        if (!supportedGeometry(kind, g.w, g.h)) return false;
+        if ((g.w != old.w || g.h != old.h) && !supportedGeometry(kind, g.w, g.h)) return false;
         if (over.type) {
           static constexpr const char* keys[] = {"x", "y", "w", "h"};
           const uint8_t values[] = {g.x, g.y, g.w, g.h};
@@ -347,6 +347,8 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
       if (page.count >= HomeWidgets || p.instanceCount_ >= 128) return LayoutEditStatus::NoSpace;
       const char* widget = edit.widget == WidgetKind::Continue   ? "continue-reading"
                            : edit.widget == WidgetKind::Shelf    ? "booklist"
+                           : edit.widget == WidgetKind::Library ? "library"
+                           : edit.widget == WidgetKind::Lists ? "lists"
                            : edit.widget == WidgetKind::Browse   ? "library"
                            : edit.widget == WidgetKind::Week     ? "this-week"
                            : edit.widget == WidgetKind::Streak   ? "reading-streak"
@@ -360,16 +362,18 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
                            : edit.widget == WidgetKind::Monthly  ? "monthly-reading"
                                                                  : nullptr;
       if (!widget) return LayoutEditStatus::Invalid;
-      if (!std::strcmp(device, "x3") && isStatsWidget(edit.widget)) return LayoutEditStatus::Invalid;
-      const uint8_t h = edit.widget == WidgetKind::Browse || isStatsWidget(edit.widget) ? 1 : 2;
-      const uint8_t w = isStatsWidget(edit.widget) && edit.widget != WidgetKind::Year &&
-                                edit.widget != WidgetKind::Monthly && edit.widget != WidgetKind::Records
+      const bool collectionWidget = edit.widget == WidgetKind::Library || edit.widget == WidgetKind::Lists;
+      const bool newX4Only = isStatsWidget(edit.widget) || collectionWidget;
+      if (!std::strcmp(device, "x3") && newX4Only) return LayoutEditStatus::Invalid;
+      const uint8_t h = edit.widget == WidgetKind::Browse || isStatsWidget(edit.widget) || collectionWidget ? 1 : 2;
+      const uint8_t w = collectionWidget || (isStatsWidget(edit.widget) && edit.widget != WidgetKind::Year &&
+                                edit.widget != WidgetKind::Monthly && edit.widget != WidgetKind::Records)
                             ? 1
                             : 2;
       uint8_t xs[3]{}, ys[3]{};
       static constexpr const char* classes[] = {"android-tablet", "x4", "x3"};
       for (unsigned i = 0; i < 3; ++i) {
-        if (i == 2 && isStatsWidget(edit.widget)) continue;  // New X4 cards stay hidden on X3.
+        if (i == 2 && newX4Only) continue;  // New X4 cards stay hidden on X3.
         if (!freeCell(root, pg, classes[i], i == 0 && edit.widget == WidgetKind::Continue ? 4 : w, h, xs[i], ys[i]))
           return LayoutEditStatus::NoSpace;
       }
@@ -431,7 +435,7 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
           p.space(pos);
           std::snprintf(text, sizeof(scratch_), "%s\"%s\":{\"x\":%u,\"y\":%u,\"w\":%u,\"h\":%u%s}",
                         p.at(pos) == '}' ? "" : ",", id, xs[i], ys[i], w, h,
-                        i == 2 && isStatsWidget(edit.widget) ? ",\"hidden\":true" : "");
+                        i == 2 && newX4Only ? ",\"hidden\":true" : "");
           if (!patch(group.end - 1, group.end - 1, text)) return LayoutEditStatus::Invalid;
         } else {
           pos = overrides.begin + 1;
@@ -440,7 +444,7 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
           std::snprintf(missing + used, sizeof(missing_) - used,
                         "%s\"%s\":{\"%s\":{\"x\":%u,\"y\":%u,\"w\":%u,\"h\":%u%s}}",
                         used || p.at(pos) != '}' ? "," : "", classes[i], id, xs[i], ys[i], w, h,
-                        i == 2 && isStatsWidget(edit.widget) ? ",\"hidden\":true" : "");
+                        i == 2 && newX4Only ? ",\"hidden\":true" : "");
         }
       }
       if (missing[0] && !patch(overrides.end - 1, overrides.end - 1, missing)) return LayoutEditStatus::Invalid;

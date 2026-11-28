@@ -321,6 +321,12 @@ add_subdirectory(host/catalog_surface)
 add_subdirectory(host/reminder_presenter)
 add_subdirectory(host/native_personal)
 add_subdirectory(host/device_bridge)
-
 add_subdirectory(host/reminder_settings)
 add_subdirectory(host/chapter_capture)
+add_subdirectory(host/continue_widget)
+add_subdirectory(host/booklist_widget)
+
+add_subdirectory(host/booklist_renderer)
+
+add_subdirectory(host/collection_widgets)
+add_subdirectory(host/collection_renderers)

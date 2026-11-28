@@ -1,0 +1,17 @@
+{
+  "reference": "f40w-widgets--21-discover.png",
+  "normalizedTile": [
+    456,
+    224
+  ],
+  "crop": [
+    12,
+    52,
+    114,
+    196
+  ],
+  "width": 128,
+  "height": 180,
+  "blackBit": 0,
+  "sha256": "d610a5e11cbec0181d62fa6afd624b7ade0d4cce67cb6a4ce28f6ff014208fe2"
+}

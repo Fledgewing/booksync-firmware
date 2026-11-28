@@ -552,9 +552,10 @@ bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePa
           uint32_t styleValue = 0;
           if (style.type && number(style, 0, 1, styleValue)) out.style = styleValue;
           if (source.type && text(source, text_)) {
-            if (!std::strcmp(text_, "device"))
+            if (!std::strcmp(text_, "device") || !std::strcmp(text_, "on-device"))
               out.source = WindowSource::OnDevice;
-            else if (!std::strcmp(text_, "up-next"))
+            else if (!std::strcmp(text_, "up-next") || !std::strcmp(text_, "upnext") ||
+                     !std::strcmp(text_, "series-next"))
               out.source = WindowSource::UpNext;
             else if ((!std::strcmp(text_, "want-to-read") || !std::strcmp(text_, "wtr")))
               out.source = WindowSource::WantToRead;
@@ -562,10 +563,17 @@ bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePa
               out.source = WindowSource::Unopened;
             else if (!std::strcmp(text_, "random"))
               out.source = WindowSource::Random;
-            else if (!std::strcmp(text_, "finished-this-year"))
+            else if (!std::strcmp(text_, "finished-this-year") || !std::strcmp(text_, "year") ||
+                     !std::strcmp(text_, "finished-year"))
               out.source = WindowSource::FinishedYear;
-            else if (!std::strcmp(text_, "pick-back-up"))
+            else if (!std::strcmp(text_, "pick-back-up") || !std::strcmp(text_, "pickup"))
               out.source = WindowSource::PickBackUp;
+            else if (std::strcmp(device, "x3") &&
+                     (!std::strcmp(text_, "reading") || !std::strcmp(text_, "also-reading")))
+              out.source = WindowSource::AlsoReading;
+            else if (std::strcmp(device, "x3") &&
+                     (!std::strcmp(text_, "finished") || !std::strcmp(text_, "all-finished")))
+              out.source = WindowSource::AllFinished;
             else if (!std::strcmp(text_, "recent") || !std::strcmp(text_, "recently-added"))
               out.source = WindowSource::Recent;
             else {
@@ -599,7 +607,9 @@ bool Layout::installedKind(std::string_view id, bool textOnly, WidgetKind& kind)
   else if (id == "booklist")
     kind = WidgetKind::Shelf;
   else if (id == "library")
-    kind = WidgetKind::Browse;
+    kind = textOnly ? WidgetKind::Browse : WidgetKind::Library;
+  else if (!textOnly && id == "lists")
+    kind = WidgetKind::Lists;
   else if (!textOnly && id == "this-week")
     kind = WidgetKind::Week;
   else if (!textOnly && id == "reading-streak")
@@ -635,7 +645,7 @@ const char* Layout::deviceClass() {
 }
 LayoutInput Layout::defaults() {
   static constexpr char raw[] =
-      R"({"schemaVersion":1,"revision":1,"grids":{"android-tablet":{"cols":4,"rows":8},"x4":{"cols":2,"rows":6},"x3":{"cols":2,"rows":7}},"pages":[{"id":"home","tab":"Home","placements":[{"instance":"resume","widget":"continue-reading","version":1,"x":0,"y":0,"w":4,"h":3,"settings":{}},{"instance":"recent","widget":"booklist","version":1,"x":0,"y":3,"w":2,"h":2,"settings":{"src":"recent","style":0,"sort":0,"cap":1}},{"instance":"library","widget":"library","version":1,"x":2,"y":3,"w":2,"h":1,"settings":{}}]}],"overrides":{"x4":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}},"x3":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}}}})";
+      R"({"schemaVersion":1,"revision":1,"grids":{"android-tablet":{"cols":4,"rows":8},"x4":{"cols":2,"rows":6},"x3":{"cols":2,"rows":7}},"pages":[{"id":"home","tab":"Home","placements":[{"instance":"resume","widget":"continue-reading","version":1,"x":0,"y":0,"w":4,"h":3,"settings":{}},{"instance":"recent","widget":"booklist","version":1,"x":0,"y":3,"w":2,"h":2,"settings":{"src":"recent","style":0,"sort":0,"cap":1}},{"instance":"library","widget":"library","version":1,"x":2,"y":3,"w":2,"h":1,"settings":{}}]}],"overrides":{"x4":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4,"w":1,"h":1}},"x3":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}}}})";
   return LayoutInput::memory(raw, sizeof(raw) - 1);
 }
 }  // namespace booksync

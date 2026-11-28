@@ -9,10 +9,15 @@ struct WidgetView {
   uint32_t total = 0;
   uint16_t count = 0;
   bool stale = false;
+  uint32_t ageDays = 0;
+  bool ageKnown = false;
+  const FileAvailability* files = nullptr;
+  uint16_t year = 0;
 };
 struct WidgetBox {
   int width = 0, height = 0, line = 0;
   bool textOnly = false, touch = false;
+  uint8_t titleLines = 1;
 };
 struct WidgetCell {
   int x = 0, y = 0, width = 0, height = 0;
@@ -39,6 +44,12 @@ class WidgetHost {
   uint8_t hitWidgetRow(uint8_t widget, WidgetBox itemBox, int x, int y) const;
   auto retryWidget(uint8_t widget) -> bool;
   CommandStatus dispatchWidget(uint8_t widget, uint8_t itemIndex = 0);
+  const ContinueValues& continueValues() const { return data_.resume; }
+  const LibraryWidgetValues& libraryValues() const { return data_.librarySummary; }
+  const ListsWidgetValues& listsValues(uint8_t widget) const {
+    return widget < page_.count && page_.widgets[widget].w >= 2 && page_.widgets[widget].h >= 2 ? data_.expandedLists
+                                                                                                : data_.savedLists;
+  }
   const HomePage& page() const { return page_; }
 
  private:
@@ -51,6 +62,8 @@ class WidgetHost {
   uint8_t wanted_ = 0;
   bool pending_ = true, accepted_ = false;
 };
-static_assert(sizeof(WidgetHost) <= 10 * 1024);
+// One existing host owns the fixed Library batch and all ten stats values.
+// Combined collection/stats storage remains bounded; no per-widget allocation.
+static_assert(sizeof(WidgetHost) <= 11 * 1024);
 WidgetView boundedWidget(const LibraryWindow&, const WindowSpan&, WindowRequest);
 }  // namespace booksync

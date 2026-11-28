@@ -24,6 +24,14 @@ class EditorAddRemove {
   uint8_t selected() const { return selected_; }
   uint8_t rows() const;
   uint8_t firstVisibleRow(uint8_t capacity) const;
+  WidgetKind editorAddKind(uint8_t index) const {
+    constexpr WidgetKind kinds[] = {WidgetKind::Continue, WidgetKind::Shelf,  WidgetKind::Library, WidgetKind::Lists,
+                                    WidgetKind::Week,     WidgetKind::Streak, WidgetKind::Year,    WidgetKind::Monthly,
+                                    WidgetKind::Today, WidgetKind::Pages, WidgetKind::When, WidgetKind::Records, WidgetKind::Goal, WidgetKind::Forecast};
+    if (library_.homePage().textOnly)
+      return index == 0 ? WidgetKind::Continue : index == 1 ? WidgetKind::Shelf : WidgetKind::Browse;
+    return index < uint8_t(WidgetKind::Count) - 1 ? kinds[index] : WidgetKind::Continue;
+  }
   char* nameBuffer() { return name_.data(); }
   const char* pageName() const { return name_.data(); }
   bool hasPageName() const {

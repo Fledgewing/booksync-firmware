@@ -9,8 +9,9 @@ struct Size {
 static constexpr Size calendarYear[] = {{2, 1}, {2, 2}};
 static constexpr Size calendarMonth[] = {{2, 1}};
 static constexpr Size compact[] = {{1, 1}};
-static constexpr Size hero[] = {{1, 2}, {2, 3}, {2, 2}};
-static constexpr Size shelf[] = {{2, 2}, {1, 3}, {1, 2}, {2, 3}, {2, 4}, {2, 1}};
+static constexpr Size hero[] = {{2, 2}};
+static constexpr Size shelf[] = {{2, 2}};
+static constexpr Size compactCounts[] = {{1, 1}, {2, 2}};
 static constexpr Size browse[] = {{2, 3}, {1, 2}, {2, 1}, {1, 1}, {2, 2}};
 const Size* sizes(WidgetKind kind, unsigned& count) {
   if (kind == WidgetKind::Year) {
@@ -26,12 +27,16 @@ const Size* sizes(WidgetKind kind, unsigned& count) {
     return compact;
   }
   if (kind == WidgetKind::Continue) {
-    count = 3;
+    count = 1;
     return hero;
   }
   if (kind == WidgetKind::Shelf) {
-    count = 6;
+    count = 1;
     return shelf;
+  }
+  if (kind == WidgetKind::Library || kind == WidgetKind::Lists) {
+    count = 2;
+    return compactCounts;
   }
   count = 5;
   return browse;
@@ -67,9 +72,11 @@ LayoutPreview previewGeometry(const HomePage& page, uint8_t index, LayoutStep st
   if (step == LayoutStep::Size) {
     unsigned count = 0, current = 0;
     const auto* list = sizes(tile.kind, count);
+    current = count;
     for (unsigned i = 0; i < count; ++i)
       if (list[i].w == tile.w && list[i].h == tile.h) current = i;
-    for (unsigned j = 1; j < count; ++j) {
+    const unsigned start = current == count ? 0 : 1;
+    for (unsigned j = start; j < count; ++j) {
       const auto s = list[(current + j) % count];
       target.w = s.w;
       target.h = s.h;

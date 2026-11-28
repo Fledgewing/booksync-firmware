@@ -3,6 +3,10 @@ add_executable(BookSyncCatalogTest CatalogTest.cpp
   ${REPO_ROOT}/src/booksync/services/CatalogSource.cpp
   ${REPO_ROOT}/src/booksync/services/DeviceIndex.cpp
   ${REPO_ROOT}/src/booksync/services/ReadModel.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Library.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Lists.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/BookList.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Continue.cpp
   ${REPO_ROOT}/src/booksync/storage/Index.cpp
   ${REPO_ROOT}/src/booksync/storage/FilePublish.cpp
   ${REPO_ROOT}/src/booksync/storage/Identity.cpp)

@@ -2,7 +2,10 @@
 #pragma once
 #include "HistorySource.h"
 #include "booksync/storage/Index.h"
+#include "widgets/BookList.h"
+#include "widgets/Collections.h"
 namespace booksync {
+struct PersonalCard;
 enum class Invalidation { Files, Capture, Generation, Account };
 // Worker materializes one visible window; renderer gets only a copied value.
 // Caller excludes rendering during mutation (the existing RenderLock contract).
@@ -10,11 +13,49 @@ class ReadModel {
  public:
   explicit ReadModel(storage::Index& index) : index_(index), lifetime_(++nextLifetime_) {}
   bool materialize(WindowRequest request);
-  void setContinue(const BookRow& row, bool available) {
-    continue_ = row;
-    continueAvailable_ = available;
-  }
+  void setContinue(const BookRow& row, bool available, const PersonalCard* resolved = nullptr);
   void copyWindow(LibraryWindow& out) const { out = window_; }
+  void setBookListScratch(BookListProjection* scratch) { bookListScratch_ = scratch; }
+  void setLibraryWidgetSource(const LibraryWidgetInput* input, ReadingScope scope) {
+    libraryInput_ = input;
+    collectionScope_ = scope;
+  }
+  void setListsWidgetSource(ListsWidgetSource source, ReadingScope scope) {
+    listsSource_ = source;
+    collectionScope_ = scope;
+  }
+  bool savedListScope(ListKey key, std::array<char, 64>& out) const {
+    out.fill(0);
+    if (!listsSource_.peek || !listsSource_.membership) return false;
+    const auto meta = listsSource_.peek(listsSource_.context);
+    const auto indexed = index_.provenance();
+    if (!index_.ready() || meta.provenance.owner != indexed.owner ||
+        meta.provenance.accountEpoch != indexed.accountEpoch)
+      return false;
+    if (meta.state != PersonalState::Ready || key.provenance != meta.provenance ||
+        (meta.provenance.owner &&
+         (meta.provenance.owner != collectionScope_.owner || meta.provenance.accountEpoch != collectionScope_.epoch)))
+      return false;
+    if (!listsSource_.membership(listsSource_.context, key, out) || !out[0] || out.back() ||
+        !(listsSource_.peek(listsSource_.context) == meta)) {
+      out.fill(0);
+      return false;
+    }
+    return true;
+  }
+  bool materializeSavedLists(SavedListsRequest request, SavedListsPage& out) {
+    const bool result = projectSavedListsPage(listsSource_, collectionScope_, request, out);
+    publishChanged();
+    out.publication = sequence_;
+    return result;
+  }
+  // Borrowed frozen selection, retired before its owner is released. Only the
+  // normalized source owner supplies membership/order/year and saved age.
+  void setBookListSource(BookListSource source, ReadingScope scope, uint16_t year) {
+    bookListSource_ = source;
+    bookListScope_ = scope;
+    bookListYear_ = year;
+  }
   bool materializeBatch(const WindowBatchRequest& batch);
   static bool accepts(const WindowBatchRequest& batch);
   Availability availability() const { return window_.availability; }
@@ -39,7 +80,15 @@ class ReadModel {
   storage::Index& index_;
   LibraryWindow window_{};
   BookRow continue_{};
-  bool continueAvailable_ = false;
+  const LibraryWidgetInput* libraryInput_ = nullptr;  // Borrowed frozen F39 source, retired with account.
+  ListsWidgetSource listsSource_{};
+  ReadingScope collectionScope_{};
+  BookListProjection* bookListScratch_ = nullptr;  // Optional X4 worker lifetime, owned by facade.
+  BookListSource bookListSource_{};
+  ReadingScope bookListScope_{};
+  uint16_t bookListYear_ = 0;
+  bool materializeList(WindowSpan&);
+  bool continueAvailable_ = false, continueProgressResolved_ = false;
   inline static uint64_t nextPublication_ = 0;
   void publishChanged() {
     sequence_ = ++nextPublication_;
