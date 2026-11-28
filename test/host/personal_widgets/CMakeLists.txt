@@ -1,0 +1,13 @@
+add_executable(BookSyncPersonalWidgetsTest PersonalWidgetsTest.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/PersonalWidgets.cpp
+  ${REPO_ROOT}/src/booksync/services/PersonalReading.cpp
+  ${REPO_ROOT}/src/booksync/services/ReadingStats.cpp
+  ${REPO_ROOT}/src/booksync/storage/PageJournal.cpp
+  ${REPO_ROOT}/src/booksync/storage/LifecycleJournal.cpp
+  ${REPO_ROOT}/src/booksync/storage/FilePublish.cpp)
+target_include_directories(BookSyncPersonalWidgetsTest PRIVATE ../file_publish/stubs ${REPO_ROOT}/src)
+target_link_libraries(BookSyncPersonalWidgetsTest PRIVATE crosspoint_test_common GTest::gtest_main)
+if(NOT APPLE)
+  target_link_libraries(BookSyncPersonalWidgetsTest PRIVATE OpenSSL::Crypto)
+endif()
+gtest_discover_tests(BookSyncPersonalWidgetsTest)

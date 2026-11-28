@@ -13344,6 +13344,7 @@
         "../../test/simulator/NativeEvidenceScenario.h",
         "../../test/simulator/NativePersonalScenario.h",
         "../../test/simulator/PersonalReadingScenario.h",
+        "../../test/simulator/PersonalWidgetsScenario.h",
         "../../test/simulator/PositionPolicyScenario.h",
         "../../test/simulator/QueriesScenario.h",
         "../../test/simulator/ReaderCaptureScenario.h",
@@ -16238,6 +16239,14 @@
     "src/booksync/services/PersonalWorker.cpp": {
       "role": "services",
       "rationale": "F40w production personal prerequisite: bounded original-native saved passage source and cached Library publication; exact identities, frozen generation, full row/byte budgets, no paint I/O or second writer."
+    },
+    "src/booksync/services/widgets/PersonalWidgets.h": {
+      "role": "services",
+      "rationale": "F40w explicit four-row Discover projection and one-row Recommended projection over a frozen F39 capture. Caller-owned bounded values, cooperative worker steps, no UI, transport, allocation or writer."
+    },
+    "src/booksync/services/widgets/PersonalWidgets.cpp": {
+      "role": "services",
+      "rationale": "F40w explicit four-row Discover projection and one-row Recommended projection over a frozen F39 capture. Caller-owned bounded values, cooperative worker steps, no UI, transport, allocation or writer."
     }
   },
   "generators": {

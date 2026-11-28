@@ -2,6 +2,7 @@
 // Selection semantics follow BookSync companion PersonalReading.kt. Provider
 // arrays are replaced by bounded cooperative cursors for C3 memory constraints.
 #include "PersonalReading.h"
+#include "widgets/PersonalWidgets.h"
 
 #include <Logging.h>
 
@@ -295,6 +296,10 @@ struct ReadingLinkInput {
   booksync::ReadingValue watermark;
   uint64_t now;
   int64_t day, pick;
+  booksync::DiscoverProjection* discoverWidget = nullptr;
+  booksync::PersonalWidgetValues* recommendedWidget = nullptr;
+  const booksync::PersonalWidgetCapture* widgetCapture = nullptr;
+  const booksync::PersonalWidgetAllowance* widgetAllowance = nullptr;
 };
 }  // namespace
 extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
@@ -304,5 +309,14 @@ extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
   input.stats.combine(input.remote, scope, true, input.day, input.out);
   input.personal.begin(input.kind, input.day, input.pick, scope);
   input.personal.card({}, scope, input.card);
-  return input.stats.tick() && input.personal.tick();
+  const bool base = input.stats.tick() && input.personal.tick();
+  bool widgets = true;
+  if (input.discoverWidget && input.widgetCapture && input.widgetAllowance) {
+    widgets &= input.discoverWidget->begin(input.day, input.pick, *input.widgetCapture, *input.widgetAllowance);
+    widgets &= input.discoverWidget->tick(*input.widgetCapture);
+  }
+  if (input.recommendedWidget && input.widgetCapture && input.widgetAllowance)
+    widgets &= booksync::projectRecommendedWidget(input.personal.result(), *input.widgetCapture, *input.widgetAllowance,
+                                                *input.recommendedWidget);
+  return base && widgets;
 }

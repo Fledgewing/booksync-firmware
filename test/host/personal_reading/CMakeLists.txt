@@ -1,6 +1,7 @@
 add_executable(PersonalReadingTest ReadingStatsTest.cpp PersonalReadingTest.cpp
   ${REPO_ROOT}/src/booksync/services/ReadingStats.cpp
   ${REPO_ROOT}/src/booksync/services/PersonalReading.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/PersonalWidgets.cpp
   ${REPO_ROOT}/src/booksync/storage/PageJournal.cpp
   ${REPO_ROOT}/src/booksync/storage/LifecycleJournal.cpp
   ${REPO_ROOT}/src/booksync/storage/FilePublish.cpp)
