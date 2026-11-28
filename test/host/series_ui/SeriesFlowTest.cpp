@@ -431,4 +431,20 @@ TEST_F(SeriesFlowTest, RefusedAuthResumePublishesSameQueueWithNewRevision) {
   EXPECT_TRUE(published.queue.paused);
   EXPECT_FALSE(published.pending);
 }
+TEST_F(SeriesFlowTest, FutureQueueRowCanBeCanceledThroughPublishedControl) {
+  reviewFiles();
+  ASSERT_TRUE(send(SeriesAction::Start));
+  for (unsigned i = 0; i < 12 && (published.scene != SeriesFlowScene::Queue || published.pending); ++i) ticks(1);
+  ASSERT_EQ(published.scene, SeriesFlowScene::Queue);
+  ASSERT_EQ(published.queue.items[2].job, 0u);
+  ASSERT_TRUE(published.queue.items[2].cancelable);
+  intent.row = 2;
+  ASSERT_TRUE(send(SeriesAction::CancelRow));
+  ticks(100);
+  ASSERT_TRUE(send(SeriesAction::Status));
+  ticks(2);
+  EXPECT_EQ(published.queue.items[2].state, SeriesItemState::Canceled);
+  EXPECT_EQ(source.opens, 2u);
+  EXPECT_EQ(links, 2u);
+}
 }  // namespace

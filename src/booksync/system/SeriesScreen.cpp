@@ -434,6 +434,30 @@ class SeriesActivity final : public Activity {
         return tr(STR_BACK);
     }
   }
+  unsigned controlCount() const {
+    if (series_.scene() == SeriesScene::Count) return 2;
+    return series_.scene() == SeriesScene::Page ? series_.members().count + 2 : rowCount() + actionCount();
+  }
+  bool focusable(uint8_t control) const {
+    if (control >= controlCount()) return false;
+    if (series_.scene() == SeriesScene::Page || series_.scene() == SeriesScene::Count || control >= rowCount())
+      return true;
+    return series_.scene() == SeriesScene::Files ||
+           (series_.scene() == SeriesScene::Queue && series_.flow().queue.items[control].cancelable);
+  }
+  uint8_t firstFocus() const {
+    if (series_.scene() == SeriesScene::Page) return series_.members().count ? 1 : 0;
+    for (uint8_t i = 0; i < controlCount(); ++i)
+      if (focusable(i)) return i;
+    return 0;
+  }
+  void moveFocus(int direction) {
+    for (int i = int(focus_) + direction; i >= 0 && unsigned(i) < controlCount(); i += direction)
+      if (focusable(i)) {
+        focus_ = i;
+        break;
+      }
+  }
   void activate(uint8_t control) {
     const auto count = rowCount();
     if (series_.scene() == SeriesScene::Page) {
@@ -630,7 +654,7 @@ class SeriesActivity final : public Activity {
       } else {
         const auto& item = f.queue.items[i];
         const auto* state = stateLabel(item.state);
-        if (item.job && item.state != SeriesItemState::Complete)
+        if (item.cancelable)
           std::snprintf(buffer, sizeof(buffer), tr(STR_SERIES_CANCEL_SUFFIX_FORMAT), state);
         else
           std::snprintf(buffer, sizeof(buffer), "%s", state);
@@ -708,7 +732,7 @@ class SeriesActivity final : public Activity {
     LOG_INF("BSS", "Series screen workspace=%u bytes", unsigned(sizeof(SeriesActivity)));
     series_.enterSeries(initial_.key.data(), initial_.current, initial_.currentKnown);
     series_.pollSeries();
-    focus_ = series_.members().count ? 1 : 0;
+    focus_ = firstFocus();
     requestUpdate();
   }
   void onExit() override {
@@ -722,6 +746,8 @@ class SeriesActivity final : public Activity {
     RenderLock lock;
     bool changed = false;
     const auto previous = series_.scene();
+    const auto previousFile = series_.flow().fileRow;
+    const auto previousMembers = series_.members().count;
     const auto now = millis();
     if (now - lastPoll_ >= 1000 || series_.pending() || series_.loading()) {
       lastPoll_ = now;
@@ -768,14 +794,12 @@ class SeriesActivity final : public Activity {
 #endif
       }
     } else {
-      const unsigned controls =
-          series_.scene() == SeriesScene::Page ? series_.members().count + 2 : rowCount() + actionCount();
       if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Down))) {
-        if (focus_ + 1 < controls) ++focus_;
+        moveFocus(1);
         changed = true;
       }
       if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Up))) {
-        if (focus_) --focus_;
+        moveFocus(-1);
         changed = true;
       }
       if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
@@ -836,8 +860,10 @@ class SeriesActivity final : public Activity {
       }
     }
 #endif
-    if (previous != series_.scene()) {
-      focus_ = series_.scene() == SeriesScene::Page ? (series_.members().count ? 1 : 0) : rowCount();
+    if (previous != series_.scene() || !focusable(focus_) ||
+        (series_.scene() == SeriesScene::Page && !previousMembers && series_.members().count) ||
+        (series_.scene() == SeriesScene::Files && previousFile != series_.flow().fileRow)) {
+      focus_ = firstFocus();
       scroll_ = 0;
       changed = true;
     }
@@ -848,6 +874,7 @@ class SeriesActivity final : public Activity {
   }
 #ifdef SIMULATOR
   bool scenarioInvariant() const {
+    if (!focusable(focus_)) return false;
     auto ink = [&](Rect r) {
       for (int y = r.y; y < r.y + r.height; ++y)
         for (int x = r.x; x < r.x + r.width; ++x)
@@ -888,7 +915,7 @@ class SeriesActivity final : public Activity {
         for (const char* byte = typed; *byte; ++byte) series_.appendSeriesCount(*byte);
       }
     }
-    focus_ = rowCount();
+    focus_ = firstFocus();
     scroll_ = 0;
     requestUpdate();
   }
@@ -917,9 +944,11 @@ class SeriesActivity final : public Activity {
     std::snprintf(buffer, sizeof(buffer), tr(STR_SERIES_RANGE_FORMAT), static_cast<unsigned long>(first),
                   static_cast<unsigned long>(series_.offset() + series_.members().count),
                   static_cast<unsigned long>(series_.members().matchedBooks));
-    if(series_.members().availability==Availability::Ready && series_.members().count)
-      text(Rect{s.x+seriesScale(70),bottom()+seriesScale(8),s.width-seriesScale(140),seriesScale(30)},buffer);
-    else text(Rect{s.x+seriesScale(16),bottom()+seriesScale(8),s.width-seriesScale(32),seriesScale(30)},tr(STR_BACK));
+    if (series_.members().availability == Availability::Ready && series_.members().count)
+      text(Rect{s.x + seriesScale(70), bottom() + seriesScale(8), s.width - seriesScale(140), seriesScale(30)}, buffer);
+    else
+      text(Rect{s.x + seriesScale(16), bottom() + seriesScale(8), s.width - seriesScale(32), seriesScale(30)},
+           tr(STR_BACK));
     if (series_.scene() == SeriesScene::Page) {
       const int y = bottom() + seriesScale(20);
       if (series_.offset()) {

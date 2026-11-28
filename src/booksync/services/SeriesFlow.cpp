@@ -237,7 +237,7 @@ bool SeriesFlow::action(const SeriesFlowRequest& input) {
     case SeriesAction::CancelRemaining:
       if (view_.scene != SeriesFlowScene::Queue || view_.queue.complete) return false;
       if (input.action == SeriesAction::CancelRow &&
-          (input.row >= view_.queue.count || !view_.queue.items[input.row].job ||
+          (input.row >= view_.queue.count || !view_.queue.items[input.row].cancelable ||
            view_.queue.items[input.row].state == SeriesItemState::Complete ||
            view_.queue.items[input.row].state == SeriesItemState::Canceled))
         return false;

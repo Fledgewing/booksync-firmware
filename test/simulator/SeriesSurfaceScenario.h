@@ -90,7 +90,9 @@ struct Fixture final : Library {
       row.book.key = {members.provenance, i};
       std::strcpy(row.book.title.data(), Titles[i]);
       std::strcpy(row.label.data(), "Example Press");
-      row.book.readingKnown=i==1;row.book.page=42;row.book.pages=100;
+      row.book.readingKnown = i == 1;
+      row.book.page = 42;
+      row.book.pages = 100;
       row.seriesPositionKnown = true;
       row.seriesPosition = i == 1 ? 1.5 : i == 2 ? 2 : 1;
       row.onDevice = i < 2 ? QueryTruth::Yes : QueryTruth::No;
@@ -131,7 +133,8 @@ struct Fixture final : Library {
     std::strcpy(plan.author.data(), "Example Press");
     for (uint8_t i = 0; i < 3; ++i) {
       plan.next[i].book.key = {plan.provenance, uint32_t(i + 2)};
-      plan.next[i].positionKnown=true;plan.next[i].position=i+2;
+      plan.next[i].positionKnown = true;
+      plan.next[i].position = i + 2;
       std::snprintf(plan.next[i].book.title.data(), 96, "%s",
                     i == 0   ? "Stone Path"
                     : i == 1 ? "Far Shore"
@@ -247,7 +250,7 @@ struct Fixture final : Library {
       for (uint8_t i = 0; i < 3; ++i) {
         auto& row = value.queue.items[i];
         row.title = value.plan.next[i].book.title;
-        row.job = i + 1;
+        row.job = i == 1 ? 1 : 0;
         row.state = i == 0 ? SeriesItemState::Complete : i == 1 ? SeriesItemState::Running : SeriesItemState::Queued;
       }
       if (scene >= 24 && scene <= 26) value.queue.items[1].state = SeriesItemState::Paused;
@@ -257,6 +260,9 @@ struct Fixture final : Library {
       if (scene == 30)
         for (auto& row : value.queue.items) row.state = SeriesItemState::Complete;
     }
+    for (auto& row : value.queue.items)
+      row.cancelable = row.state != SeriesItemState::Complete && row.state != SeriesItemState::Canceled &&
+                       row.state != SeriesItemState::Unsupported && !row.cancelWanted;
     return CommandStatus::Accepted;
   }
   void readSeriesFlow(SeriesFlowView& out) const override {
@@ -294,7 +300,7 @@ inline bool tick() {
       if (activityManager.requestUpdateAndWait() != RequestUpdateResult::Rendered) std::_Exit(33);
       RenderLock lock;
       if (reads != fixture.reads || writes != fixture.writes) std::_Exit(34);
-      if(!seriesScenarioInvariant())std::_Exit(36);
+      if (!seriesScenarioInvariant()) std::_Exit(36);
       rawCapture(directory, Names[scene], renderer.getScreenWidth(), renderer.getScreenHeight());
     }
     if (step == 16 || (step == 20 && scene >= 9) || (step == 22 && scene == 16))

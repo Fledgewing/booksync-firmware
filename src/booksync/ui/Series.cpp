@@ -64,7 +64,8 @@ void Series::requestSeriesPage() {
   plan_.clear();
   loading_ = true;
   query_.requestId = ++counter_;
-  request_.series.count=3;request_.series.startKnown=false;
+  request_.series.count = 3;
+  request_.series.startKnown = false;
   request_.series.requestId = ++counter_;
   pageRequestId_ = request_.series.requestId;
   const bool rows = library_.requestQuery(query_);
@@ -146,7 +147,7 @@ bool Series::pollSeries() {
       members_.clear();
       members_.availability = Availability::Unavailable;
     }
-    if(plan_.requestId!=pageRequestId_ || plan_.pending || loading_)library_.readSeries(plan_);
+    if (plan_.requestId != pageRequestId_ || plan_.pending || loading_) library_.readSeries(plan_);
     if (plan_.requestId != pageRequestId_) plan_.clear();
     loading_ =
         members_.requestId == query_.requestId && members_.availability == Availability::NotSaved && plan_.pending;
@@ -276,7 +277,7 @@ void Series::resumeSeriesQueue() {
 void Series::cancelSeriesRow(uint8_t row) {
   if (scene_ != SeriesScene::Queue || row >= flow_.queue.count) return;
   const auto& item = flow_.queue.items[row];
-  if (!item.job || item.state == SeriesItemState::Complete || item.state == SeriesItemState::Canceled) return;
+  if (!item.cancelable || item.state == SeriesItemState::Complete || item.state == SeriesItemState::Canceled) return;
   request_.row = row;
   sendSeries(SeriesAction::CancelRow);
 }
@@ -293,9 +294,9 @@ void Series::backSeries() {
     sendSeries(SeriesAction::Preview);
     return;
   }
-  const bool refresh=scene_==SeriesScene::Queue;
+  const bool refresh = scene_ == SeriesScene::Queue;
   closeSeriesFlow();
   scene_ = SeriesScene::Page;
-  if(refresh)requestSeriesPage();
+  if (refresh) requestSeriesPage();
 }
 }  // namespace booksync

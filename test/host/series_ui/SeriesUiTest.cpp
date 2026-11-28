@@ -87,9 +87,9 @@ struct FakeSeriesLibrary : Library {
       value.scene = SeriesFlowScene::Queue;
       value.queue.id = 91;
       value.queue.count = 3;
-      value.queue.items[0].job = 1;
-      value.queue.items[1].job = 2;
-      value.queue.items[2].job = 3;
+      value.queue.items[0].cancelable = true;
+      value.queue.items[1].cancelable = true;
+      value.queue.items[2].cancelable = true;
     }
     if (r.action == SeriesAction::Resume || r.action == SeriesAction::ConnectAndResume) value.queue.paused = false;
     if (r.action == SeriesAction::Status) ++polls;
@@ -344,7 +344,14 @@ TEST_F(SeriesUiTest, AsyncFollowupWaitsForNewRevisionAndCannotRepeatAction) {
   EXPECT_EQ(ui.scene(), SeriesScene::Files);
 }
 TEST_F(SeriesUiTest, CountCancelRetainsPublishedPageFactsWhenPlannerIsReused) {
-  ASSERT_EQ(ui.plan().total,9u);preview();ui.changeSeriesCount();library.plan.requestId=library.last.series.requestId;
-  library.plan.total=0;ui.backSeries();ui.pollSeries();EXPECT_EQ(ui.scene(),SeriesScene::Page);EXPECT_EQ(ui.plan().total,9u);
+  ASSERT_EQ(ui.plan().total, 9u);
+  preview();
+  ui.changeSeriesCount();
+  library.plan.requestId = library.last.series.requestId;
+  library.plan.total = 0;
+  ui.backSeries();
+  ui.pollSeries();
+  EXPECT_EQ(ui.scene(), SeriesScene::Page);
+  EXPECT_EQ(ui.plan().total, 9u);
 }
 }  // namespace
