@@ -30,6 +30,10 @@ class DownloadJobs {
   DownloadJobs& operator=(const DownloadJobs&) = delete;
   // Boot is read-only and never starts transport or creates an open intent.
   bool recover(storage::ScopeView scope, DeliveryTicket current);
+  // Serialized worker coordinator only: paths remain borrowed until next bind.
+  // A paused journal is never resumed by selecting it.
+  bool selectJournal(storage::PublishPaths, storage::ScopeView, DeliveryTicket);
+  bool matchesSelection(const DownloadSpec&, DeliveryTicket) const;
   uint64_t start(const DownloadSpec&, DownloadSource&, DeliveryTicket current);
   bool resume(uint64_t id, DownloadSource&, DeliveryTicket current);
   void cancel(uint64_t id, DeliveryTicket current);

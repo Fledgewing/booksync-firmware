@@ -33,3 +33,6 @@ env.AddBuildMiddleware(bounded_reminder_frame, "*/RemindersFacade.cpp")
 env.AddBuildMiddleware(bounded_reminder_frame, "*/RemindersStore.cpp")
 env.AddBuildMiddleware(bounded_reminder_frame, "*/RemindersRuntime.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/SeriesPlan.cpp")
+
+env.AddBuildMiddleware(bounded_reading_frame, "*/SeriesQueue.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/SeriesQueueStore.cpp")

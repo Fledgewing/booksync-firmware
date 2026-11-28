@@ -206,6 +206,14 @@ bool DownloadJobs::setPaths(const DownloadSpec& s) {
   std::memcpy(backup_.data() + n, ".bak", 5);
   return true;
 }
+bool DownloadJobs::selectJournal(storage::PublishPaths paths, storage::ScopeView scope, DeliveryTicket current) {
+  if (busy() || artifactOpen_ || !paths.current || !paths.staging || !paths.backup) return false;
+  journal_ = paths;
+  return recover(scope, current);
+}
+bool DownloadJobs::matchesSelection(const DownloadSpec& spec, DeliveryTicket current) const {
+  return same(current) && status_.id && sameSelection(record_.spec, spec);
+}
 bool DownloadJobs::recover(storage::ScopeView scope, DeliveryTicket current) {
   if (busy() || !current.owner || !current.epoch || scope.server.empty() || scope.account.empty() ||
       scope.server.find('\0') != scope.server.npos || scope.account.find('\0') != scope.account.npos ||
