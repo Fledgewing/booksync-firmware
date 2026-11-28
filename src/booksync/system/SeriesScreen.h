@@ -11,7 +11,8 @@ void showSeries(GfxRenderer&, MappedInputManager&, Library&, const char* key, Bo
 void drawSeriesGroupHeader(GfxRenderer&, int x, int y, int width, const char* title, uint32_t total);
 #ifdef SIMULATOR
 uint32_t seriesPaints();
-bool seriesScenarioInvariant(); // Caller holds RenderLock after a completed paint.
+void seriesScenarioGeometry(const char* path);
+bool seriesScenarioInvariant();  // Caller holds RenderLock after a completed paint.
 void seriesScenarioBegin(bool count = false, const char* typed = nullptr);
 #endif
 }  // namespace booksync

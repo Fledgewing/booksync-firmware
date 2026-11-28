@@ -9,6 +9,8 @@
 
 - BookSync keeps the saved best-streak value visible alongside its stale age, and distinguishes an unknown best from zero.
 
+- BookSync Series now uses measured text spacing, compact member details, large statistics, approved header and footer controls, and human-readable download sizes on X4 Pro, X4 Classic and X3.
+
 - BookSync Home widgets no longer pulls the retired native Settings screen graph into button images; X3 uses a bounded Settings entry and X4 keeps its spatial editor. Physical symbol guards reject regressions.
 
 ### Added

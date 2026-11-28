@@ -44,6 +44,10 @@ emit_hash_define BITTER_16_FONT_ID \
 emit_hash_define UI_10_FONT_ID ./inter_10_regular.h ./inter_10_bold.h ./ui_symbols_10.h
 emit_hash_define UI_12_FONT_ID ./inter_12_regular.h ./inter_12_bold.h ./ui_symbols_10.h
 emit_hash_define SMALL_FONT_ID ./inter_8_regular.h
+emit_hash_define SERIES_META_FONT_ID ./inter_7_bold.h
+emit_hash_define SERIES_CAPTION_FONT_ID ./inter_6_regular.h
+emit_hash_define SERIES_MEMBER_FONT_ID ./inter_8_bold.h
+emit_hash_define SERIES_NUMBER_FONT_ID ./inter_16_numbers.h
 
 echo ""
 echo "// Font ID 0 is reserved as the \"not found\" sentinel."
@@ -51,6 +55,6 @@ echo "// Guard against any hash accidentally producing 0."
 for id in \
   LEXENDDECA_10_FONT_ID LEXENDDECA_12_FONT_ID LEXENDDECA_14_FONT_ID LEXENDDECA_16_FONT_ID \
   BITTER_10_FONT_ID BITTER_12_FONT_ID BITTER_14_FONT_ID BITTER_16_FONT_ID \
-  UI_10_FONT_ID UI_12_FONT_ID SMALL_FONT_ID; do
+  UI_10_FONT_ID UI_12_FONT_ID SMALL_FONT_ID SERIES_META_FONT_ID SERIES_CAPTION_FONT_ID SERIES_MEMBER_FONT_ID SERIES_NUMBER_FONT_ID; do
   echo "static_assert(${id} != 0, \"Font ID collision with sentinel\");"
 done

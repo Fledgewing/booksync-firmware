@@ -5,8 +5,8 @@ set -e
 cd "$(dirname "$0")"
 
 case "${1:-}" in
-  ""|--ui-only) ;;
-  *) echo "Usage: $0 [--ui-only]" >&2; exit 2 ;;
+  ""|--ui-only|--series-only) ;;
+  *) echo "Usage: $0 [--ui-only|--series-only]" >&2; exit 2 ;;
 esac
 
 SYMBOLS_FONT="../builtinFonts/source/NotoSymbols/NotoSansSymbols-Regular.ttf"
@@ -173,7 +173,7 @@ generate_reading_fonts() {
   echo ""
 }
 
-if [[ "${1:-}" != "--ui-only" ]]; then
+if [[ "${1:-}" != "--ui-only" && "${1:-}" != "--series-only" ]]; then
   # Built-in reader fonts retain the PHM fallback ranges, but exclude emoticons.
   generate_reading_fonts
 
@@ -225,6 +225,7 @@ ARABIC_INTERVALS=(
   --additional-intervals 0xFE80,0xFEFC  # Presentation Forms-B: core Arabic + Lam-Alef
 )
 
+if [[ "${1:-}" != "--series-only" ]]; then
 for size in ${UI_FONT_SIZES[@]}; do
   for style in ${UI_FONT_STYLES[@]}; do
     font_name="inter_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
@@ -247,5 +248,20 @@ python fontconvert.py inter_8_regular 8 \
   --additional-intervals 0x05D0,0x05EA "${AZERBAIJANI_INTERVALS[@]}" "${ARABIC_INTERVALS[@]}" > ../builtinFonts/inter_8_regular.h
 
 echo ""
+fi
+
+# Compact Series captions and strong labels, with no reader/font preference changes.
+for spec in "6 Regular" "7 Bold" "8 Bold"; do
+  read -r size style <<< "$spec"
+  name="inter_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
+  python fontconvert.py "$name" "$size" "../builtinFonts/source/Inter/Inter-${style}.ttf" \
+    "../builtinFonts/source/NotoSansArabic/NotoSansArabic-${style}.ttf" \
+    "${AZERBAIJANI_INTERVALS[@]}" "${ARABIC_INTERVALS[@]}" > "../builtinFonts/${name}.h"
+done
+
+# Compact statistics face: numeric-only, no reader/font preference changes.
+python fontconvert.py inter_16_numbers 16 ../builtinFonts/source/Inter/Inter-Bold.ttf \
+  --no-default-intervals --additional-intervals 0x30,0x39 > ../builtinFonts/inter_16_numbers.h
+
 echo "Running compression verification..."
 python verify_compression.py ../builtinFonts/

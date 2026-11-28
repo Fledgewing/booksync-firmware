@@ -49,7 +49,7 @@ void Series::closeSeriesFlow() {
 }
 void Series::leaveSeries() {
   if (live_) closeSeriesFlow();
-  live_ = loading_ = pending_ = false;
+  live_ = loading_ = pending_ = signInNeeded_ = false;
   members_.clear();
   plan_.clear();
   flow_.clear();
@@ -127,11 +127,15 @@ bool Series::sendSeries(SeriesAction action) {
 }
 bool Series::pollSeries() {
   if (!live_) return false;
+  const auto account = library_.accountView();
+  const bool signInNeeded = account.available && account.accountSupported && !account.signedIn;
+  const bool accountChanged = signInNeeded != signInNeeded_;
+  signInNeeded_ = signInNeeded;
   if (!currentSeries()) {
     leaveSeries();
     return true;
   }
-  if (scene_ == SeriesScene::Count) return false;
+  if (scene_ == SeriesScene::Count) return accountChanged;
   if (awaiting_) {
     library_.readSeriesFlow(candidate_);
     adoptSeriesFlow();
@@ -165,7 +169,7 @@ bool Series::pollSeries() {
       candidate_.requestId != request_.series.requestId || candidate_.revision < previous)
     return false;
   adoptSeriesFlow();
-  return previous != flow_.revision || scene != scene_;
+  return previous != flow_.revision || scene != scene_ || accountChanged;
 }
 void Series::nextSeriesPage(int direction) {
   if (!currentSeries() || scene_ != SeriesScene::Page) return;

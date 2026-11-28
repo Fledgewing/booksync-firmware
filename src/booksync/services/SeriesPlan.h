@@ -23,6 +23,13 @@ class SeriesPlan {
   void cancel();
 
  private:
+  struct ProgressOrder {
+    double position = 0;
+    uint32_t rank = 0, ordinal = 0;
+    bool known = false;
+  };
+  // A bounded first-24 ordering window; no per-book allocation or UI sorting.
+  std::array<ProgressOrder, SeriesProgressMax> progressOrder_{};
   QuerySource source_{};
   SeriesJobsView jobs_{};
   QueryState state_{};

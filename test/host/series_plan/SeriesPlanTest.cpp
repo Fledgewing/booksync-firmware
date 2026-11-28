@@ -48,6 +48,9 @@ struct Fixture : testing::Test {
                                        ? QueryShow::Reading
                                    : f.finished != 0xffffffffu && key.ordinal <= f.finished ? QueryShow::Finished
                                                                                             : QueryShow::Unread;
+                      out.book.readingKnown = key.ordinal == f.current;
+                      out.book.page = 42;
+                      out.book.pages = 100;
                       out.onDevice = f.unknownDevice ? QueryTruth::Unknown : f.local ? QueryTruth::Yes : QueryTruth::No;
                       if (!f.missingDate || key.ordinal != f.current) std::strcpy(out.last.data(), "2026-11-28");
                       return true;
@@ -297,3 +300,27 @@ TEST_F(Fixture, PendingSnapshotRetainsRequestedCount) {
   EXPECT_EQ(result.requested, 10);
 }
 }  // namespace
+
+TEST_F(Fixture, ProgressSegmentsFollowSeriesOrderAndKeepUnknownProgress) {
+  ties = true;
+  extraReading = 5;
+  run();
+  ASSERT_EQ(result.progressCount, 12);
+  EXPECT_EQ(result.progress[0].status, QueryShow::Finished);
+  EXPECT_EQ(result.progress[3].status, QueryShow::Reading);
+  EXPECT_TRUE(result.progress[3].known);
+  EXPECT_EQ(result.progress[3].percent, 42);
+  EXPECT_EQ(result.progress[4].status, QueryShow::Reading);
+  EXPECT_FALSE(result.progress[4].known);
+  EXPECT_EQ(result.progress[5].status, QueryShow::Unread);
+}
+TEST_F(Fixture, ProgressWindowIsBoundedAndClearedBetweenRequests) {
+  state.count = 100;
+  run();
+  ASSERT_EQ(result.total, 100);
+  EXPECT_EQ(result.progressCount, SeriesProgressMax);
+  state.count = 1;
+  run();
+  EXPECT_EQ(result.progressCount, 1);
+  EXPECT_EQ(result.progress[1].status, QueryShow::Unknown);
+}

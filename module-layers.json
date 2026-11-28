@@ -1823,6 +1823,34 @@
         "EpdFontData.h"
       ]
     },
+    "lib/EpdFont/builtinFonts/inter_16_numbers.h": {
+      "role": "retained-library",
+      "rationale": "F36c generated compact Series metadata or numeric face from existing source fonts via lib/EpdFont/scripts/convert-builtin-fonts.sh; immutable glyph data only, with no reader settings, transport or product policy.",
+      "includes": [
+        "EpdFontData.h"
+      ]
+    },
+    "lib/EpdFont/builtinFonts/inter_7_bold.h": {
+      "role": "retained-library",
+      "rationale": "F36c generated compact Series metadata or numeric face from existing source fonts via lib/EpdFont/scripts/convert-builtin-fonts.sh; immutable glyph data only, with no reader settings, transport or product policy.",
+      "includes": [
+        "EpdFontData.h"
+      ]
+    },
+    "lib/EpdFont/builtinFonts/inter_6_regular.h": {
+      "role": "retained-library",
+      "rationale": "F36c generated compact Series metadata or numeric face from existing source fonts via lib/EpdFont/scripts/convert-builtin-fonts.sh; immutable glyph data only, with no reader settings, transport or product policy.",
+      "includes": [
+        "EpdFontData.h"
+      ]
+    },
+    "lib/EpdFont/builtinFonts/inter_8_bold.h": {
+      "role": "retained-library",
+      "rationale": "F36c immutable compact member title face, generated from existing source fonts; only glyph data and no reader setting or product policy.",
+      "includes": [
+        "EpdFontData.h"
+      ]
+    },
     "lib/EpdFont/builtinFonts/inter_8_regular.h": {
       "role": "retained-library",
       "rationale": "Native engine/support library; exact include edges retained, not a product-layer escape.",
@@ -12343,6 +12371,10 @@
         "booksync/system/ReminderPresenter.h",
         "booksync/system/SleepRuntime.h",
         "builtinFonts/all.h",
+        "builtinFonts/inter_16_numbers.h",
+        "builtinFonts/inter_6_regular.h",
+        "builtinFonts/inter_7_bold.h",
+        "builtinFonts/inter_8_bold.h",
         "components/UITheme.h",
         "components/icons/tablerFilledIcons.h",
         "cstdlib",
