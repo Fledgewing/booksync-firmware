@@ -13,6 +13,7 @@ struct PositionValue {
   uint16_t kind = 0, version = 0;
   std::string_view raw, label;
   bool reset = false, redated = false;
+  bool browser = false;  // Normalized origin provenance, retained independently of reset.
   bool operator==(const PositionValue&) const = default;
 };
 struct PositionRecord {
