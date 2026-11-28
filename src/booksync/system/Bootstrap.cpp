@@ -314,7 +314,12 @@ class ShellActivity final : public Activity {
       }
       return false;
     }
-    if (mappedInput.wasReleased(MappedInputManager::Button::Back))
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const bool touchBack = tapped && editor.panel() != Panel::Select && editor.panel() != Panel::Selected &&
+                           x >= header.x + header.width - 80 && x < header.x + header.width && y >= header.y &&
+                           y < header.y + header.height;
+    if (touchBack || mappedInput.wasReleased(MappedInputManager::Button::Back))
       editor.back();
     else if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Down)))
       editor.stepEditor(1);
@@ -497,7 +502,11 @@ class ShellActivity final : public Activity {
     const char* title = editing                               ? tr(STR_HOME_EDIT)
                         : widgets && widgets->page().title[0] ? widgets->page().title.data()
                                                               : tr(STR_HOME);
-    renderer.beginTextClip(header.x + 12, header.y, header.width - 24, header.height);
+    int titleWidth = header.width - 24;
+#if CROSSINK_APP_CAP_HOME_EDITOR
+    if (canEdit()) titleWidth -= 80;
+#endif
+    renderer.beginTextClip(header.x + 12, header.y, titleWidth, header.height);
     renderer.drawText(BITTER_14_FONT_ID, header.x + 12, header.y + 4, title, true, EpdFontFamily::BOLD);
     renderer.drawText(UI_10_FONT_ID, header.x + 12, header.y + renderer.getLineHeight(BITTER_14_FONT_ID) + 6,
                       editing ? "" : tr(STR_HOME_OFFLINE));
@@ -527,6 +536,9 @@ class ShellActivity final : public Activity {
 #if CROSSINK_APP_CAP_HOME_EDITOR
     if (canEdit() && !editing) {
       paintFittedText(UI_10_FONT_ID, header.x + header.width - 72, header.y + 4, tr(STR_EDIT), 68);
+    } else if (editing && editor.panel() != EditorAddRemove::Panel::Select &&
+               editor.panel() != EditorAddRemove::Panel::Selected) {
+      paintFittedText(UI_10_FONT_ID, header.x + header.width - 72, header.y + 4, tr(STR_BACK), 68);
     }
 #endif
     const auto labels = mappedInput.mapLabels(editing ? tr(STR_BACK) : "", editing ? tr(STR_SELECT) : action,

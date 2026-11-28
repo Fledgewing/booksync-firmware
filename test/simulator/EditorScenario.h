@@ -116,7 +116,8 @@ inline bool tick() {
                              i * (renderer.getLineHeight(UI_10_FONT_ID) + 26));
       };
       if (f == 10) tap(header.x + header.width - 40, header.y + 10);
-      if (f == 30) toolbar(0);
+      if (f == 30 || f == 34) toolbar(0);
+      if (f == 33) tap(header.x + header.width - 40, header.y + 10);
       if (f == 38) row(2);
       if (f == 54) tap(safe.x + 40, header.y + header.height + 50);
       if (f == 60) toolbar(0);
@@ -135,6 +136,7 @@ inline bool tick() {
     }
     if (f == 20) capture(directory, "edit-grid");
     if (f == 32) capture(directory, "add-picker");
+    if (f == 35 && (fixture.page.revision != 1 || fixture.writes != 0)) std::_Exit(21);
     if (f == 90) capture(directory, "reset-keep-focused");
     if (f == 94 && fixture.page.revision != 3) std::_Exit(16);
     if (f == 124) key(MappedInputManager::Button::Back);
