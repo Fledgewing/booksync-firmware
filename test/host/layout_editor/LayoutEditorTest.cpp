@@ -1,6 +1,7 @@
 #include <HalStorage.h>
 #include <gtest/gtest.h>
 
+#include <cstring>
 #include <string>
 
 #include "booksync/services/LayoutEditor.h"
@@ -94,10 +95,20 @@ TEST(LayoutEditor, UnknownBytesAndClassOverridesSurviveEdits) {
   EXPECT_NE(changed.find(opaque), std::string::npos);
 }
 TEST(LayoutEditor, EveryEditPublicationCutRetainsACompleteLayout) {
-  for (auto kind : {LayoutEditKind::Add, LayoutEditKind::Remove, LayoutEditKind::Reset, LayoutEditKind::Geometry}) {
+  for (auto kind : {LayoutEditKind::Add, LayoutEditKind::Remove, LayoutEditKind::Reset, LayoutEditKind::Geometry,
+                    LayoutEditKind::CreatePage, LayoutEditKind::NamePage, LayoutEditKind::MovePage}) {
     LayoutEditor editor;
     auto raw = original();
     auto edit = request(kind);
+    if (kind == LayoutEditKind::NamePage) std::strcpy(edit.name.data(), "Reading");
+    if (kind == LayoutEditKind::MovePage) {
+      ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", request(LayoutEditKind::CreatePage)),
+                LayoutEditStatus::Saved);
+      raw = bytes(editor.output());
+      edit.revision = 2;
+      edit.page = 1;
+      edit.index = 0;
+    }
     if (kind == LayoutEditKind::Geometry) {
       Layout layout;
       HomePage page;
@@ -606,6 +617,10 @@ TEST(EditorAddRemove, X3ListNeverStartsGeometryOrOptions) {
   lib.page.textOnly = true;
   EditorAddRemove ui(lib);
   ui.enter();
+  EXPECT_EQ(ui.rows(), 6);  // Three widgets plus Add/Reset/Done; page actions stay hidden.
+  ui.chooseEditor(6);
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Select);
+  EXPECT_EQ(lib.writes, 0u);
   ui.moreEditor();
   EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Select);
   ui.chooseEditor(1);
@@ -732,4 +747,169 @@ TEST(UpgradeNotice, UsesCachedNeutralAccountServiceLabel) {
   UpgradeNotice ui(lib);
   ASSERT_TRUE(ui.pollNotice(true));
   EXPECT_STREQ(ui.serviceName(), "Example service");
+}
+TEST(LayoutPages, CreateRenameReorderAndStale) {
+  LayoutEditor editor;
+  Layout parser;
+  auto raw = original();
+  auto edit = request(LayoutEditKind::CreatePage);
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  HomePage page;
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 1, page));
+  EXPECT_EQ(page.pages, 2);
+  EXPECT_EQ(page.count, 0);
+  EXPECT_STREQ(page.title.data(), "Page 2");
+  edit = request(LayoutEditKind::NamePage, 2);
+  edit.page = 1;
+  std::strcpy(edit.name.data(), "Reading \"now\" \\ later");
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 1, page));
+  EXPECT_STREQ(page.title.data(), edit.name.data());
+  edit = request(LayoutEditKind::MovePage, 3);
+  edit.page = 1;
+  edit.index = 0;
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
+  EXPECT_STREQ(page.title.data(), "Reading \"now\" \\ later");
+  EXPECT_EQ(page.count, 0);
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x3", 1, page));
+  EXPECT_EQ(page.count, 3);
+  EXPECT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Stale);
+}
+TEST(LayoutPages, X3AndBoundsRejectWithoutOutput) {
+  LayoutEditor editor;
+  auto raw = original();
+  for (auto kind : {LayoutEditKind::CreatePage, LayoutEditKind::NamePage, LayoutEditKind::MovePage}) {
+    auto edit = request(kind);
+    EXPECT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x3", edit), LayoutEditStatus::Invalid);
+    EXPECT_EQ(editor.output().bytes, 0u);
+  }
+  auto edit = request(LayoutEditKind::MovePage);
+  edit.index = 1;
+  EXPECT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Invalid);
+  edit = request(LayoutEditKind::NamePage);
+  EXPECT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Invalid);
+  edit.name.fill('x');
+  EXPECT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Invalid);
+}
+
+TEST(LayoutPages, InsertionOrderLimitAndUniqueIds) {
+  LayoutEditor editor;
+  Layout parser;
+  auto raw = original();
+  for (uint32_t revision = 1; revision < 16; ++revision) {
+    auto edit = request(LayoutEditKind::CreatePage, revision);
+    ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+    raw = bytes(editor.output());
+    HomePage page;
+    ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 1, page));
+    EXPECT_EQ(page.pages, revision + 1);
+    const auto expected = "Page " + std::to_string(revision + 1);
+    EXPECT_STREQ(page.title.data(), expected.c_str());
+  }
+  EXPECT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", request(LayoutEditKind::CreatePage, 16)),
+            LayoutEditStatus::Invalid);
+  EXPECT_EQ(editor.output().bytes, 0u);
+}
+TEST(LayoutPages, OpaqueLargePagesAndNamesSurviveMovingBothDirections) {
+  LayoutEditor editor;
+  Layout parser;
+  auto raw = original();
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", request(LayoutEditKind::CreatePage)),
+            LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  const std::string opaque = "\"opaque\":\"" + std::string(70000, 'q') + "\"";
+  raw.insert(raw.find("\"placements\":[]"), opaque + ",");
+  for (uint32_t revision : {2u, 3u}) {
+    auto edit = request(LayoutEditKind::MovePage, revision);
+    edit.page = revision == 2 ? 1 : 0;
+    edit.index = revision == 2 ? 0 : 1;
+    ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+    raw = bytes(editor.output());
+    EXPECT_NE(raw.find(opaque), std::string::npos);
+    for (const char* device : {"android-tablet", "x4", "x3"})
+      EXPECT_TRUE(parser.validate(LayoutInput::memory(raw.data(), raw.size()), device));
+  }
+}
+TEST(LayoutPages, RenameRetainsManualFlagAndRejectsBlankOrControlText) {
+  LayoutEditor editor;
+  auto raw = original();
+  auto edit = request(LayoutEditKind::NamePage);
+  for (const char* name : {"   ", "a\nb", "a\tb"}) {
+    std::strcpy(edit.name.data(), name);
+    EXPECT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Invalid);
+    EXPECT_EQ(editor.output().bytes, 0u);
+  }
+  std::strcpy(edit.name.data(), "  Reading  ");
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  EXPECT_NE(raw.find("\"name\":\"Reading\""), std::string::npos);
+  EXPECT_NE(raw.find("\"named\":true"), std::string::npos);
+  auto add = request(LayoutEditKind::Add, 2);
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", add), LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  EXPECT_NE(raw.find("\"name\":\"Reading\""), std::string::npos);
+}
+TEST(EditorPages, CreateNameCancelAndMoveUseCapturedRevision) {
+  EditorFixture lib;
+  lib.page.revision = 3;
+  lib.page.pages = 2;
+  lib.page.page = 1;
+  EditorAddRemove ui(lib, true);
+  ui.enter();
+  ui.chooseEditor(6);
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Name);
+  ui.namePage("Reading");
+  ui.back();
+  EXPECT_EQ(lib.writes, 0u);
+  ui.chooseEditor(6);
+  ui.namePage("Lists");
+  ui.chooseEditor(2);
+  EXPECT_EQ(lib.captured.kind, LayoutEditKind::NamePage);
+  EXPECT_EQ(lib.captured.revision, 3u);
+  EXPECT_EQ(lib.captured.page, 1);
+  EXPECT_STREQ(lib.captured.name.data(), "Lists");
+  ui.back();
+  lib.result = {LayoutEditStatus::Saved, 4};
+  EXPECT_FALSE(ui.pollEditor());
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Closed);
+  ui.enter();
+  ui.chooseEditor(7);
+  EXPECT_EQ(lib.captured.kind, LayoutEditKind::MovePage);
+  EXPECT_EQ(lib.captured.index, 0);
+}
+TEST(LayoutPages, FirstWidgetNamesNewPageButManualNamesStay) {
+  LayoutEditor editor;
+  Layout parser;
+  auto raw = original();
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", request(LayoutEditKind::CreatePage)),
+            LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  auto edit = request(LayoutEditKind::Add, 2);
+  edit.page = 1;
+  std::strcpy(edit.name.data(), "Library");
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  HomePage page;
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 1, page));
+  EXPECT_STREQ(page.title.data(), "Library");
+  edit = request(LayoutEditKind::NamePage, 3);
+  edit.page = 1;
+  std::strcpy(edit.name.data(), "My shelves");
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  edit = request(LayoutEditKind::Remove, 4);
+  edit.page = 1;
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  edit = request(LayoutEditKind::Add, 5);
+  edit.page = 1;
+  std::strcpy(edit.name.data(), "Reading");
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 1, page));
+  EXPECT_STREQ(page.title.data(), "My shelves");
 }

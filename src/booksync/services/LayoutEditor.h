@@ -27,6 +27,8 @@ class LayoutEditor {
   size_t bytes_ = 0;
   bool patch(uint32_t begin, uint32_t end, const char* text);
   bool patchSource(uint32_t at, uint32_t begin, uint32_t end);
+  bool renamePage(Layout::Span page, const char* name, bool manual);
+  bool pages(Layout::Span root, const char* device, const LayoutEdit& edit);
   bool geometry(Layout::Span root, Layout::Span pg, const char* device, const LayoutEdit& edit);
   bool read(size_t offset, void* output, size_t bytes);
   bool freeCell(Layout::Span root, Layout::Span page, const char* device, uint8_t w, uint8_t h, uint8_t& x, uint8_t& y);

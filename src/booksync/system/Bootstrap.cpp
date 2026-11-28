@@ -1,5 +1,6 @@
 #include "Bootstrap.h"
 
+#include <FreeInkUIGfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
@@ -70,6 +71,15 @@ class ShellActivity final : public Activity {
   bool editorOnly = false, editorStarted = false;
 #if CROSSINK_APP_CAP_HOME_EDITOR
   EditorAddRemove editor;
+#if CROSSINK_APP_CAP_TOUCH
+  // Fixed SDK hit table reused across frames; no naming-time heap allocation.
+  static_assert(sizeof(freeink::ui::InteractionBuffer<56>) <= 2048);
+  static_assert(sizeof(freeink::ui::KeyboardEntry) <= 32);
+  mutable freeink::ui::InteractionBuffer<56> pageKeys;
+  freeink::ui::KeyboardEntry pageEntry;
+#endif
+  bool namingAttached = false;
+  mutable char defaultPageName[24]{};
 #endif
   std::string bookPath;
   // One fallible <=6 KiB allocation per Home lifetime: the immutable visible
@@ -426,6 +436,11 @@ class ShellActivity final : public Activity {
       if (widgets->page().textOnly) return row == 0 ? tr(STR_HOME_KEEP_WIDGET) : tr(STR_HOME_REMOVE_WIDGET);
       return row == 0 ? tr(STR_HOME_REMOVE_WIDGET) : tr(STR_DONE);
     }
+    if (panel == Panel::Name) {
+      if (row == 0) return editor.pageName();
+      if (!mappedInput.hasTouch() && row <= 10) return pageNameOption(row - 1);
+      return row == (mappedInput.hasTouch() ? 1 : 11) ? tr(STR_CANCEL) : tr(STR_SAVE);
+    }
     if (panel == Panel::Reset) return row == 0 ? tr(STR_HOME_KEEP_LAYOUT) : tr(STR_HOME_RESET_LAYOUT);
     if (panel == Panel::Error) return tr(STR_BACK);
     if (panel == Panel::Add)
@@ -436,6 +451,11 @@ class ShellActivity final : public Activity {
       return kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)
              : kind == WidgetKind::Shelf  ? tr(STR_HOME_SHELF)
                                           : tr(STR_HOME_BROWSE);
+    }
+    if (row >= count + 3) {
+      const char* labels[] = {tr(STR_HOME_PAGE_PREVIOUS),    tr(STR_HOME_PAGE_NEXT), tr(STR_HOME_PAGE_ADD),
+                              tr(STR_HOME_PAGE_NAME_ACTION), tr(STR_HOME_PAGE_LEFT), tr(STR_HOME_PAGE_RIGHT)};
+      return labels[row - count - 3];
     }
     return row == count ? tr(STR_HOME_ADD_WIDGET) : row == count + 1 ? tr(STR_HOME_RESET_LAYOUT) : tr(STR_DONE);
   }
@@ -452,7 +472,104 @@ class ShellActivity final : public Activity {
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
     const int line = renderer.getLineHeight(UI_10_FONT_ID);
     const int height = line + 26;
+    if (editor.panel() == EditorAddRemove::Panel::Name && mappedInput.hasTouch()) {
+      const int keyboardHeight = safe.height * 45 / 100 < 250 ? safe.height * 45 / 100 : 250;
+      const int top = header.y + header.height + line + 24;
+      const int available = safe.y + safe.height - keyboardHeight - top - 16;
+      const int rowHeight = available / 2 < 50 ? available / 2 : 50;
+      if (index == 0) return Rect{safe.x + 24, top, safe.width - 48, rowHeight};
+      const int width = (safe.width - 56) / 2;
+      return Rect{safe.x + 24 + (index - 1) * (width + 8), top + rowHeight + 8, width, rowHeight};
+    }
+    if (editor.panel() == EditorAddRemove::Panel::Name) {
+      const int top = header.y + header.height + line + 24;
+      const int available = safe.y + safe.height - top - 16;
+      const int rowHeight = available / 9 < 46 ? available / 9 : 46;
+      if (index == 0) return Rect{safe.x + 24, top, safe.width - 48, rowHeight};
+      if (index <= 10) {
+        const int start = editor.focus() >= 8 ? 4 : 1;
+        return Rect{safe.x + 24, top + (int(index) - start + 1) * rowHeight, safe.width - 48, rowHeight};
+      }
+      const int width = (safe.width - 56) / 2;
+      return Rect{safe.x + 24 + (index - 11) * (width + 8), top + 8 * rowHeight, width, rowHeight};
+    }
     return Rect{safe.x + 24, header.y + header.height + line * 3 + 28 + index * height, safe.width - 48, height};
+  }
+  Rect editorPageButton(uint8_t index) const {
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const int width = (safe.width - 16) / 6;
+    // Compact button labels fit above Classic's guides without shrinking tiles.
+    const int height = mappedInput.hasTouch() ? 52 : renderer.getLineHeight(SMALL_FONT_ID) + 8;
+    return Rect{safe.x + 8 + index * width, safe.y + safe.height - 54, width - 2, height};
+  }
+  bool pageActionEnabled(uint8_t index) const {
+    const auto& page = widgets->page();
+    if (index == 0 || index == 4) return page.page > 0;
+    if (index == 1 || index == 5) return page.page + 1 < page.pages;
+    return index != 2 || page.pages < 16;
+  }
+  void syncPageEntry() {
+    const bool naming = editor.panel() == EditorAddRemove::Panel::Name;
+    if (naming && !namingAttached) {
+      if (!editor.pageName()[0]) editor.namePage(tr(STR_HOME));
+#if CROSSINK_APP_CAP_TOUCH
+      pageEntry.attach(editor.nameBuffer(), 81);
+#endif
+    }
+    namingAttached = naming;
+  }
+  const char* pageNameOption(uint8_t index) const {
+    const char* names[] = {tr(STR_HOME),
+                           tr(STR_HOME_PAGE_READING),
+                           tr(STR_LIBRARY),
+                           tr(STR_HOME_PAGE_LISTS),
+                           tr(STR_HOME_WANT_TO_READ),
+                           tr(STR_HOME_PAGE_STATS),
+                           tr(STR_HOME_PAGE_SHELVES),
+                           tr(STR_HOME_SERIES),
+                           tr(STR_HOME_PAGE_FAVOURITES)};
+    if (index < 9) return names[index];
+    std::snprintf(defaultPageName, sizeof(defaultPageName), tr(STR_HOME_PAGE_DEFAULT_FORMAT),
+                  unsigned(widgets->page().page + 1));
+    return defaultPageName;
+  }
+  void cyclePageName() {
+    uint8_t current = 0;
+    while (current < 10 && std::strcmp(editor.pageName(), pageNameOption(current))) ++current;
+    editor.namePage(pageNameOption(current < 9 ? current + 1 : 0));
+  }
+  const char* firstWidgetPageName(uint8_t widget) const {
+    return widget == 0 ? tr(STR_HOME_PAGE_READING) : widget == 1 ? tr(STR_HOME_RECENT) : tr(STR_LIBRARY);
+  }
+  void paintPageKeyboard() const {
+#if CROSSINK_APP_CAP_TOUCH
+    if (!mappedInput.hasTouch()) return;
+    namespace fui = freeink::ui;
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    fui::GfxRendererTarget target(renderer);
+    target.setFont(fui::GfxRendererTarget::FONT_SMALL, UI_10_FONT_ID);
+    target.setFont(fui::GfxRendererTarget::FONT_BODY, UI_12_FONT_ID);
+    const auto device = target.deviceContext();
+    const fui::InputSnapshot noInput{};
+    pageKeys.beginPublishCycle();
+    fui::Frame<56> frame(target, device, noInput, pageKeys);
+    fui::QwertyKeyboardProps props;
+    fui::applyEntry(props, pageEntry);
+    props.keyAction = 1;
+    props.shiftAction = 2;
+    props.modeAction = 3;
+    props.deleteAction = 4;
+    props.okAction = 5;
+    props.okLabel = tr(STR_SAVE);
+    props.modeLabel = pageEntry.symbols ? tr(STR_KEY_MODE_ABC) : tr(STR_KEY_MODE_SYMBOLS);
+    // Keyboard is docked at the usable bottom; field and actions stay above it.
+    const int16_t height = safe.height * 45 / 100 < 250 ? safe.height * 45 / 100 : 250;
+    fui::qwertyKeyboard(frame,
+                        {static_cast<int16_t>(safe.x), static_cast<int16_t>(safe.y + safe.height - height),
+                         static_cast<int16_t>(safe.width), height},
+                        props);
+    pageKeys.publish();
+#endif
   }
   Rect editorMoveButton(uint8_t index) const {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
@@ -500,6 +617,24 @@ class ShellActivity final : public Activity {
         renderer.drawRect(r.x, r.y, r.width, r.height, panel == Panel::Select && editor.focus() == row ? 3 : 1, true);
         paintFittedText(UI_10_FONT_ID, r.x + 5, r.y + 4, editorLabel(row), r.width - 10);
       }
+      if (panel == Panel::Select) {
+        const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+        const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+        char number[24];
+        std::snprintf(number, sizeof(number), tr(STR_HOME_PAGE_FORMAT), widgets->page().page + 1,
+                      widgets->page().pages);
+        paintFittedText(UI_10_FONT_ID, header.x + header.width - 72, header.y + 4, number, 68);
+        for (uint8_t i = 0; i < 6; ++i) {
+          const auto r = editorPageButton(i);
+          const auto row = widgets->page().count + 3 + i;
+          renderer.drawRect(r.x, r.y, r.width, r.height, editor.focus() == row ? 3 : 1, true);
+          const int font = SMALL_FONT_ID;
+          const int labelY = r.y + (r.height - renderer.getTextHeight(font)) / 2;
+          paintFittedText(font, r.x + 4, labelY, editorLabel(row), r.width - 8);
+          if (!pageActionEnabled(i))
+            renderer.drawLine(r.x + 4, r.y + r.height - 3, r.x + r.width - 4, r.y + r.height - 3, 1, true);
+        }
+      }
       if (panel == Panel::Selected) {
         paintEditorMoveBar();
         const auto& tile = editor.draftPage()->widgets[editor.selected()];
@@ -522,7 +657,9 @@ class ShellActivity final : public Activity {
     }
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
-    const char* title = panel == Panel::Add                                   ? tr(STR_HOME_ADD_WIDGET)
+    const char* title = panel == Panel::Name                                  ? tr(STR_HOME_PAGE_RENAME)
+                        : panel == Panel::Paging                              ? tr(STR_HOME_EDIT_SAVING)
+                        : panel == Panel::Add                                 ? tr(STR_HOME_ADD_WIDGET)
                         : panel == Panel::Reset                               ? tr(STR_HOME_RESET_CONFIRM)
                         : panel == Panel::Waiting                             ? tr(STR_HOME_EDIT_SAVING)
                         : panel == Panel::Options                             ? tr(STR_HOME_REMOVE_WIDGET)
@@ -555,11 +692,23 @@ class ShellActivity final : public Activity {
       offset += n;
       while (title[offset] == ' ') ++offset;
     }
-    if (panel == Panel::Waiting) return;
+    if (panel == Panel::Waiting || panel == Panel::Paging) return;
     for (uint8_t i = 0; i < editor.rows(); ++i) {
+      if (panel == Panel::Name && !mappedInput.hasTouch() && i >= 1 && i <= 10) {
+        const uint8_t start = editor.focus() >= 8 ? 4 : 1;
+        if (i < start || i >= start + 7) continue;
+      }
       const auto r = editorRow(i);
       renderer.drawRect(r.x, r.y, r.width, r.height, i == editor.focus() ? 3 : 1, true);
       paintFittedText(UI_10_FONT_ID, r.x + 12, r.y + 10, editorLabel(i), r.width - 24);
+    }
+    if (panel == Panel::Name) {
+      if (!mappedInput.hasTouch()) {
+        const auto actions = editorRow(11);
+        paintFittedText(UI_10_FONT_ID, safe.x + 24, actions.y + actions.height + 12, tr(STR_HOME_PAGE_NAME_NEXT),
+                        safe.width - 48);
+      }
+      paintPageKeyboard();
     }
   }
   bool editorInput() {
@@ -588,6 +737,37 @@ class ShellActivity final : public Activity {
     const bool touchBack = tapped && editor.panel() != Panel::Select && editor.panel() != Panel::Selected &&
                            x >= header.x + header.width - 80 && x < header.x + header.width && y >= header.y &&
                            y < header.y + header.height;
+#if CROSSINK_APP_CAP_TOUCH
+    if (tapped && editor.panel() == Panel::Name && mappedInput.hasTouch()) {
+      freeink::ui::InputSnapshot input{};
+      input.touchReleased = true;
+      input.touchX = x;
+      input.touchY = y;
+      const auto event = pageKeys.routePublished(input);
+      if (event) {
+        switch (event.action) {
+          case 1:
+            pageEntry.key(event.value);
+            break;
+          case 2:
+            pageEntry.shift();
+            break;
+          case 3:
+            pageEntry.mode();
+            break;
+          case 4:
+            pageEntry.backspace();
+            break;
+          case 5:
+            editor.chooseEditor(2);
+            break;
+        }
+        syncPageEntry();
+        requestUpdate();
+        return true;
+      }
+    }
+#endif
     if (touchBack || mappedInput.wasReleased(MappedInputManager::Button::Back))
       editor.back();
     else if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Right)))
@@ -596,9 +776,16 @@ class ShellActivity final : public Activity {
       editor.stepEditor(1);
     else if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Up)))
       editor.stepEditor(-1);
-    else if (mappedInput.wasReleased(MappedInputManager::Button::Confirm))
-      editor.activateEditor();
-    else if (tapped) {
+    else if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+      if (editor.panel() == Panel::Name && editor.focus() == 0)
+        cyclePageName();
+      else if (editor.panel() == Panel::Name && !mappedInput.hasTouch() && editor.focus() <= 10)
+        editor.namePage(pageNameOption(editor.focus() - 1));
+      else {
+        if (editor.panel() == Panel::Add) editor.namePage(firstWidgetPageName(editor.focus()));
+        editor.activateEditor();
+      }
+    } else if (tapped) {
       if (editor.panel() == Panel::Select || editor.panel() == Panel::Selected) {
         if (editor.panel() == Panel::Selected) {
           static constexpr LayoutStep steps[] = {LayoutStep::Left, LayoutStep::Up, LayoutStep::Down, LayoutStep::Right,
@@ -620,6 +807,24 @@ class ShellActivity final : public Activity {
             break;
           }
         }
+        if (editor.panel() == Panel::Select) {
+          for (uint8_t i = 0; i < 6; ++i) {
+            const auto r = editorPageButton(i);
+            if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height && pageActionEnabled(i)) {
+              editor.chooseEditor(widgets->page().count + 3 + i);
+              syncPageEntry();
+              requestUpdate();
+              return true;
+            }
+          }
+          if (x >= header.x && x < header.x + header.width - 80 && y >= header.y &&
+              y < header.y + renderer.getLineHeight(BITTER_14_FONT_ID) + 8) {
+            editor.chooseEditor(widgets->page().count + 6);
+            syncPageEntry();
+            requestUpdate();
+            return true;
+          }
+        }
         if (editor.panel() == Panel::Select)
           for (uint8_t i = 0; i < widgets->page().count; ++i) {
             const auto r = tileRect(i);
@@ -632,6 +837,7 @@ class ShellActivity final : public Activity {
         for (uint8_t i = 0; i < editor.rows(); ++i) {
           const auto r = editorRow(i);
           if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) {
+            if (editor.panel() == Panel::Add) editor.namePage(firstWidgetPageName(i));
             editor.chooseEditor(i);
             break;
           }
@@ -639,6 +845,7 @@ class ShellActivity final : public Activity {
     } else {
       return true;  // Consume the editor context without scheduling an idle repaint.
     }
+    syncPageEntry();
     requestUpdate();
     return true;
   }
@@ -654,7 +861,7 @@ class ShellActivity final : public Activity {
         notice(library),
         editorOnly(editorOnly),
 #if CROSSINK_APP_CAP_HOME_EDITOR
-        editor(library),
+        editor(library, input.hasTouch()),
 #endif
         initialRefresh(refresh) {
   }
@@ -752,7 +959,8 @@ class ShellActivity final : public Activity {
         requestUpdate();
       if (noticeInput()) return;
       if (editorInput()) return;
-      if (widgets && widgets->page().count) {
+      // A valid empty page still owns navigation; Confirm cannot open a hidden book.
+      if (widgets && widgets->page().revision) {
         const auto count = widgets->page().count;
         int step = 0;
         if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Down))) step = 1;
@@ -778,7 +986,7 @@ class ShellActivity final : public Activity {
           }
           requestUpdate();
         }
-        if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+        if (count && mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
           if (!widgets->retryWidget(focus) && focusRow < widgets->widgetRows(focus, widgetBox(focus)))
             widgets->dispatchWidget(focus, focusRow);
         }
@@ -833,10 +1041,12 @@ class ShellActivity final : public Activity {
 #else
     constexpr bool editing = false;
 #endif
-    const char* title = editing ? (widgets->page().textOnly ? tr(STR_HOME_WIDGETS) : tr(STR_HOME_EDIT))
+    const char* title = editing && widgets->page().textOnly ? tr(STR_HOME_WIDGETS)
                         : widgets && widgets->page().title[0] ? widgets->page().title.data()
                                                               : tr(STR_HOME);
 #if CROSSINK_APP_CAP_HOME_EDITOR
+    if (editing && !widgets->page().textOnly && editor.panel() != EditorAddRemove::Panel::Select)
+      title = tr(STR_HOME_EDIT);
     if (editing && editor.draftPage()) {
       const auto kind = editor.draftPage()->widgets[editor.selected()].kind;
       title = kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)

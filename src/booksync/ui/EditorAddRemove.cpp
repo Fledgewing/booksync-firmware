@@ -9,14 +9,16 @@ void EditorAddRemove::enter() {
   panel_ = !page.revision ? Panel::Closed : Panel::Select;
 }
 uint8_t EditorAddRemove::rows() const {
-  if (panel_ == Panel::Select) return library_.homePage().count + 3;  // Add, Reset, Done after tiles.
+  // X3 exposes only Add/Reset/Done; X4 also has six page actions.
+  if (panel_ == Panel::Select) return library_.homePage().count + (library_.homePage().textOnly ? 3 : 9);
+  if (panel_ == Panel::Name) return touchNaming_ ? 3 : 13;
   if (panel_ == Panel::Add) return 3;
   if (panel_ == Panel::Selected || panel_ == Panel::Options) return 2;  // Remove, Done.
   if (panel_ == Panel::Reset) return 2;                                 // Keep first.
   return 1;
 }
 void EditorAddRemove::stepEditor(int direction) {
-  if (panel_ == Panel::Closed || panel_ == Panel::Waiting) return;
+  if (panel_ == Panel::Closed || panel_ == Panel::Waiting || panel_ == Panel::Paging) return;
   if (panel_ == Panel::Selected && !library_.homePage().textOnly) {
     geometryStep(direction > 0 ? LayoutStep::Next : LayoutStep::Previous);
     return;
@@ -25,7 +27,7 @@ void EditorAddRemove::stepEditor(int direction) {
   if (nextFocus >= 0 && nextFocus < rows()) focus_ = nextFocus;
 }
 void EditorAddRemove::chooseEditor(uint8_t index) {
-  if (index >= rows() || panel_ == Panel::Waiting) return;
+  if (index >= rows() || panel_ == Panel::Waiting || panel_ == Panel::Paging) return;
   focus_ = index;
   if (panel_ == Panel::Selected && !library_.homePage().textOnly) {
     if (index == 0)
@@ -37,7 +39,7 @@ void EditorAddRemove::chooseEditor(uint8_t index) {
 }
 void EditorAddRemove::back() {
   // Accepted work finishes atomically; Back retires only this presentation.
-  if (panel_ == Panel::Select || panel_ == Panel::Waiting)
+  if (panel_ == Panel::Select || panel_ == Panel::Waiting || panel_ == Panel::Paging)
     panel_ = Panel::Closed;
   else if (panel_ == Panel::Error)
     enter();
@@ -56,6 +58,7 @@ void EditorAddRemove::send(LayoutEditKind kind, WidgetKind widget) {
   request.revision = revision_;
   request.page = page_;
   request.index = selected_;
+  request.name = name_;
   pendingKind_ = kind;
   if (kind == LayoutEditKind::Geometry) {
     request.count = draft_.count;
@@ -90,12 +93,33 @@ void EditorAddRemove::activateEditor() {
       focus_ = 0;
     } else if (focus_ == page.count) {
       panel_ = Panel::Add;
+      name_ = {};
       focus_ = 0;
     } else if (focus_ == page.count + 1) {
       panel_ = Panel::Reset;
       focus_ = 0;
-    } else
+    } else if (focus_ == page.count + 2)
       panel_ = Panel::Closed;
+    else if (focus_ == page.count + 3 || focus_ == page.count + 4) {
+      const int nextPageIndex = int(page.page) + (focus_ == page.count + 3 ? -1 : 1);
+      if (nextPageIndex >= 0 && nextPageIndex < page.pages && library_.requestHomePage(nextPageIndex))
+        panel_ = Panel::Paging;
+    } else if (focus_ == page.count + 5) {
+      if (page.pages < 16) send(LayoutEditKind::CreatePage);
+    } else if (focus_ == page.count + 6) {
+      name_ = page.title;
+      panel_ = Panel::Name;
+      focus_ = 0;
+    } else {
+      const int nextPageIndex = int(page.page) + (focus_ == page.count + 7 ? -1 : 1);
+      if (nextPageIndex >= 0 && nextPageIndex < page.pages) {
+        selected_ = nextPageIndex;
+        send(LayoutEditKind::MovePage);
+      }
+    }
+  } else if (panel_ == Panel::Name) {
+    if (focus_ == (touchNaming_ ? 1 : 11)) back();
+    if (focus_ == (touchNaming_ ? 2 : 12) && hasPageName()) send(LayoutEditKind::NamePage);
   } else if (panel_ == Panel::Selected) {
     if (library_.homePage().textOnly) {
       if (focus_ == 1)
@@ -120,7 +144,20 @@ void EditorAddRemove::activateEditor() {
     enter();
   }
 }
+void EditorAddRemove::namePage(const char* name) {
+  if ((panel_ != Panel::Name && panel_ != Panel::Add) || !name) return;
+  uint8_t length = 0;
+  while (length < 81 && name[length]) ++length;
+  if (length == 81) return;
+  for (uint8_t i = 0; i <= length; ++i) name_[i] = name[i];
+}
 bool EditorAddRemove::pollEditor() {
+  if (panel_ == Panel::Paging) {
+    const auto page = library_.homePage();
+    if (page.page == page_ && page.revision == revision_) return false;
+    enter();
+    return true;
+  }
   if (panel_ != Panel::Waiting) {
     if (panel_ == Panel::Closed || panel_ == Panel::Error) return false;
     const auto page = library_.homePage();

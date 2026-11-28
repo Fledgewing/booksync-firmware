@@ -5,8 +5,8 @@ namespace booksync {
 // Approved X4 spatial and X3 Settings-list add/remove/reset operations.
 class EditorAddRemove {
  public:
-  enum class Panel : uint8_t { Closed, Select, Selected, Options, Add, Reset, Waiting, Error };
-  explicit EditorAddRemove(Library& library) : library_(library) {}
+  enum class Panel : uint8_t { Closed, Select, Selected, Options, Add, Reset, Name, Paging, Waiting, Error };
+  explicit EditorAddRemove(Library& library, bool touchNaming = false) : library_(library), touchNaming_(touchNaming) {}
   auto enter() -> void;
   auto back() -> void;
   auto stepEditor(int direction) -> void;
@@ -23,11 +23,23 @@ class EditorAddRemove {
   uint8_t focus() const { return focus_; }
   uint8_t selected() const { return selected_; }
   uint8_t rows() const;
+  char* nameBuffer() { return name_.data(); }
+  const char* pageName() const { return name_.data(); }
+  bool hasPageName() const {
+    for (char c : name_) {
+      if (!c) break;
+      if (c != ' ') return true;
+    }
+    return false;
+  }
+  auto namePage(const char* name) -> void;
   LayoutEditStatus editorFailure() const { return error_; }
 
  private:
   Library& library_;
+  const bool touchNaming_;
   HomePage draft_{};
+  std::array<char, 81> name_{};
   bool blocked_ = false;
   uint8_t nextW_ = 0, nextH_ = 0;
   LayoutEditKind pendingKind_ = LayoutEditKind::Add;
@@ -38,4 +50,5 @@ class EditorAddRemove {
   auto updateSizePreview() -> void;
   auto send(LayoutEditKind kind, WidgetKind widget = WidgetKind::Continue) -> void;
 };
+static_assert(sizeof(EditorAddRemove) <= 384);
 }  // namespace booksync

@@ -11275,7 +11275,7 @@
     },
     "src/booksync/services/Library.cpp": {
       "role": "services",
-      "rationale": "Private policy contracts; only SyncOwner may mint the serial writer token. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O."
+      "rationale": "Private policy contracts; only SyncOwner may mint the serial writer token. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O."
     },
     "src/booksync/services/OfflineLibrary.h": {
       "role": "services",
@@ -14938,7 +14938,7 @@
     },
     "src/booksync/system/Bootstrap.cpp": {
       "role": "system",
-      "rationale": "F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F34 projects Library-only widget values into foreground drawing and mapped input; fonts prepare on entry, and snapshot/focus mutation is serialized by RenderLock. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O."
+      "rationale": "F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F34 projects Library-only widget values into foreground drawing and mapped input; fonts prepare on entry, and snapshot/focus mutation is serialized by RenderLock. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O."
     },
     "src/booksync/system/Bootstrap.h": {
       "role": "system",
@@ -15376,23 +15376,23 @@
     },
     "src/booksync/interface/LayoutEdit.h": {
       "role": "interface",
-      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O."
+      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O."
     },
     "src/booksync/services/LayoutEditor.h": {
       "role": "services",
-      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O."
+      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O."
     },
     "src/booksync/services/LayoutEditor.cpp": {
       "role": "services",
-      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O."
+      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O."
     },
     "src/booksync/ui/EditorAddRemove.h": {
       "role": "ui",
-      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O."
+      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O."
     },
     "src/booksync/ui/EditorAddRemove.cpp": {
       "role": "ui",
-      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O."
+      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O."
     },
     "src/booksync/server/bookorbit/LifecycleState.h": {
       "role": "server",
