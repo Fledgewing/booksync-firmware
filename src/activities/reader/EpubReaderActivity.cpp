@@ -6924,6 +6924,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     }
 
     activeFootnotePreview = buildingFootnotePreview;
+    if (activeFootnotePreview) markReminderNonReadingFrame();
 
     if (!buildingFootnotePreview && usedRenderMode != selectedRenderMode && !safeModeBuildSucceeded) {
       SETTINGS.epubRenderMode = static_cast<uint8_t>(usedRenderMode);
