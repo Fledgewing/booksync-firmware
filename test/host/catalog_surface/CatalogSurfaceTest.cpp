@@ -446,3 +446,22 @@ TEST(CatalogStateMachine, LibraryFailureKeepsSameAccountCachedLocalPreviews) {
   ui.pollCatalog();
   EXPECT_FALSE(ui.catalogLive());
 }
+
+TEST(CatalogStateMachine, BrowseUsesPublishedCountsAndOmitsOnlyUnsupportedRoots) {
+  catalogFixture::SceneLibrary library;
+  library.summary.libraries.availability = Availability::Unsupported;
+  library.summary.collections.availability = Availability::Unsupported;
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  ui.browseCatalogIndex();
+  ui.pollCatalog();
+  ASSERT_EQ(ui.catalogControls(), 7);
+  EXPECT_EQ(ui.catalogRootCount(CatalogRoot::All).value, 10020u);
+  EXPECT_EQ(ui.catalogBrowseRootAt(4), CatalogRoot::Authors);
+  EXPECT_EQ(ui.catalogBrowseRootAt(5), CatalogRoot::Series);
+  EXPECT_EQ(ui.catalogBrowseRootAt(6), CatalogRoot::Lists);
+  ui.selectCatalogControl(6);
+  EXPECT_EQ(ui.activateCatalog(), CommandStatus::Accepted);
+  EXPECT_EQ(ui.catalogRoot(), CatalogRoot::Lists);
+}

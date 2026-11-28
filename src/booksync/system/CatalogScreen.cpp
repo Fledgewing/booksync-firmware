@@ -244,15 +244,43 @@ class CatalogActivity final : public Activity {
       hit(box, n + 10);
     }
   }
+  void catalogRowMetadata(char (&value)[96], const QueryEntry& entry, const char* fileText,
+                          bool transferText = false) const {
+    const char* reading = entry.status == QueryShow::Finished    ? tr(STR_CATALOG_FINISHED)
+                          : entry.status == QueryShow::Unread    ? tr(STR_CATALOG_UNREAD)
+                          : entry.status == QueryShow::Reading   ? tr(STR_HOME_PAGE_READING)
+                          : entry.status == QueryShow::Rereading ? tr(STR_CATALOG_REREADING)
+                          : entry.status == QueryShow::OnHold    ? tr(STR_CATALOG_ON_HOLD)
+                          : entry.status == QueryShow::Abandoned ? tr(STR_CATALOG_ABANDONED)
+                                                                 : nullptr;
+    char progress[48];
+    if (!transferText && reading) {
+      if ((entry.status == QueryShow::Reading || entry.status == QueryShow::Rereading) && entry.book.readingKnown &&
+          entry.book.pages) {
+        const auto percent = uint64_t(entry.book.page) * 100 / entry.book.pages;
+        std::snprintf(progress, sizeof(progress), tr(STR_CATALOG_STATUS_PERCENT_FORMAT), reading,
+                      unsigned(percent > 100 ? 100 : percent));
+        reading = progress;
+      }
+      std::snprintf(value, sizeof(value), "%s · %s", fileText, reading);
+    } else {
+      std::snprintf(value, sizeof(value), "%s", fileText);
+    }
+  }
   void list() const {
     const auto s = safe();
     const int line = renderer.getLineHeight(UI_10_FONT_ID);
     const int top = headerBottom() + 62;
     if (catalog_->catalogPanel() == CatalogSurface::Panel::Browse) {
       const int h = (s.y + s.height - top - 60) / 5;
-      for (uint8_t i = 0; i < 9; ++i)
-        button(Rect{s.x + 12 + (i % 2) * ((s.width - 24) / 2), top + (i / 2) * h, (s.width - 34) / 2, h - 8},
-               rootTitle(CatalogSurface::catalogBrowseRoot(i)), i);
+      text(Rect{s.x + 12, headerBottom() + 14, s.width - 24, line}, tr(STR_CATALOG_INDEXES));
+      for (uint8_t i = 0; i < catalog_->catalogBrowseCount(); ++i) {
+        const auto root = catalog_->catalogBrowseRootAt(i);
+        const Rect tile{s.x + 12 + (i % 2) * ((s.width - 24) / 2), top + (i / 2) * h, (s.width - 34) / 2, h - 8};
+        button(tile, rootTitle(root), i);
+        number(Rect{tile.x + 9, tile.y + line + 17, tile.width - 40, line + 6}, catalog_->catalogRootCount(root));
+        text(Rect{tile.x + tile.width - 25, tile.y + line + 17, 22, line}, "›");
+      }
       return;
     }
     button(Rect{s.x + 12, headerBottom() + 6, 140, 50},
@@ -320,10 +348,11 @@ class CatalogActivity final : public Activity {
             paintCatalogCover(Rect{preview.x + 5, preview.y + 5, 48, preview.height > 80 ? 72 : preview.height - 10},
                               entry.book, i);
           text(Rect{row.x + inset, preview.y + 8, row.width - inset - 8, line}, entry.book.title.data());
-          text(Rect{row.x + inset, preview.y + line + 12, row.width - inset - 8, line},
-               entry.onDevice == QueryTruth::Yes  ? tr(STR_CATALOG_ON_CARD)
-               : entry.onDevice == QueryTruth::No ? tr(STR_CATALOG_SERVER_ONLY)
-                                                  : tr(STR_HOME_NOT_SAVED));
+          catalogRowMetadata(label, entry,
+                             entry.onDevice == QueryTruth::Yes  ? tr(STR_CATALOG_ON_CARD)
+                             : entry.onDevice == QueryTruth::No ? tr(STR_CATALOG_SERVER_ONLY)
+                                                                : tr(STR_HOME_NOT_SAVED));
+          text(Rect{row.x + inset, preview.y + line + 12, row.width - inset - 8, line}, label);
         } else {
           const int inset = textOnly_ ? 8 : 48;
           if (!textOnly_) paintCatalogCover(Rect{row.x + 5, row.y + 4, 35, row.height - 8}, entry.book, i);
@@ -345,6 +374,12 @@ class CatalogActivity final : public Activity {
             detail = tr(STR_DOWNLOADING);
           const int metadataY = row.y + line + 9;
           if (entry.label[0]) text(Rect{row.x + inset, metadataY, row.width - inset - 50, line}, entry.label.data());
+          const bool transferText =
+              selected && (catalog_->catalogAvailabilityUnknown() || catalog_->catalogPreparing() ||
+                           catalog_->catalogInlineError() != DownloadError::None ||
+                           catalog_->catalogTransferValue().state == DownloadState::Transferring);
+          catalogRowMetadata(label, entry, detail, transferText);
+          detail = label;
           text(Rect{row.x + inset, metadataY + (entry.label[0] ? line + 4 : 0), row.width - inset - 50, line}, detail);
           text(Rect{row.x + row.width - 44, row.y + 8, 40, line}, "...");
           hit(Rect{row.x + row.width - 50, row.y, 50, row.height}, i, 1);
@@ -577,7 +612,7 @@ class CatalogActivity final : public Activity {
     text(Rect{s.x + 12, s.y + 8, 76, 44}, tr(STR_BACK));
     text(Rect{s.x + 92, s.y + 8, s.width - 104, 44},
          catalog_->catalogPanel() == CatalogSurface::Panel::Dashboard ? tr(STR_CATALOG_TITLE)
-         : catalog_->catalogPanel() == CatalogSurface::Panel::Browse  ? tr(STR_BROWSE)
+         : catalog_->catalogPanel() == CatalogSurface::Panel::Browse  ? tr(STR_CATALOG_BROWSE_TITLE)
                                                                       : rootTitle(catalog_->catalogRoot()),
          UI_12_FONT_ID);
     renderer.drawLine(s.x, headerBottom(), s.x + s.width, headerBottom());

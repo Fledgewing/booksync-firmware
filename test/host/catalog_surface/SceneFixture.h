@@ -67,6 +67,8 @@ class SceneLibrary final : public Library {
     summary.onCard = {6, Availability::Ready};
     summary.linked = {5, Availability::Ready};
     summary.collections = {1, Availability::Ready};
+    summary.reading = {17, Availability::Ready};
+    summary.libraries = {3, Availability::Ready};
     summary.lists = {12, Availability::Ready};
     std::snprintf(summary.sourceLabel.data(), summary.sourceLabel.size(), "Saved source");
     if (scene >= 3 && scene <= 5) {
@@ -166,6 +168,9 @@ class SceneLibrary final : public Library {
       entry.books = i == 1 ? 1 : 12;
       entry.missing = q.kind == QueryKind::Groups && i == 2;
       entry.onDevice = scene == 8 || i != 1 ? QueryTruth::Yes : QueryTruth::No;
+      static constexpr QueryShow statuses[] = {QueryShow::Reading,   QueryShow::Unread, QueryShow::Finished,
+                                               QueryShow::Rereading, QueryShow::OnHold, QueryShow::Abandoned};
+      entry.status = statuses[(q.offset + i) % 6];
       entry.book.readingKnown = true;
       entry.book.page = 42;
       entry.book.pages = 100;

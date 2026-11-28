@@ -158,12 +158,46 @@ CatalogRoot CatalogSurface::catalogBrowseRoot(uint8_t index) {
                                           CatalogRoot::Series, CatalogRoot::Collections, CatalogRoot::Lists};
   return index < 9 ? roots[index] : CatalogRoot::All;
 }
+CatalogCount CatalogSurface::catalogRootCount(CatalogRoot root) const {
+  switch (root) {
+    case CatalogRoot::Authors:
+      return summary_.authors;
+    case CatalogRoot::Series:
+      return summary_.series;
+    case CatalogRoot::OnCard:
+      return summary_.onCard;
+    case CatalogRoot::Lists:
+      return summary_.lists;
+    case CatalogRoot::Libraries:
+      return summary_.libraries;
+    case CatalogRoot::Collections:
+      return summary_.collections;
+    case CatalogRoot::Reading:
+      return summary_.reading;
+    default:
+      return summary_.books;
+  }
+}
+uint8_t CatalogSurface::catalogBrowseCount() const {
+  uint8_t count = 0;
+  for (uint8_t i = 0; i < 9; ++i)
+    if (catalogRootCount(catalogBrowseRoot(i)).availability != Availability::Unsupported) ++count;
+  return count;
+}
+CatalogRoot CatalogSurface::catalogBrowseRootAt(uint8_t index) const {
+  for (uint8_t i = 0; i < 9; ++i) {
+    const auto root = catalogBrowseRoot(i);
+    if (catalogRootCount(root).availability == Availability::Unsupported) continue;
+    if (!index--) return root;
+  }
+  return CatalogRoot::All;
+}
 uint8_t CatalogSurface::catalogControls() const {
   if (!catalogLive()) return 0;
   if (dialog_ == Dialog::Choices) return choices_.count + 1;
   if (dialog_ != Dialog::None) return 2;
   if (panel_ == Panel::Dashboard) return 14;  // Shelf headers/books and four compact tiles.
-  if (panel_ == Panel::Browse) return 9;
+  if (panel_ == Panel::Browse) return catalogBrowseCount();
   if (panel_ == Panel::Groups) return catalogVisibleRows() * 2 + 3;
   return catalogVisibleRows() + (catalogHasMore() ? 3
                                  : current_.offset
@@ -603,7 +637,8 @@ CommandStatus CatalogSurface::activateCatalog() {
     return CommandStatus::Accepted;
   }
   if (panel_ == Panel::Browse) {
-    browseCatalog(catalogBrowseRoot(focus_));
+    if (focus_ >= catalogBrowseCount()) return CommandStatus::Unavailable;
+    browseCatalog(catalogBrowseRootAt(focus_));
     return CommandStatus::Accepted;
   }
   if (panel_ == Panel::Groups && focus_ >= catalogVisibleRows() + 3)

@@ -40,6 +40,9 @@ class CatalogSurface {
     return panel_ == Panel::Sources ? CatalogSourceRows : panel_ == Panel::Groups ? 3 : textOnly_ ? 6 : 5;
   }
   static CatalogRoot catalogBrowseRoot(uint8_t index);
+  CatalogCount catalogRootCount(CatalogRoot root) const;
+  CatalogRoot catalogBrowseRootAt(uint8_t index) const;
+  uint8_t catalogBrowseCount() const;
   CatalogRoot catalogRoot() const { return current_.root; }
   uint32_t catalogOffset() const { return current_.offset; }
   const CatalogSummary& catalogSummaryValue() const { return summary_; }
