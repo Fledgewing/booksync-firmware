@@ -59,9 +59,11 @@ class ReminderSettingsActivity final : public Activity {
     return {r.x + 12 + static_cast<int>(i) * width, r.y + r.h - 52, width - 4, 44};
   }
   Region key(unsigned i) const {
-    auto r = safe();
-    return {r.x + 12 + static_cast<int>(i % 10) * (r.w - 24) / 10, r.y + r.h - 184 + static_cast<int>(i / 10) * 44,
-            (r.w - 24) / 10 - 2, 42};
+    const auto r = safe();
+    const unsigned column = i == 32 ? 3 : i == 34 ? 5 : i % 10;
+    const unsigned span = i == 30 ? 3 : i == 32 || i == 34 || i == 37 ? 2 : 1;
+    return {r.x + 12 + static_cast<int>(column) * (r.w - 24) / 10, r.y + r.h - 184 + static_cast<int>(i / 10) * 44,
+            static_cast<int>(span) * (r.w - 24) / 10 - 2, 42};
   }
   void paintReminderText(const char* text, int x, int& y, int width, bool draw = true) const {
     paintReminderParagraph(renderer, text, x, y, width, draw);
@@ -290,7 +292,6 @@ class ReminderSettingsActivity final : public Activity {
       for (unsigned i = 0; i < 40; ++i)
         if (messageKey(i)) {
           auto a = key(i);
-          if (i >= 30 && i != 39) a.w *= i == 34 ? 3 : 2;
           if (a.contains(x, y)) return i;
         }
       return 255;
@@ -462,6 +463,19 @@ class ReminderSettingsActivity final : public Activity {
     }
     if (which == 5) {
       prepareScene(9);
+      if constexpr (!CROSSINK_APP_REMINDER_TEXT_LAYOUT) {
+        static constexpr unsigned keys[] = {30, 32, 34, 37, 39};
+        const char* labels[] = {tr(STR_REMINDER_BACKSPACE), tr(STR_REMINDER_NUMBERS), tr(STR_REMINDER_SPACE),
+                                tr(STR_DONE), tr(STR_REMINDER_CASE)};
+        int right = safe().x;
+        for (unsigned i = 0; i < 5; ++i) {
+          const auto a = key(keys[i]);
+          if (a.x < right || renderer.getTextWidth(UI_10_FONT_ID, labels[i]) > a.w - 12 ||
+              target(a.x + a.w / 2, a.y + a.h / 2) != keys[i])
+            return false;
+          right = a.x + a.w;
+        }
+      }
       focus = 0;
       activate();
       if (!model.draft().child.message[0]) return false;
@@ -834,7 +848,6 @@ class ReminderSettingsActivity final : public Activity {
             ++ordinal;
           } else {
             auto a = key(i);
-            if (i >= 30 && i != 39) a.w *= i == 34 ? 3 : 2;
             box(a, caption, focus == i);
           }
         }
