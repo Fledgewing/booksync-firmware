@@ -515,3 +515,35 @@ TEST(LibraryUpgradeNotice, CachedReadsNeverCheckpointAndDismissalRunsOnlyOnWorke
   EXPECT_EQ(writes, 1u);
   publishUpgradeState(false, false, nullptr);
 }
+
+TEST_F(IndexTest, QuerySnapshotUsesLibrarySubscriptionAndDoesNoPaintIo) {
+  Index runtime{{"/.booksync/device.index", "/.booksync/device.index.tmp", "/.booksync/device.index.bak"},
+                "/.booksync/device.a",
+                "/.booksync/device.b"};
+  ASSERT_TRUE(runtime.begin({1, 1, 0, 0}));
+  row(0);
+  ASSERT_TRUE(runtime.append(record));
+  ASSERT_TRUE(runtime.commit());
+  enterLocalLibrary();
+  auto& library = offlineLibrary();
+  workLocalLibrary();
+  const auto subscription = library.subscribe();
+  QueryRequest request{};
+  request.filter.where = QueryWhere::OnDevice;
+  ASSERT_TRUE(library.requestQuery(request));
+  workLocalLibrary();
+  QueryResult result{};
+  library.readQuery(result);
+  EXPECT_EQ(result.availability, Availability::Ready);
+  EXPECT_EQ(result.count, 1);
+  EXPECT_TRUE(library.changed(subscription));
+  card.events.clear();
+  for (unsigned paint = 0; paint < 100; ++paint) library.readQuery(result);
+  EXPECT_TRUE(card.events.empty());
+  invalidateLocalCapture();
+  library.readQuery(result);
+  EXPECT_EQ(result.availability, Availability::Unavailable);
+  leaveLocalLibrary();
+  library.readQuery(result);
+  EXPECT_EQ(result.availability, Availability::NotSaved);
+}

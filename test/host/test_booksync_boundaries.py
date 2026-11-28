@@ -94,6 +94,14 @@ class Boundaries(unittest.TestCase):
                        'struct Bad { LibraryWindow& out, other; };'):
             self.assertTrue(boundary.ui_source_errors('src/booksync/interface/Probe.h', source))
 
+    def test_query_value_references_do_not_admit_handles(self):
+        for source in ('void copy(QueryResult& out);', 'bool request(const QueryRequest&);'):
+            self.assertFalse(boundary.ui_source_errors('src/booksync/interface/Probe.h', source))
+        for source in ('QueryResult* handle;', 'QueryResult& member;',
+                       'const QueryRequest& member;', 'bool request(Secret&);',
+                       'bool request(const QueryRequest*&);'):
+            self.assertTrue(boundary.ui_source_errors('src/booksync/interface/Probe.h', source))
+
     def test_build_hook_outside_script_directory_is_inventoried(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

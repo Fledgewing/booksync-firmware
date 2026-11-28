@@ -114,7 +114,10 @@ def ui_source_errors(name, source):
         bare = TOKENS.sub(' ', code)
         # A caller-owned concrete window is a value-copy destination, never an
         # opaque handle. Pointer/other reference types remain forbidden.
-        bare = re.sub(r'(\(\s*)LibraryWindow\s*&(?=\s+out\s*\))', r'\1LibraryWindow', bare)
+        bare = re.sub(r'(\(\s*)(LibraryWindow|QueryResult)\s*&(?=\s+out\s*\))', r'\1\2', bare)
+        # Large concrete immutable request values remain caller-owned during
+        # dispatch; copying the 3 KiB filter onto a C3 task stack is unsafe.
+        bare = re.sub(r'(\(\s*)const\s+QueryRequest\s*&(?=\s*\))', r'\1QueryRequest', bare)
         if re.search(r'\b(?:class|struct)\s+\w+\s*;', bare) or re.search(r'[&*]', bare):
             errors.append(f'{name}: public values cannot expose opaque pointers/references or forward handles')
     if name.startswith(('src/booksync/ui/', 'src/booksync/interface/')):

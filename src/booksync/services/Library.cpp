@@ -5,10 +5,17 @@
 #include "LocalLibrary.h"
 #include "NativeHistory.h"
 #include "OfflineLibrary.h"
+#include "Queries.h"
 #include "SdIndexSource.h"
 #include "booksync/storage/LayoutStore.h"
 namespace booksync {
 namespace {
+struct LocalQueryState {
+  StoredQuerySource source;
+  Queries worker;
+  explicit LocalQueryState(storage::Index& index) : source(index), worker(source.source()) {}
+};
+static_assert(sizeof(LocalQueryState) <= 48 * 1024);
 struct LocalState {
   storage::Index index{{"/.booksync/device.index", "/.booksync/device.index.tmp", "/.booksync/device.index.bak"},
                        "/.booksync/device.a",
@@ -29,6 +36,8 @@ struct LocalState {
   WindowBatchRequest pending{};
   storage::IndexRecord openRecord{};
   BookKey openKey{};
+  std::unique_ptr<LocalQueryState> query;
+  bool queryChanged = false;
   bool requested = false, rescan = false, resolveOpen = false, openReady = false;
 };
 static_assert(sizeof(LocalState) <= 28 * 1024);
@@ -69,6 +78,28 @@ class OfflineLibrary final : public Library {
     local->pending = batch;
     local->requested = true;
     return true;
+  }
+  bool requestQuery(const QueryRequest& request) override {
+    if (!local) return false;
+    if (!local->query) {
+      // Optional query-lifetime workspace <=48 KiB, too large for the worker
+      // stack. No allocation on ordinary Home entry or per scanned record.
+      local->query = makeUniqueNoThrow<LocalQueryState>(local->index);
+      if (!local->query) {
+        LOG_ERR("BSQ", "Cannot allocate query workspace (%u bytes)", unsigned(sizeof(LocalQueryState)));
+        return false;
+      }
+    }
+    const bool accepted = local->query->worker.start(request);
+    if (accepted) local->queryChanged = true;
+    return accepted;
+  }
+  void readQuery(QueryResult& out) const override {
+    if (local && local->query)
+      local->query->worker.copyResult(out);
+    else {
+      out.clear();
+    }
   }
   CommandStatus open(BookKey key) override {
     if (!local || !local->index.ready() || key.provenance != local->index.provenance() ||
@@ -223,6 +254,14 @@ void workLocalLibrary() {
       state.model.beginHistory(state.history.source());
   }
   if (state.model.historyBusy()) state.model.historyTick(DeviceIndex::Batch);
+  if (state.query && state.query->worker.busy()) {
+    state.query->worker.tick();
+    if (!state.query->worker.busy()) state.queryChanged = true;
+  }
+  if (state.queryChanged) {
+    state.queryChanged = false;
+    state.model.notifyQueryPublication();
+  }
 }
 bool takeIndexedOpenRequest(std::string& path) {
   if (!local || !local->openReady) return false;
@@ -235,6 +274,10 @@ bool takeIndexedOpenRequest(std::string& path) {
 void invalidateLocalCapture() {
   if (local) {
     local->model.invalidate(Invalidation::Capture);
+    if (local->query) {
+      local->query->worker.invalidate();
+      local->queryChanged = true;
+    }
     local->requested = local->pending.count != 0;
   }
 }

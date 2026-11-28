@@ -20,6 +20,8 @@ class ReadModel {
   Availability availability() const { return window_.availability; }
   LibraryWindow window() const { return window_; }
   void invalidate(Invalidation reason);
+  // Query snapshots share the Library subscription, without making book windows stale.
+  void notifyQueryPublication() { publishChanged(); }
   bool beginHistory(HistorySource source);
   bool historyTick(uint16_t allowance = HistoryBatch);
   bool historyBusy() const { return historyBusy_; }
@@ -44,7 +46,8 @@ class ReadModel {
     window_.publication = sequence_;
   }
   inline static uint64_t nextLifetime_ = 0;  // Main-loop serialized; never reset with Home.
-  uint64_t sequence_ = 1, lifetime_ = 0;
+  // Zero means no publication; the first global publication must notify subscribers.
+  uint64_t sequence_ = 0, lifetime_ = 0;
   struct ReadingValue {
     uint64_t hash = 0, revision = 0;
     uint32_t page = 0, pages = 0, seconds = 0;
