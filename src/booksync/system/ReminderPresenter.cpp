@@ -179,7 +179,11 @@ void paint(GfxRenderer& renderer, const ReminderSheetView& value) {
                               : value.due.source == ReminderSource::Managed ? StrId::STR_REMINDER_MANAGED_OFF
                                                                             : StrId::STR_REMINDER_TURN_OFF);
     const int top = r.actionY + int(i) * 52;
-    renderer.drawRect(r.x + 12, top, r.width - 24, r.actionHeight, value.focus == i ? 3 : 1, true);
+    const bool enabled =
+        !(value.due.kind == ReminderKind::Time && i == 2 && !value.sleepAvailable) &&
+        !(value.due.kind == ReminderKind::Interval && i == 1 && value.due.source != ReminderSource::Local);
+    if (!enabled) renderer.fillRectDither(r.x + 12, top, r.width - 24, r.actionHeight, Color::LightGray);
+    renderer.drawRect(r.x + 12, top, r.width - 24, r.actionHeight, value.focus == i && enabled ? 3 : 1, true);
     renderer.drawText(UI_10_FONT_ID, r.x + 24, top + 10, I18N.get(label));
   }
   renderer.displayBuffer(HalDisplay::FAST_REFRESH);
