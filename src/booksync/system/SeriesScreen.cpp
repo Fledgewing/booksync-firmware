@@ -986,14 +986,15 @@ void showSeries(GfxRenderer& renderer, MappedInputManager& input, Library& libra
   activityManager.pushActivity(std::move(screen));
 }
 void drawSeriesGroupHeader(GfxRenderer& renderer, int x, int y, int width, const char* title, uint32_t total) {
-  const int target = std::min(width / 2, std::max(100, width * 145 / 448));
   char label[48];
   std::snprintf(label, sizeof(label), tr(STR_SERIES_ALL_FORMAT), static_cast<unsigned long>(total));
+  const int labelWidth = renderer.getTextWidth(UI_10_FONT_ID, label, EpdFontFamily::BOLD);
+  const int target = std::min(width / 2, labelWidth + 16);
   renderer.beginTextClip(x, y, width - target, 50);
   renderer.drawText(UI_10_FONT_ID, x, y, title, true, EpdFontFamily::BOLD);
   renderer.endTextClip();
   renderer.beginTextClip(x + width - target, y, target, 50);
-  renderer.drawText(UI_10_FONT_ID, x + width - target, y, label, true, EpdFontFamily::BOLD);
+  renderer.drawText(UI_10_FONT_ID, x + width - labelWidth, y, label, true, EpdFontFamily::BOLD);
   renderer.endTextClip();
 }
 #ifdef SIMULATOR
