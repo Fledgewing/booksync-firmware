@@ -407,6 +407,19 @@ bool DownloadJobs::begin(DownloadSource& source) {
     return false;
   }
   const auto expected = status_.totalKnown ? status_.total : MaxBytes;
+  if (!status_.received) {
+    // Reuse cold-path scratch; preserve the frozen destination while creating
+    // its parent hierarchy under the admitted storage writer.
+    const auto parent = std::strrchr(record_.spec.path.data(), '/') - record_.spec.path.data();
+    if (parent) {
+      std::memcpy(buffer_.data(), record_.spec.path.data(), parent);
+      buffer_[parent] = 0;
+      if (!Storage.ensureDirectoryExists(reinterpret_cast<const char*>(buffer_.data()))) {
+        fail(DownloadError::StorageFailure);
+        return false;
+      }
+    }
+  }
   artifactOpen_ = status_.received ? artifact_.resume(expected, status_.received) : artifact_.begin(expected);
   if (!artifactOpen_) {
     fail(DownloadError::StorageFailure);

@@ -15,7 +15,8 @@ single-job limit deliberately keeps the C3 workspace bounded; sequential bulk
 orchestration belongs to F36c. A new selection never substitutes a primary file
 or overwrites an unrelated destination. F24 owns copy replacement and sidecars.
 
-The worker acquires F11 TLS/catalog/worker tokens before opening transport and
+The worker creates missing destination parents with the HAL under the same
+admission, without changing the frozen path. It acquires F11 TLS/catalog/worker tokens before opening transport and
 checks admission before each chunk, hashing read, and publication. Status is a
 value copy; progress includes an ID and monotonic sequence. Only the private
 adapter resolves acquisition paths with current authorization. It rejects

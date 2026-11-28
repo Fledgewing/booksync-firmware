@@ -30,6 +30,7 @@ inline void runDownloadJobsScenario() {
   std::strcpy(spec.file.data(), "opaque:file");
   std::strcpy(spec.variant.data(), "selected");
   std::strcpy(spec.path.data(), "/downloads/book.epub");
+  if (!std::strcmp(mode, "nested")) std::strcpy(spec.path.data(), "/downloads/author/nested/book.epub");
   spec.bytes = 3;
   spec.sizeKnown = true;
   if (protocol) {

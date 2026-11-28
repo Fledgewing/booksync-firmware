@@ -171,6 +171,22 @@ TEST_F(DownloadTest, VisibleRenameMustConfirmDurabilityBeforeLink) {
   EXPECT_EQ(links, 1u);
   EXPECT_EQ(card.disk[spec.path.data()], "abc");
 }
+TEST_F(DownloadTest, CreatesNestedDestinationOnlyInsideAdmission) {
+  std::strcpy(spec.path.data(), "/books/author/nested/book.epub");
+  DownloadJobs j(journal, admission, ports);
+  ASSERT_TRUE(j.recover(scope, owner));
+  admission.setReading(true);
+  const auto before = card.events.size();
+  EXPECT_EQ(j.start(spec, source, owner), 0u);
+  EXPECT_EQ(card.events.size(), before);
+  admission.setReading(false);
+  const auto id = j.start(spec, source, owner);
+  ASSERT_NE(id, 0u);
+  complete(j);
+  EXPECT_NE(std::find(card.events.begin(), card.events.end(), "mkdir:/books/author/nested"), card.events.end());
+  EXPECT_EQ(j.result(id, owner), DeliveryResult::Ready);
+  EXPECT_EQ(card.files[spec.path.data()], "abc");
+}
 TEST_F(DownloadTest, WrongDigestNeverPublishes) {
   source.badDigest = true;
   DownloadJobs j(journal, admission, ports);

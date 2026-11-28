@@ -12,7 +12,7 @@ if profile not in ('x4-pro-simulator', 'x4-classic-simulator', 'simulator-X3'):
     raise SystemExit('unrecognized simulator profile')
 out = root / 'reports' / profile
 out.mkdir(parents=True, exist_ok=True)
-groups = (('download',), ('retired',), ('digest',), ('edition',), ('space',),
+groups = (('download',), ('nested',), ('retired',), ('digest',), ('edition',), ('space',),
           ('cancel', 'recover-canceled'), ('cut', 'resume'), ('cut-published', 'resume-published'),
           ('proof-download',), ('proof-digest',), ('proof-edition',),
           ('proof-cut', 'proof-resume'), ('proof-cut-published', 'proof-resume-published'))

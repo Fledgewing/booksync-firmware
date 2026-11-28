@@ -109,6 +109,9 @@ using FsFile = HalFile;
 class HalStorage {
  public:
   bool mkdir(const char*) { return true; }
+  bool ensureDirectoryExists(const char* path) {
+    return card.event(std::string("mkdir:") + path) && !card.readOnly && !card.full;
+  }
   bool exists(const char* path) { return card.files.count(path); }
   FsFile open(const char* path, int flags = O_RDONLY) {
     if (!card.event("open")) return {};
