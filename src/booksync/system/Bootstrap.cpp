@@ -230,15 +230,15 @@ class ShellActivity final : public Activity {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
     const int width = (header.width - 24) / 3;
-    return {header.x + 12 + index * width, header.y + renderer.getLineHeight(BITTER_14_FONT_ID) + 8, width - 4,
-            renderer.getLineHeight(UI_10_FONT_ID) + 12};
+    return Rect{header.x + 12 + index * width, header.y + renderer.getLineHeight(BITTER_14_FONT_ID) + 8, width - 4,
+                renderer.getLineHeight(UI_10_FONT_ID) + 12};
   }
   Rect editorRow(uint8_t index) const {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
     const int line = renderer.getLineHeight(UI_10_FONT_ID);
     const int height = line + 26;
-    return {safe.x + 24, header.y + header.height + line * 3 + 28 + index * height, safe.width - 48, height};
+    return Rect{safe.x + 24, header.y + header.height + line * 3 + 28 + index * height, safe.width - 48, height};
   }
   void paintEditor() const {
     using Panel = EditorAddRemove::Panel;
