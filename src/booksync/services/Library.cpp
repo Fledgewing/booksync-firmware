@@ -43,6 +43,7 @@ struct LocalState {
   std::unique_ptr<StatsWorker> stats;
   ServerAdapter* savedStatsSource = nullptr;  // Borrowed Home-lifetime provider; Bootstrap owns it.
   bool queryChanged = false;
+  uint64_t queryRequestId = 0;
   bool requested = false, rescan = false, resolveOpen = false, openReady = false;
 };
 static_assert(sizeof(LocalState) <= 28 * 1024);
@@ -58,6 +59,7 @@ AccountView accountPresentation{};
 // a heap allocation for the offline capability view and never holds credentials.
 AccountFormView formPresentation{};
 uint64_t nextAccountForm = 0;
+bool catalogRequested = false, catalogAccountRequested = false;
 bool noticeDismissalPending = false;
 // Presentation retirement spans Home instances, independently of SD checkpoint
 // success. A failed write must not reopen a dismissed notice during this boot.
@@ -144,6 +146,16 @@ class OfflineLibrary final : public Library {
     }
     return value;
   }
+  CatalogSummary catalogSummary() const override {
+    CatalogSummary value;
+    if (local) {
+      value.provenance = local->index.provenance();
+      value.publication = local->model.subscribe().sequence;
+      // A device index proves local files only; never impersonate server totals.
+      value.onCard = {local->index.count(), local->index.ready() ? Availability::Ready : Availability::NotSaved};
+    }
+    return value;
+  }
   bool requestWindow(WindowRequest request) override {
     WindowBatchRequest batch;
     batch.windows[0] = request;
@@ -169,8 +181,17 @@ class OfflineLibrary final : public Library {
       }
     }
     const bool accepted = local->query->worker.start(request);
-    if (accepted) local->queryChanged = true;
+    if (accepted) {
+      local->queryChanged = true;
+      local->queryRequestId = request.requestId;
+    }
     return accepted;
+  }
+  void retireQuery(uint64_t requestId) override {
+    if (!local || !local->query || local->queryRequestId != requestId) return;
+    local->query->worker.cancel();
+    local->query.reset();  // Release the optional F22 workspace when its foreground owner leaves.
+    local->queryChanged = true;
   }
   void readQuery(QueryResult& out) const override {
     if (local && local->query)
@@ -228,6 +249,14 @@ class OfflineLibrary final : public Library {
   Subscription subscribe() const override { return local ? local->model.subscribe() : Subscription{}; }
   bool changed(Subscription value) const override { return local && local->model.changed(value); }
   CommandStatus submit(Intent intent) override {
+    if (intent == Intent::OpenAccount) {
+      catalogAccountRequested = true;
+      return CommandStatus::Accepted;
+    }
+    if (intent == Intent::BrowseLibrary) {
+      catalogRequested = true;
+      return CommandStatus::Accepted;
+    }
     if (intent == Intent::DismissUpgradeNotice) {
       if (!noticeCheckpoint) return CommandStatus::Unavailable;
       noticePresentationRetired = true;
@@ -274,11 +303,22 @@ void publishHomeBook(bool available, const char* title) {
   shellLibrary().available = available;
   shellLibrary().openRequested = false;
 }
+bool takeCatalogAccountRequest() {
+  const bool requested = catalogAccountRequested;
+  catalogAccountRequested = false;
+  return requested;
+}
+bool takeCatalogRequest() {
+  const bool requested = catalogRequested;
+  catalogRequested = false;
+  return requested;
+}
 bool takeHomeOpenRequest() {
   const bool requested = shellLibrary().openRequested;
   shellLibrary().openRequested = false;
   return requested;
 }
+bool localLibraryActive() { return bool(local); }
 void enterLocalLibrary(ServerAdapter* savedStatsSource) {
   reader::captureChanged = invalidateLocalCapture;
   if (local) return;
@@ -346,6 +386,15 @@ void workLocalLibrary() {
   if (state.resolveOpen) {
     state.resolveOpen = false;
     state.openReady = state.index.read(state.openKey, state.openRecord) && Storage.exists(state.openRecord.path.data());
+    if (!state.openReady) {
+      LOG_ERR("BSI", "Indexed file unavailable; scheduling bounded device-index refresh");
+      state.model.invalidate(Invalidation::Files);
+      state.rescan = true;
+      if (state.query) {
+        state.query->worker.invalidate();
+        state.queryChanged = true;
+      }
+    }
   }
   const bool scanning = state.worker.busy();
   if (scanning && !state.worker.tick()) state.source.close();

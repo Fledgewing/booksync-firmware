@@ -5,6 +5,7 @@
 #include "Models.h"
 #include "booksync/interface/AccountForm.h"
 #include "booksync/interface/AccountView.h"
+#include "booksync/interface/CatalogView.h"
 #include "booksync/interface/Clock.h"
 #include "booksync/interface/Covers.h"
 #include "booksync/interface/Downloads.h"
@@ -58,6 +59,7 @@ class Library {
   virtual CommandStatus resumeDownload(uint64_t) { return CommandStatus::Unavailable; }
   virtual CommandStatus cancelDownload(uint64_t) { return CommandStatus::Unavailable; }
   virtual bool requestQuery(const QueryRequest&) { return false; }
+  virtual void retireQuery(uint64_t) {}
   virtual void readQuery(QueryResult& out) const {
     out.clear();
     out.availability = Availability::Unsupported;
@@ -81,6 +83,20 @@ class Library {
     return false;
   }
   virtual CommandStatus showBook(BookKey key) { return open(key); }
+  // F36 cached presentation projections. Dispatch/request methods run outside paint.
+  virtual CatalogSummary catalogSummary() const { return {}; }
+  virtual bool requestCatalogSources(CatalogSourceRequest) { return false; }
+  virtual void readCatalogSources(CatalogSources& out) const {
+    out = {};
+    out.availability = Availability::Unsupported;
+  }
+  virtual void readDownloadChoices(BookKey, DownloadChoices& out) const { out = {}; }
+  virtual DownloadStatus bookDownloadStatus(BookKey) const { return {}; }
+  virtual CommandStatus connectForDownload(BookKey) { return CommandStatus::Unavailable; }
+  virtual CommandStatus showBookDetails(BookKey) { return CommandStatus::Unavailable; }
+  virtual CommandStatus showCatalogSeries(std::array<char, 64>) { return CommandStatus::Unavailable; }
+  virtual CommandStatus showCatalogFilter() { return CommandStatus::Unavailable; }
+  virtual CommandStatus showDownloadAccount() { return submit(Intent::OpenAccount); }
   virtual CommandStatus open(BookKey) { return CommandStatus::Unavailable; }
   virtual LibraryWindow window() const { return {}; }
   virtual void readWindow(LibraryWindow& out) const { out = window(); }

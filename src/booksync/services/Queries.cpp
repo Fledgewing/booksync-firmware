@@ -81,7 +81,8 @@ QueryFields Queries::required() const {
   need(f.show != QueryShow::All && f.show != QueryShow::WantToRead, QueryField::Status);
   need(f.wantToRead || f.show == QueryShow::WantToRead, QueryField::WantToRead);
   need(f.where != QueryWhere::Anywhere, QueryField::Device);
-  need(f.authors.count || (grouped && f.group == QueryGroup::Author) || (ordered && f.sort == QuerySort::Author),
+  need(f.withoutAuthor || f.authors.count || (grouped && f.group == QueryGroup::Author) ||
+           (ordered && f.sort == QuerySort::Author),
        QueryField::Author);
   need(f.series.count || f.withoutSeries || (grouped && f.group == QueryGroup::Series), QueryField::Series);
   need(f.tags.count, QueryField::Tags);
@@ -203,6 +204,7 @@ bool Queries::matches(bool omitFacet) const {
   if (where == QueryWhere::OnDevice && row_.onDevice != QueryTruth::Yes) return false;
   if (where == QueryWhere::ServerOnly && row_.onDevice != QueryTruth::No) return false;
   if (f.withoutSeries && row_.seriesCount) return false;
+  if (f.withoutAuthor && row_.authorCount) return false;
   if ((!ignore(QueryFacet::Author) && !selected(f.authors, row_.authors, row_.authorCount)) ||
       (!ignore(QueryFacet::Series) && !selected(f.series, row_.series, row_.seriesCount)) ||
       (!ignore(QueryFacet::Tags) && !selected(f.tags, row_.tags, row_.tagCount)) ||
@@ -260,6 +262,15 @@ bool Queries::validRow() const {
          (!row_.seriesPositionKnown || std::isfinite(row_.seriesPosition)) &&
          (!row_.matchKnown || std::isfinite(row_.match));
 }
+// Reuse the member scratch out of line: grouped preview projection must not
+// inline a BookRow reset temporary into its nested membership pass on C3.
+void Queries::clearCandidate() {
+  candidate_.value.clear();
+  candidate_.order.fill(0);
+  candidate_.number = 0;
+  candidate_.sourceRank = 0;
+  candidate_.known = true;
+}
 void Queries::rank() {
   clearCandidate();
   candidate_.value.book = row_.book;
@@ -270,6 +281,7 @@ void Queries::rank() {
   candidate_.value.ratingKnown = row_.ratingKnown;
   candidate_.sourceRank = row_.book.key.ordinal;
   const auto& f = request_.filter;
+  if (f.group == QueryGroup::None && row_.authorCount) candidate_.value.label = row_.authors[0];
   if (f.group == QueryGroup::Author)
     copy(candidate_.value.label, row_.authorCount ? row_.authors[0].data() : "Unknown author");
   if (f.group == QueryGroup::Series)
@@ -335,7 +347,7 @@ int Queries::compare(const Ranked& a, const Ranked& b) const {
     if (request_.field <= QueryFacet::Tags) return cmp(a.value.label.data(), b.value.label.data());
     return static_cast<int>(a.value.option) - static_cast<int>(b.value.option);
   }
-  int c = cmp(a.value.label.data(), b.value.label.data());
+  int c = request_.filter.group == QueryGroup::None ? 0 : cmp(a.value.label.data(), b.value.label.data());
   if (c) return c;
   if (a.known != b.known) return a.known ? -1 : 1;
   if (a.known) {
@@ -359,21 +371,37 @@ void Queries::insert() {
   selected_[at] = candidate_;
 }
 void Queries::projectLabels() {
+  // Android groups by first author / primary series; secondary identities stay
+  // available through contextual series queries, without duplicating groups.
   const bool series = request_.filter.group == QueryGroup::Series;
   const bool missing = series ? !row_.seriesCount : !row_.authorCount;
-  const char* label =
-      missing ? (series ? "No series" : "Unknown author") : (series ? row_.series[0].data() : row_.authors[0].data());
+  const char* label = missing  ? (series ? "No series" : "Unknown author")
+                      : series ? row_.series[0].data()
+                               : row_.authors[0].data();
   clearCandidate();
   copy(candidate_.value.label, label);
   candidate_.value.missing = missing;
-  if (series && !missing) candidate_.value.groupKey = row_.seriesKeys[0];
+  candidate_.value.book = row_.book;
+  candidate_.value.onDevice = row_.onDevice;
+  candidate_.value.status = row_.status;
+  if (series && !missing) {
+    candidate_.value.groupKey = row_.seriesKeys[0];
+    candidate_.value.seriesPosition = row_.seriesPositions[0];
+    candidate_.value.seriesPositionKnown = row_.seriesPositionsKnown[0];
+  }
   if (countingFacets_) {
     for (unsigned i = 0; i < selectedCount_; ++i)
       if (!compare(candidate_, selected_[i])) ++selected_[i].value.books;
     return;
   }
   for (unsigned i = 0; i < selectedCount_; ++i)
-    if (!compare(candidate_, selected_[i])) return;
+    if (!compare(candidate_, selected_[i])) {
+      const auto& preview = selected_[i].value;
+      const bool earlier = series && candidate_.value.seriesPositionKnown &&
+                           (!preview.seriesPositionKnown || candidate_.value.seriesPosition < preview.seriesPosition);
+      if (earlier) selected_[i].value = candidate_.value;
+      return;
+    }
   insert();
 }
 void Queries::finishPass() {

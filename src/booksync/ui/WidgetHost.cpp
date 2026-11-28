@@ -172,6 +172,6 @@ CommandStatus WidgetHost::dispatchWidget(uint8_t widget, uint8_t itemIndex) {
   if (viewValue.viewState != WidgetState::Known || itemIndex >= viewValue.count) return CommandStatus::Unavailable;
   if (page_.widgets[widget].kind == WidgetKind::Continue) return library_.submit(Intent::OpenLastBook);
   if (page_.widgets[widget].kind == WidgetKind::Shelf) return library_.open(viewValue.rows[itemIndex].key);
-  return library_.submit(Intent::BrowseOnDevice);
+  return library_.submit(Intent::BrowseLibrary);
 }
 }  // namespace booksync

@@ -87,6 +87,7 @@ class Queries {
       result.clear();
       result.provenance = state_.provenance;
       result.requestId = request_.requestId;
+      result.pending = true;
     } else {
       result = result_;
       if (result.availability == Availability::Ready) {
@@ -132,13 +133,7 @@ class Queries {
   void seedLabel();
   void advanceLabel();
   bool validRow() const;
-  void clearCandidate() {
-    candidate_.value.clear();
-    candidate_.order.fill(0);
-    candidate_.number = 0;
-    candidate_.sourceRank = 0;
-    candidate_.known = true;
-  }
+  void clearCandidate();
   void rank();
   int compare(const Ranked&, const Ranked&) const;
   void insert();

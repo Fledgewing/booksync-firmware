@@ -15,6 +15,8 @@
 - BookSync adds compact Series pages and exact next-1–10 download review on X4 Pro touch, X4 Classic buttons and X3, with offline/Back behavior, frozen file choices and restart-safe account-scoped queues through Library.
 - BookSync Home adds compact This week and Reading streak summaries on X4 Pro and Classic, with explicit missing/off/stale/error states and unchanged X3 availability.
 
+- BookSync adds the approved compact Library and scoped/grouped lists on touch, buttons and X3 text, with explicit offline download consent, cached file choices, cancel/resume states and Back restoration. The live catalog/download facade remains a separate integration.
+
 - BookSync adds shared position conflict, reset, override and decline policy with durable account/edition isolation and stale-answer rejection; late consent uses the existing one-draw reading exception. Live transport and reader presentation remain deferred.
 - BookSync adds account-isolated authenticated catalog transport behind Library, with bounded response spooling and rejection of incomplete or revoked responses; automatic sync scheduling follows separately.
 - BookSync preserves immutable account- and source-bound native observations for live sync, with independent source identities and restart-safe match/statistics evidence; worker scheduling follows separately.

@@ -26,6 +26,7 @@
 #include "activities/Activity.h"
 #include "booksync/services/LocalLibrary.h"
 #include "booksync/services/OfflineLibrary.h"
+#include "booksync/system/CatalogScreen.h"
 #include "booksync/ui/EditorAddRemove.h"
 #include "booksync/ui/Home.h"
 #include "booksync/ui/WidgetHost.h"
@@ -1228,6 +1229,15 @@ class ShellActivity final : public Activity {
         }
       } else if (mappedInput.wasReleased(MappedInputManager::Button::Confirm))
         home.submit();
+    }
+    if (takeCatalogRequest()) {
+      auto screen = createCatalogScreen(renderer, mappedInput, library);
+      if (screen)
+        startActivityForResult(std::move(screen), [this](const ActivityResult&) {
+          if (widgets) widgets->enter(widgets->page().page);
+          requestUpdate();
+        });
+      return;
     }
     std::string indexedPath;
     if (takeIndexedOpenRequest(indexedPath)) activityManager.goToReader(indexedPath);

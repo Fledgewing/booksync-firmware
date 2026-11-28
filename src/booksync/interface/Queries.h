@@ -31,7 +31,7 @@ struct QueryFilter {
   QueryWhere where = QueryWhere::Anywhere;
   QueryGroup group = QueryGroup::None;
   QuerySort sort = QuerySort::Order;
-  bool wantToRead = false, withoutSeries = false, descending = false;
+  bool wantToRead = false, withoutSeries = false, descending = false, withoutAuthor = false;
 };
 struct QueryRequest {
   uint64_t requestId = 0;  // Caller correlation; never a durable job or server identity.
@@ -83,6 +83,7 @@ struct QueryResult {
   std::array<uint32_t, 3> deviceCounts{};
   bool statusCountsKnown = false, deviceCountsKnown = false;
   bool hasMore = false;
+  bool membershipComplete = true, pending = false;
   void clear() {
     for (uint16_t i = 0; i < LibraryRows; ++i) entries[i].clear();
     provenance = {};
@@ -92,7 +93,8 @@ struct QueryResult {
     availability = Availability::NotSaved;
     statuses.fill(0);
     deviceCounts.fill(0);
-    statusCountsKnown = deviceCountsKnown = hasMore = false;
+    statusCountsKnown = deviceCountsKnown = hasMore = pending = false;
+    membershipComplete = true;
   }
 };
 static_assert(sizeof(QueryResult) <= LibraryBytes);

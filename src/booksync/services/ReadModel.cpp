@@ -36,6 +36,7 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
   constexpr uint32_t Metadata = sizeof(LibraryWindow) - sizeof(BookRow) * LibraryRows;
   historyBusy_ = false;
   window_.rows.fill({});
+  window_.fileAvailability.fill(FileAvailability::Unknown);
   window_.windows.fill({});
   window_.count = 0;
   window_.windowCount = batch.count;
@@ -81,6 +82,7 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
         ok = false;
         break;
       }
+      window_.fileAvailability[window_.count] = FileAvailability::OnCard;
       ++span.count;
       ++window_.count;
     }
@@ -96,6 +98,7 @@ void ReadModel::invalidate(Invalidation reason) {
     // Account retirement clears counts/provenance as well as row contents; a
     // cached source total must not escape into the next account's snapshot.
     window_.rows.fill({});
+    window_.fileAvailability.fill(FileAvailability::Unknown);
     window_.windows.fill({});
     window_.provenance = {};
     window_.request = {};

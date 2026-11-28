@@ -12,7 +12,7 @@ struct QueryFixture : testing::Test {
   QueryRequest request{};
   uint32_t generation = 1, books = 80, reads = 0;
   QueryFields fields = QueryAllFields;
-  bool fail = false;
+  bool fail = false, missingAuthors = false;
   QuerySource source() {
     return {this,
             [](void* p) {
@@ -27,7 +27,7 @@ struct QueryFixture : testing::Test {
               row.book.key = key;
               std::snprintf(row.book.title.data(), row.book.title.size(), "Book %03u", key.ordinal);
               std::strcpy(row.authors[0].data(), key.ordinal % 2 ? "Writer B" : "Writer A");
-              row.authorCount = 1;
+              row.authorCount = f.missingAuthors && key.ordinal % 3 == 0 ? 0 : 1;
               std::strcpy(row.series[0].data(), "Primary");
               std::strcpy(row.series[1].data(), "Secondary");
               row.seriesCount = 2;
@@ -415,3 +415,42 @@ TEST(StoredQueries, NativeReadingPagesDoNotClaimBibliographicLength) {
 }
 
 }  // namespace
+
+TEST_F(QueryFixture, GroupPreviewKeepsAndroidPrimarySemanticsAndContextWindowsStayAvailable) {
+  request.kind = QueryKind::Groups;
+  request.filter.group = QueryGroup::Series;
+  request.limit = 5;
+  run();
+  ASSERT_EQ(result.availability, Availability::Ready);
+  ASSERT_EQ(result.count, 1);
+  EXPECT_STREQ(result.entries[0].groupKey.data(), "series-primary");
+  EXPECT_EQ(result.entries[0].books, 80u);
+  EXPECT_STREQ(result.entries[0].book.title.data(), "Book 000");
+  request.kind = QueryKind::Books;
+  request.filter.group = QueryGroup::None;
+  std::strcpy(request.seriesKey.data(), "series-secondary");
+  request.filter.sort = QuerySort::Series;
+  run();
+  ASSERT_EQ(result.availability, Availability::Ready);
+  EXPECT_EQ(result.entries[0].book.key.ordinal, 79u);
+}
+
+TEST_F(QueryFixture, MissingAuthorScopeUsesAbsenceInsteadOfDisplayLabel) {
+  missingAuthors = true;
+  request.filter.withoutAuthor = true;
+  run();
+  ASSERT_EQ(result.availability, Availability::Ready);
+  EXPECT_EQ(result.matchedBooks, 27u);
+  ASSERT_GE(result.count, 2);
+  EXPECT_EQ(result.entries[0].book.key.ordinal, 0u);
+  EXPECT_EQ(result.entries[1].book.key.ordinal, 3u);
+  request.kind = QueryKind::Groups;
+  request.filter.group = QueryGroup::Author;
+  run();
+  ASSERT_EQ(result.count, 1);
+  EXPECT_TRUE(result.entries[0].missing);
+  EXPECT_EQ(result.entries[0].books, 27u);
+  fields &= ~queryField(QueryField::Author);
+  run();
+  EXPECT_EQ(result.availability, Availability::Unsupported);
+}
