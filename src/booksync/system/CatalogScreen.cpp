@@ -223,8 +223,8 @@ class CatalogActivity final : public Activity {
   void button(Rect r, const char* label, uint8_t index, uint8_t action = 0, int size = 16, bool centered = true) const {
     renderer.drawRect(r.x, r.y, r.width, r.height, 1, true);
     if (catalogFocused(index) && !action) paintCatalogFocus(r);
-    text(Rect{r.x + catalogPixels(12), r.y + catalogPixels(14), r.width - catalogPixels(24),
-              r.height - catalogPixels(18)},
+    const int inset = catalogPixels(centered ? 16 : 12);
+    text(Rect{r.x + inset, r.y + catalogPixels(14), r.width - inset * 2, r.height - catalogPixels(18)},
          label, size, false, centered ? 1 : 0);
     hit(r, index, action);
   }
