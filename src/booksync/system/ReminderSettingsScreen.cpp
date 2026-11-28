@@ -69,7 +69,7 @@ class ReminderSettingsActivity final : public Activity {
     paintReminderParagraph(renderer, text, x, y, width, draw);
   }
 
-  void box(Region r, const char* text, bool selected, bool enabled = true) const {
+  void paintReminderOption(Region r, const char* text, bool selected, bool enabled = true) const {
     if (!enabled) renderer.fillRectDither(r.x, r.y, r.w, r.h, Color::LightGray);
     renderer.drawRect(r.x, r.y, r.w, r.h, selected && enabled ? 3 : 1, true);
     renderer.drawText(UI_10_FONT_ID, r.x + 10, r.y + 8, text);
@@ -613,8 +613,8 @@ class ReminderSettingsActivity final : public Activity {
         int y = r.y + 100;
         paintReminderText(tr(STR_REMINDER_UNREADABLE), r.x + 12, y, r.w - 24);
         paintReminderText(tr(STR_REMINDER_DATA_KEPT), r.x + 12, y, r.w - 24);
-        box(footer(0, 2), tr(STR_BACK), focus == 0);
-        box(footer(1, 2), tr(STR_RETRY), focus == 1);
+        paintReminderOption(footer(0, 2), tr(STR_BACK), focus == 0);
+        paintReminderOption(footer(1, 2), tr(STR_RETRY), focus == 1);
       } else {
         int y = r.y + 54;
         if (!model.memo().clockKnown) paintReminderText(tr(STR_REMINDER_CLOCK_HELP), r.x + 12, y, r.w - 24);
@@ -633,9 +633,9 @@ class ReminderSettingsActivity final : public Activity {
           if constexpr (CROSSINK_APP_REMINDER_TEXT_LAYOUT) {
             char numbered[96]{};
             std::snprintf(numbered, sizeof(numbered), tr(STR_REMINDER_NUMBERED_FORMAT), index + 1, text);
-            box(a, numbered, focus == i);
+            paintReminderOption(a, numbered, focus == i);
           } else
-            box(a, text, focus == i);
+            paintReminderOption(a, text, focus == i);
           if (value.fields.kind == ReminderKind::Interval) {
             if (!model.memo().clockKnown)
               std::snprintf(text, sizeof(text), "%s", tr(STR_REMINDER_EYE_CLOCK_HELP));
@@ -678,16 +678,16 @@ class ReminderSettingsActivity final : public Activity {
         renderer.drawText(UI_10_FONT_ID, r.x + 12, r.y + r.h - (model.memo().clockKnown ? 78 : 126),
                           model.timeCount() == 8 ? tr(STR_REMINDER_FULL) : text);
         if (model.pages() == 1)
-          box(footer(0), tr(STR_REMINDER_ADD), focus == 4, focusValid(4));
+          paintReminderOption(footer(0), tr(STR_REMINDER_ADD), focus == 4, focusValid(4));
         else {
-          box(footer(0, 3), tr(STR_REMINDER_ADD), focus == 4, focusValid(4));
-          box(footer(1, 3), tr(STR_HOME_PREV), focus == 5, focusValid(5));
-          box(footer(2, 3), tr(STR_HOME_NEXT), focus == 6, focusValid(6));
+          paintReminderOption(footer(0, 3), tr(STR_REMINDER_ADD), focus == 4, focusValid(4));
+          paintReminderOption(footer(1, 3), tr(STR_HOME_PREV), focus == 5, focusValid(5));
+          paintReminderOption(footer(2, 3), tr(STR_HOME_NEXT), focus == 6, focusValid(6));
         }
         if (!model.memo().clockKnown) {
           auto connect = footer(0);
           connect.y -= 48;
-          box(connect, tr(STR_REMINDER_CONNECT), focus == 7);
+          paintReminderOption(connect, tr(STR_REMINDER_CONNECT), focus == 7);
         }
       }
     } else if (screen == ReminderScreen::Editor) {
@@ -705,26 +705,27 @@ class ReminderSettingsActivity final : public Activity {
                                                   : StrId::STR_REMINDER_CUSTOM),
                           r.x + 12, y, r.w - 24);
         paintReminderText(d.message[0] ? d.message : tr(STR_REMINDER_DEFAULT), r.x + 12, y, r.w - 24);
-        box(footer(0), tr(STR_BACK), true);
+        paintReminderOption(footer(0), tr(STR_BACK), true);
       } else {
         std::snprintf(text, sizeof(text), tr(STR_REMINDER_FIELD_FORMAT), tr(STR_REMINDER),
                       d.enabled ? tr(STR_REMINDER_ON) : tr(STR_REMINDER_OFF));
-        box(row(0), text, focus == 0);
+        paintReminderOption(row(0), text, focus == 0);
         minutes(text, sizeof(text), d.minute);
         char label[96]{};
         std::snprintf(label, sizeof(label), tr(STR_REMINDER_FIELD_FORMAT), tr(STR_REMINDER_TIME), text);
         if (interval) std::snprintf(label, sizeof(label), tr(STR_REMINDER_MINUTES_FORMAT), unsigned(d.intervalMinutes));
-        box(row(1), label, focus == 1);
+        paintReminderOption(row(1), label, focus == 1);
         if (!interval) {
           std::snprintf(label, sizeof(label), tr(STR_REMINDER_FIELD_FORMAT), tr(STR_REMINDER_DAYS),
                         I18N.get(d.days == 127  ? StrId::STR_REMINDER_EVERY_DAY
                                  : d.days == 31 ? StrId::STR_REMINDER_WEEKDAYS
                                  : d.days == 96 ? StrId::STR_REMINDER_WEEKENDS
                                                 : StrId::STR_REMINDER_CUSTOM));
-          box(row(2), label, focus == 2);
+          paintReminderOption(row(2), label, focus == 2);
           std::snprintf(label, sizeof(label), tr(STR_REMINDER_FIELD_FORMAT), tr(STR_REMINDER_MESSAGE),
                         d.message[0] ? d.message : tr(STR_REMINDER_DEFAULT));
-          box(row(3), renderer.getTextWidth(UI_10_FONT_ID, label) < row(3).w - 20 ? label : tr(STR_REMINDER_MESSAGE),
+          paintReminderOption(
+              row(3), renderer.getTextWidth(UI_10_FONT_ID, label) < row(3).w - 20 ? label : tr(STR_REMINDER_MESSAGE),
               focus == 3);
         } else {
           int y = row(2).y;
@@ -735,8 +736,8 @@ class ReminderSettingsActivity final : public Activity {
           paintReminderText(tr(STR_REMINDER_SAVE_ERROR), r.x + 12, y, r.w - 24);
         auto save = footer(0);
         if (!interval && model.draft().existing) save.y -= 48;
-        box(save, tr(STR_REMINDER_SAVE), focus == (interval ? 2 : 4));
-        if (!interval && model.draft().existing) box(footer(0), tr(STR_REMINDER_DELETE), focus == 5);
+        paintReminderOption(save, tr(STR_REMINDER_SAVE), focus == (interval ? 2 : 4));
+        if (!interval && model.draft().existing) paintReminderOption(footer(0), tr(STR_REMINDER_DELETE), focus == 5);
       }
     } else if (screen == ReminderScreen::Days || screen == ReminderScreen::CustomDays) {
       if (screen == ReminderScreen::Days) {
@@ -746,23 +747,23 @@ class ReminderSettingsActivity final : public Activity {
           const auto chosen = model.draft().child.days;
           const unsigned preset = chosen == 127 ? 0 : chosen == 31 ? 1 : chosen == 96 ? 2 : 3;
           std::snprintf(text, sizeof(text), "[%c] %s", preset == i ? 'x' : ' ', I18N.get(labels[i]));
-          box(row(i), text, focus == i);
+          paintReminderOption(row(i), text, focus == i);
         }
-        box(footer(0), tr(STR_DONE), focus == 4);
+        paintReminderOption(footer(0), tr(STR_DONE), focus == 4);
       } else {
         for (unsigned i = 0; i < dayRows(); ++i) {
           const unsigned n = dayPage * dayRows() + i;
           if (n >= 7) break;
           std::snprintf(text, sizeof(text), "[%c] %s", model.draft().child.days & (1 << n) ? 'x' : ' ',
                         I18N.get(days[n]));
-          box(row(i), text, focus == i);
+          paintReminderOption(row(i), text, focus == i);
         }
         if (dayRows() == 7)
-          box(footer(0), tr(STR_DONE), focus == 7);
+          paintReminderOption(footer(0), tr(STR_DONE), focus == 7);
         else {
-          box(footer(0, 3), tr(STR_DONE), focus == 4);
-          box(footer(1, 3), tr(STR_HOME_PREV), focus == 5, focusValid(5));
-          box(footer(2, 3), tr(STR_HOME_NEXT), focus == 6, focusValid(6));
+          paintReminderOption(footer(0, 3), tr(STR_DONE), focus == 4);
+          paintReminderOption(footer(1, 3), tr(STR_HOME_PREV), focus == 5, focusValid(5));
+          paintReminderOption(footer(2, 3), tr(STR_HOME_NEXT), focus == 6, focusValid(6));
         }
       }
       if (model.error() == ReminderStatus::Invalid)
@@ -774,15 +775,15 @@ class ReminderSettingsActivity final : public Activity {
         std::snprintf(caption, sizeof(caption), tr(STR_REMINDER_MINUTES_FORMAT), unsigned(values[i]));
         std::snprintf(text, sizeof(text), "[%c] %s", model.draft().child.intervalMinutes == values[i] ? 'x' : ' ',
                       caption);
-        box(row(i), text, focus == i);
+        paintReminderOption(row(i), text, focus == i);
       }
-      box(footer(0), tr(STR_DONE), focus == 4);
+      paintReminderOption(footer(0), tr(STR_DONE), focus == 4);
     } else if (screen == ReminderScreen::Delete) {
       int y = r.y + 86;
       paintReminderText(tr(STR_REMINDER_DELETE_HELP), r.x + 12, y, r.w - 24);
       if (model.error() != ReminderStatus::Saved) paintReminderText(tr(STR_REMINDER_SAVE_ERROR), r.x + 12, y, r.w - 24);
-      box(footer(0, 2), tr(STR_CANCEL), focus == 0);
-      box(footer(1, 2), tr(STR_REMINDER_DELETE), focus == 1);
+      paintReminderOption(footer(0, 2), tr(STR_CANCEL), focus == 0);
+      paintReminderOption(footer(1, 2), tr(STR_REMINDER_DELETE), focus == 1);
     } else if (screen == ReminderScreen::Time) {
       minutes(text, sizeof(text), model.draft().child.minute);
       int y = r.y + 62;
@@ -797,17 +798,17 @@ class ReminderSettingsActivity final : public Activity {
                  (r.w - 24) / static_cast<int>(reminderSettingsActions()) - 4, 40};
         const unsigned digit = i == 0 ? h / 10 : i == 1 ? h % 10 : i == 2 ? minute % 60 / 10 : minute % 10;
         std::snprintf(text, sizeof(text), "%u", digit);
-        box(a, i == 4 ? I18N.get(minute >= 720 ? StrId::STR_PM : StrId::STR_AM) : text, focus == i);
+        paintReminderOption(a, i == 4 ? I18N.get(minute >= 720 ? StrId::STR_PM : StrId::STR_AM) : text, focus == i);
       }
       if (mappedInput.hasTouch()) {
         for (unsigned i = 0; i < 12; ++i) {
           Region a{r.x + 12 + static_cast<int>(i % 3) * (r.w - 24) / 3, r.y + r.h - 184 + static_cast<int>(i / 3) * 44,
                    (r.w - 24) / 3 - 4, 42};
           std::snprintf(text, sizeof(text), "%u", i == 10 ? 0 : i + 1);
-          box(a, i == 9 ? tr(STR_REMINDER_BACKSPACE) : i == 11 ? tr(STR_DONE) : text, false);
+          paintReminderOption(a, i == 9 ? tr(STR_REMINDER_BACKSPACE) : i == 11 ? tr(STR_DONE) : text, false);
         }
       } else
-        box(footer(0), tr(STR_DONE), focus == reminderSettingsActions() - 1);
+        paintReminderOption(footer(0), tr(STR_DONE), focus == reminderSettingsActions() - 1);
     } else if (screen == ReminderScreen::Message) {
       int y = r.y + 62;
       paintReminderText(tr(STR_REMINDER_MESSAGE_LIMIT), r.x + 12, y, r.w - 24);
@@ -843,12 +844,12 @@ class ReminderSettingsActivity final : public Activity {
               Region a{r.x + 12, r.y + r.h - 224 + static_cast<int>(ordinal % 4) * 44, r.w - 24, 42};
               char numbered[96]{};
               std::snprintf(numbered, sizeof(numbered), tr(STR_REMINDER_NUMBERED_FORMAT), ordinal + 1, caption);
-              box(a, numbered, focus == i);
+              paintReminderOption(a, numbered, focus == i);
             }
             ++ordinal;
           } else {
             auto a = key(i);
-            box(a, caption, focus == i);
+            paintReminderOption(a, caption, focus == i);
           }
         }
     }
