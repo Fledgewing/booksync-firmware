@@ -10,6 +10,8 @@
 #include "activities/Activity.h"
 #include "booksync/system/AccountScreen.h"
 #include "booksync/system/Bootstrap.h"
+#include "components/UITheme.h"
+#include "fontIds.h"
 extern GfxRenderer renderer;
 extern MappedInputManager mappedInputManager;
 namespace accountSurfaceScenario {
@@ -66,12 +68,25 @@ inline bool tick() {
   if (f == 0) showHomeScene(renderer, mappedInputManager, fixture);
   if (f == 8 || f == 70) showServiceChoice(renderer, mappedInputManager, fixture);
   if (f == 16) capture(directory, "service-choice", fixture);
+  bool touchChoice = false;
+#if CROSSINK_APP_CAP_TOUCH
+  touchChoice = mappedInputManager.hasTouch();
+  if (touchChoice && (f == 24 || f == 40)) {
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const int height = renderer.getLineHeight(UI_10_FONT_ID) * 2 + 28;
+    const int index = f == 24 ? 1 : 2;
+    const int x = safe.x + 50, y = header.y + header.height + 110 + index * (height + 12) + 15;
+    mappedInputManager.simulatorInjectTouchDown(x, y);
+    mappedInputManager.simulatorInjectTouchRelease(x, y);
+  }
+#endif
   if (f == 20) key(mappedInputManager.menuButton(MappedInputManager::Button::Down));
-  if (f == 24) key(MappedInputManager::Button::Confirm);
+  if (f == 24 && !touchChoice) key(MappedInputManager::Button::Confirm);
   if (f == 28) capture(directory, "saved-books-selected", fixture);
   if (f == 32) key(mappedInputManager.menuButton(MappedInputManager::Button::Down));
   if (f == 36) capture(directory, "continue-focused", fixture);
-  if (f == 40) key(MappedInputManager::Button::Confirm);
+  if (f == 40 && !touchChoice) key(MappedInputManager::Button::Confirm);
   if (f == 48) {
     if (fixture.writes != 1 || fixture.selection.service != 0 || fixture.selection.ticket.epoch != 5) std::_Exit(24);
     closedPaints = serviceChoicePaints();

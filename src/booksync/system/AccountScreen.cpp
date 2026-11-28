@@ -121,7 +121,10 @@ void showServiceChoice(GfxRenderer& renderer, MappedInputManager& input, Library
   activityManager.pushActivity(std::move(screen));
 }
 #ifdef SIMULATOR
-uint32_t serviceChoicePaints() { return paints; }
+uint32_t serviceChoicePaints() {
+  RenderLock lock;
+  return paints;
+}
 #endif
 }  // namespace booksync
 

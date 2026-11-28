@@ -5802,7 +5802,7 @@
     },
     "platformio.ini": {
       "role": "retained-build-input",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F11: S3 simulator profiles mirror the hardware PSRAM framebuffer ownership capability; native heap is still not ESP32 memory. F15 retains the neutral auth factory, capture and account entry points in the hardware size gate; this does not enable transport. F18a retains the dormant bounded match handler in the physical-image gate before external replay activation. F26b explicitly roots dormant import code for Xtensa and RISC-V full-link reserve checks.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F11: S3 simulator profiles mirror the hardware PSRAM framebuffer ownership capability; native heap is still not ESP32 memory. F15 retains the neutral auth factory, capture and account entry points in the hardware size gate; this does not enable transport. F18a retains the dormant bounded match handler in the physical-image gate before external replay activation. F26b explicitly roots dormant import code for Xtensa and RISC-V full-link reserve checks. F37a roots the approved dormant service-choice activity and controller so all three device reserve measurements include the complete picker before setup navigation activation.",
       "includes": []
     },
     "scripts/app_only_upload.py": {
