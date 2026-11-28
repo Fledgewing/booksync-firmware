@@ -29,6 +29,8 @@
 - BookSync exposes checked battery and frontlight values and queues native Wi-Fi, night and rotation controls through Library; stale commands cannot change newer device state.
 - BookSync adds Settings → Reminders with local bedtime and eye-rest editors, explicit Save/Back controls, and unknown-clock or storage recovery states on Pro, Classic and X3.
 
+- BookSync can read saved native word lookups through a bounded capture seam, preserving full Unicode lookup targets and reporting missing, partial, changed or oversized sources without altering reader history. The Home Word widget follows separately.
+
 - BookSync adds the approved compact Library and scoped/grouped lists on touch, buttons and X3 text, with explicit offline download consent, cached file choices, cancel/resume states and Back restoration. The live catalog/download facade remains a separate integration.
 
 - BookSync adds shared position conflict, reset, override and decline policy with durable account/edition isolation and stale-answer rejection; late consent uses the existing one-draw reading exception. Live transport and reader presentation remain deferred.
