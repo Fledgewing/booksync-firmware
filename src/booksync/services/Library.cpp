@@ -46,6 +46,7 @@ static_assert(sizeof(LocalState) <= 28 * 1024);
 // buffers and the <=4 KiB editor splice workspace exceed the task stack; releasing them before reader entry keeps C3
 // buffers out of the reader lifetime. HAL owns its bounded directory-handle allocations.
 std::unique_ptr<LocalState> local;
+AccountView accountPresentation{};
 bool noticeDismissalPending = false;
 bool noticePending = false, upgradeRecovery = false;
 bool (*noticeCheckpoint)() = nullptr;
@@ -55,6 +56,16 @@ class OfflineLibrary final : public Library {
   bool openRequested = false;
   BookRow lastBook{};
   Capabilities capabilities() const override { return {true, true, false}; }
+  AccountView accountView() const override { return accountPresentation; }
+  CommandStatus selectService(ServiceSelection selection) override {
+    const auto& current = accountPresentation;
+    if (selection.ticket.owner != current.ticket.owner || selection.ticket.epoch != current.ticket.epoch)
+      return CommandStatus::Unavailable;
+    if (selection.service && (!current.available || selection.service != current.service))
+      return CommandStatus::Unsupported;
+    accountPresentation.selectedService = selection.service;
+    return CommandStatus::Accepted;
+  }
   Snapshot snapshot() const override {
     Snapshot value;
     value.canOpenLastBook = available;
@@ -160,6 +171,10 @@ OfflineLibrary& shellLibrary() {
 }
 }  // namespace
 Library& offlineLibrary() { return shellLibrary(); }
+void publishAccountView(AccountView value) {
+  value.serviceLabel.back() = 0;
+  accountPresentation = value;
+}
 void publishUpgradeState(bool pending, bool recovery, bool (*dismiss)()) {
   noticePending = pending;
   upgradeRecovery = recovery;

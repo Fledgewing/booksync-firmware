@@ -37,6 +37,7 @@ class OfflineAdapter final : public ServerAdapter {
   server::Auth auth{transport};
 
  public:
+  const char* serviceLabel() const override { return "BookOrbit"; }
   AuthCapabilities authCapabilities() const override { return auth.authCapabilities(); }
   AuthResult authenticate(const CredentialCapture& input) override { return auth.authenticate(input); }
   AuthResult restoreLogin(const CredentialCapture& input) override { return auth.restoreLogin(input); }

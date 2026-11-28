@@ -293,3 +293,5 @@ add_subdirectory(host/download_jobs)
 add_subdirectory(host/lifecycle_annotations)
 add_subdirectory(host/queries)
 add_subdirectory(host/personal_reading)
+
+add_subdirectory(host/account_surface)

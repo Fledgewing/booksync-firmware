@@ -706,6 +706,20 @@ void initializeUpgrade() {
   noticePending = upgrade.noticePending();
   recoveryRequired = upgrade.recoveryRequired() || restoreUnresolved;
   publishUpgradeState(noticePending, recoveryRequired, dismissUpgradeNotice);
+  const auto account = syncAccount.snapshot();
+  AccountView value;
+  value.ticket = account.ticket;
+  value.signedIn = account.signedIn;
+  value.accountSupported = account.capabilities.account;
+  value.syncSupported = account.capabilities.sync;
+  value.catalogSupported = account.capabilities.acquisition;
+  value.syncReady = account.syncReady;
+  value.catalogReady = account.acquisitionReady;
+  value.service = 1;
+  value.available = true;
+  const auto* label = defaultServerAdapter().serviceLabel();
+  if (label) std::snprintf(value.serviceLabel.data(), value.serviceLabel.size(), "%s", label);
+  publishAccountView(value);
 }
 AccountSnapshot retainedLoginSnapshot(unsigned scope) {
   if (scope == 0) return syncAccount.snapshot();
