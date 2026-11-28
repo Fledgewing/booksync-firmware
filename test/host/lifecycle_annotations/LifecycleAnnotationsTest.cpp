@@ -605,3 +605,22 @@ TEST_F(AnnotationsTest, BookmarkCommitCrashResumesAfterCompletedHighlights) {
     EXPECT_EQ(read().acknowledged, 7);
   }
 }
+
+TEST_F(AnnotationsTest, PreservesCompletedStatsEnvelopeAcrossAnnotationRestart) {
+  // F18b wraps the verified match. Later phases must retain its exact bytes.
+  std::string checkpoint(36, '\0');
+  checkpoint.replace(0, 4, "BST1");
+  const auto length = static_cast<uint32_t>(matched.size());
+  for (unsigned i = 0; i < 4; ++i) checkpoint[32 + i] = static_cast<char>(length >> (i * 8));
+  checkpoint += matched;
+  ASSERT_EQ(journal.checkpoint(1, checkpoint), JournalResult::Ok);
+  adapter.remote.timeout = true;
+  EXPECT_EQ(step(), SyncResult::Uncertain);
+  EXPECT_EQ(read().checkpoint, checkpoint);
+  card.restart();
+  adapter.remote.timeout = false;
+  EXPECT_EQ(step(), SyncResult::Advanced);
+  EXPECT_EQ(adapter.remote.commits, 2);
+  EXPECT_EQ(read().checkpoint, checkpoint);
+  EXPECT_EQ(read().acknowledged, 7);
+}
