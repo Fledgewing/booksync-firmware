@@ -105,7 +105,32 @@ inline bool tick() {
   }
   if (f == 100) {
     if (closedPaints != serviceChoicePaints() || closedReads != fixture.reads || fixture.writes != 1) std::_Exit(26);
-    LOG_INF("BSA", "BookSync F37a PASS: 4 captures, 2 closures, 0 paint work, bounded view=%u",
+    showServiceChoice(renderer, mappedInputManager, fixture);
+  }
+  if (f == 108) {
+    capture(directory, "back-ready", fixture);
+    if (closedPaints >= serviceChoicePaints() || closedReads >= fixture.reads) std::_Exit(29);
+  }
+  if (f == 112) {
+#if CROSSINK_APP_CAP_TOUCH
+    if (touchChoice) {
+      const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+      mappedInputManager.simulatorInjectTouchDown(safe.x + 40, safe.y + 20);
+      mappedInputManager.simulatorInjectTouchRelease(safe.x + 40, safe.y + 20);
+    } else
+#endif
+      key(MappedInputManager::Button::Back);
+  }
+  if (f == 120) {
+    closedPaints = serviceChoicePaints();
+    closedReads = fixture.reads;
+  }
+  if (f == 128 && (closedPaints != serviceChoicePaints() || closedReads != fixture.reads || fixture.writes != 1))
+    std::_Exit(27);
+  if (f == 132) ++fixture.value.ticket.epoch;
+  if (f == 144) {
+    if (closedPaints != serviceChoicePaints() || closedReads != fixture.reads || fixture.writes != 1) std::_Exit(28);
+    LOG_INF("BSA", "BookSync F37a PASS: 5 captures, 3 closures, 0 paint work, bounded view=%u",
             unsigned(sizeof(AccountView)));
     std::_Exit(0);
   }

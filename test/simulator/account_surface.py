@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory(prefix='booksync-account-surface-') as temporar
     (out / 'scenario.log').write_text(result.stdout + result.stderr)
     if result.returncode or 'BookSync F37a PASS' not in result.stdout + result.stderr:
         raise SystemExit(f'F37a failed; see reports/{profile}/account-surface/scenario.log')
-    assert len(list(out.glob('*.pgm'))) == 4
+    assert len(list(out.glob('*.pgm'))) == 5
     rss = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
     (out / 'metrics.json').write_text(json.dumps({
         'profile': profile, 'seconds': round(time.monotonic() - started, 3),
@@ -35,4 +35,4 @@ with tempfile.TemporaryDirectory(prefix='booksync-account-surface-') as temporar
         'account_view_bound_bytes': 64, 'controller_bound_bytes': 96,
         'note': 'Native RSS includes simulator/SDL; ESP32 heap and stack are unavailable. No credential or framebuffer allocation.'
     }, indent=2) + '\n')
-print(f'BookSync F37a {profile}: 4 captures, selection/epoch/closed-form/paint PASS')
+print(f'BookSync F37a {profile}: 5 captures, selection/Back/epoch/closed-form/paint PASS')
