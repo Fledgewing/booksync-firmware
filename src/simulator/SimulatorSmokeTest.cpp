@@ -115,6 +115,7 @@
 #include "WifiCredentialStore.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
+#include "booksync/system/ReminderPresenter.h"
 #include "activities/boot_sleep/SleepActivity.h"
 #include "activities/boot_sleep/SleepCoverAssets.h"
 #include "activities/home/AlertActivity.h"

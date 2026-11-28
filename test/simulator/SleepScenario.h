@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Included in the existing reader-friend harness; never a production UI path.
-#include "booksync/system/ReminderPresenter.h"
 static bool sleepScenarioTick() {
   const char* mode = std::getenv("BOOKSYNC_SLEEP_SCENARIO");
   if (!mode) return false;
