@@ -693,7 +693,7 @@ class CatalogActivity final : public Activity {
       else
         std::snprintf(label, sizeof(label), tr(STR_CATALOG_HUMAN_RECEIVED_FORMAT), received);
     }
-    if (!offline) text(catalogRect(46, top + 109, 388, 48), label, 18);
+    if (!offline) text(catalogRect(46, top + 109, 388, 50), label, 18);
     hitCount_ = 0;
     if (choices) {
       for (uint8_t i = 0; i < catalog_->catalogChoices().count; ++i) {
@@ -744,8 +744,11 @@ class CatalogActivity final : public Activity {
       const auto total =
           panel == CatalogSurface::Panel::Groups ? catalog_->catalogResult().optionTotal : catalog_->catalogTotal();
       const auto pages = (total + catalog_->catalogPageRows() - 1) / catalog_->catalogPageRows();
-      std::snprintf(label, sizeof(label), "‹ %u / %u ›",
-                    unsigned(catalog_->catalogOffset() / catalog_->catalogPageRows() + 1), unsigned(pages ? pages : 1));
+      const auto page = unsigned(catalog_->catalogOffset() / catalog_->catalogPageRows() + 1);
+      if (panel == CatalogSurface::Panel::Groups && !total)
+        std::snprintf(label, sizeof(label), "‹ %u / ? ›", page);
+      else
+        std::snprintf(label, sizeof(label), "‹ %u / %u ›", page, unsigned(pages ? pages : 1));
     }
     const auto r = catalogRect(0, 752, 480, 48);
     renderer.drawLine(r.x, r.y, r.x + r.width, r.y);

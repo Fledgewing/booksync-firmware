@@ -21,6 +21,10 @@ rows = [r for r in json.loads(args.approvals.read_text()) if r['group'] == 'libr
 assert len(rows) == 90
 profiles = {'pro': 'x4-pro-simulator', 'cls': 'x4-classic-simulator', 'x3': 'simulator-X3'}
 labels = {'pro': 'X4 Pro', 'cls': 'X4 Classic', 'x3': 'X3'}
+from catalog_geometry import check
+for profile in profiles.values():
+    check(args.reports / profile / 'catalog-surface')
+
 commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
 manifest, cards = [], []
 for row in rows:
@@ -29,6 +33,8 @@ for row in rows:
     reference = args.approvals.parent / row['approved']
     source = args.reports / profiles[device] / 'catalog-surface' / f'{state}.pgm'
     geometry = source.with_suffix('.geometry.json')
+    canvas = Image.open(source).size
+    assert json.loads(geometry.read_text())['screen'] == [0, 0, *canvas]
     approved, captured = f'approved/{stem}.png', f'captures/{stem}.png'
     shutil.copy2(reference, args.out / 'approved-original' / f'{stem}.png')
     Image.open(source).save(args.out / captured)
@@ -63,6 +69,15 @@ for row in rows:
 <figure><figcaption>Firmware capture</figcaption><img src="{captured}" alt="Captured {state}" loading="lazy"></figure></div>
 <p><a href="approved-original/{stem}.png">Original approval PNG</a> · <a href="pairs/{stem}.png">Export pair</a> · <a href="geometry/{stem}.json">Production text geometry</a></p></article>''')
 (args.out / 'data.json').write_text(json.dumps(manifest, indent=2)+'\n')
+production = ('src/booksync/system/CatalogScreen.cpp', 'src/booksync/system/CatalogScreen.h',
+              'src/booksync/ui/Catalog.cpp', 'src/booksync/ui/Catalog.h',
+              'src/booksync/interface/CatalogView.h', 'src/booksync/interface/Queries.h')
+repo = Path(__file__).resolve().parents[2]
+receipt = dict(commit=commit, pairs=len(manifest), sources={name: hashlib.sha256((repo/name).read_bytes()).hexdigest() for name in production},
+               programs={profile: hashlib.sha256((repo/'.pio/build'/profile/'program').read_bytes()).hexdigest() for profile in profiles.values()},
+               geometry={profile: json.loads((args.reports/profile/'catalog-surface/geometry-result.json').read_text()) for profile in profiles.values()})
+(args.out / 'receipts.json').write_text(json.dumps(receipt, indent=2)+'\n')
+
 page = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>BookSync F36a visual review</title>
 <style>body{margin:0;background:#e8e7e3;color:#111;font:16px/1.4 system-ui}header{position:sticky;top:0;background:#fff;padding:12px 24px;border-bottom:1px solid;z-index:1}h1{font-size:22px;margin:0}select{font:inherit;margin:8px}main{max-width:1060px;margin:auto}article{padding:20px 16px;border-bottom:2px solid #999}.pair{display:grid;grid-template-columns:1fr 1fr;gap:24px}figure{margin:0}figcaption{font-weight:700;margin-bottom:8px}img{width:100%;max-width:480px;height:auto;background:white;border:1px solid #777}.difference{background:#fff;padding:10px}article[hidden]{display:none}a{color:#234e77}@media(max-width:650px){.pair{gap:8px}article{padding:12px 6px}}</style>
 <header><h1>BookSync · F36a Library · coordinator visual review</h1><div>Approved left · simulator capture right · 30 states × 3 profiles. PR remains unmerged. Captures use the real 1-bit framebuffer; browser approvals include antialiased gray. Approvals are uniformly fitted to the measured device viewport (X3: 528 × 792); originals are linked.</div>
