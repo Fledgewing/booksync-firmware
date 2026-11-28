@@ -416,4 +416,56 @@ TEST_F(SeriesQueueTest, JournalSwitchNeverReusesALiveEngineHandle) {
   engine.cancel(old, owner);
   EXPECT_NE(engine.status(owner).state, DownloadState::Canceled);
 }
+TEST_F(SeriesQueueTest, DamagedOtherJournalDoesNotPoisonThePreviousQueueBinding) {
+  DownloadJobs engine(journal, admission, ports);
+  SeriesQueue q(store, engine, source, queuePorts, scope, owner, "/series-job");
+  ASSERT_TRUE(q.recover());
+  const auto first = q.start(reviewed);
+  review(1, "other");
+  reviewed.books[0].key.ordinal = 20;
+  reviewed.books[0].file.identity.edition.bytes[0] = 20;
+  std::strcpy(reviewed.books[0].file.path.data(), "/books/other.epub");
+  ASSERT_NE(q.start(reviewed), 0u);
+  card.files["/series-job.1"] = "damaged";
+  run(q);
+  ASSERT_TRUE(q.read(first, view));
+  EXPECT_TRUE(view.complete);
+  EXPECT_EQ(view.saved, 3);
+  EXPECT_EQ(links, 3u);
+  EXPECT_EQ(card.files["/series-job.1"], "damaged");
+  EXPECT_EQ(card.maxHandles, 1);
+}
+TEST_F(SeriesQueueTest, OtherFeatureJournalIsRetainedWhenTheQueueResumes) {
+  DownloadJobs engine(journal, admission, ports);
+  SeriesQueue q(store, engine, source, queuePorts, scope, owner, "/series-job");
+  ASSERT_TRUE(q.recover());
+  const auto id = q.start(reviewed);
+  for (unsigned n = 0; n < 40; ++n) {
+    q.tick(owner);
+    ASSERT_TRUE(q.read(id, view));
+    if (view.saved == 1) break;
+  }
+  ASSERT_EQ(view.saved, 1);
+  online = false;
+  run(q);
+  ASSERT_FALSE(engine.busy());
+  constexpr storage::PublishPaths other{"/other-feature", "/other-feature.tmp", "/other-feature.bak"};
+  ASSERT_TRUE(engine.selectJournal(other, scope, owner));
+  auto selected = spec;
+  selected.identity.edition.bytes[0] = 31;
+  std::strcpy(selected.path.data(), "/books/standalone.epub");
+  ASSERT_NE(engine.start(selected, source, owner), 0u);
+  complete(engine);
+  ASSERT_EQ(engine.status(owner).state, DownloadState::Complete);
+  const auto retained = card.files[other.current];
+  const auto priorQueue = card.files["/series-job.0"];
+  online = true;
+  ASSERT_TRUE(q.resume(id));
+  run(q);
+  ASSERT_TRUE(q.read(id, view));
+  EXPECT_EQ(view.saved, 3);
+  EXPECT_EQ(card.files[other.current], retained);
+  EXPECT_NE(card.files["/series-job.0"], priorQueue);
+  EXPECT_EQ(card.maxHandles, 1);
+}
 }  // namespace

@@ -33,7 +33,13 @@ Queued rows expose cancellation independently of an engine job ID, so a future
 file can be canceled before transport starts. Engine handles increase across
 journal switches and recovered bindings; a late cancellation from a previous
 selection cannot name the newly bound transfer. Handles belong to the runtime
-owner lifetime, while durable queue/row identity survives reboot.
+owner lifetime, while durable queue/row identity survives reboot. A cached
+binding is used only while the engine still names that coordinator's borrowed
+journal paths. Failed recovery retires the cache. After another feature uses the
+engine, Series reselects its own journal before continuing; damaged journals and
+the other feature's durable record remain intact. Serial borrowers select/verify
+their own stable journal paths before work. The queue is noncopyable and
+nonmovable because the engine borrows those member buffers.
 
 Active queue snapshots use the record already in memory. Queue reads and actions
 are worker operations, never paint callbacks.

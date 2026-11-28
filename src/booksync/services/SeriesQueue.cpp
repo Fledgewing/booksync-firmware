@@ -140,9 +140,15 @@ bool SeriesQueue::bind(uint8_t target) {
                   i == 1   ? ".tmp"
                   : i == 2 ? ".bak"
                            : "");
-  if (bound_ != target && !engine_.selectJournal({journal_[0].data(), journal_[1].data(), journal_[2].data()},
-                                                 {server_.data(), account_.data()}, owner_))
-    return false;
+  if (bound_ != target ||
+      !engine_.matchesJournal({journal_[0].data(), journal_[1].data(), journal_[2].data()}, owner_)) {
+    // A failed recovery retires the engine's previous selection too. Never
+    // skip recovery when returning to that queue after a damaged journal.
+    bound_ = 4;
+    if (!engine_.selectJournal({journal_[0].data(), journal_[1].data(), journal_[2].data()},
+                               {server_.data(), account_.data()}, owner_))
+      return false;
+  }
   bound_ = target;
   slot_ = target;
   row_ = SeriesNextMax;

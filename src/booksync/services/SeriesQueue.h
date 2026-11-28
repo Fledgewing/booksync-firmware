@@ -17,6 +17,8 @@ class SeriesQueue {
  public:
   SeriesQueue(storage::SeriesQueueStore&, DownloadJobs&, DownloadSource&, SeriesQueuePorts, storage::ScopeView,
               DeliveryTicket, const char* journalPrefix);
+  SeriesQueue(const SeriesQueue&) = delete;
+  SeriesQueue& operator=(const SeriesQueue&) = delete;
   bool recover();
   uint64_t start(storage::SeriesQueueRecord& reviewed);
   bool resume(uint64_t id);

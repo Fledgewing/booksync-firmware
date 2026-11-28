@@ -33,6 +33,8 @@ class DownloadJobs {
   // Serialized worker coordinator only: paths remain borrowed until next bind.
   // A paused journal is never resumed by selecting it.
   bool selectJournal(storage::PublishPaths, storage::ScopeView, DeliveryTicket);
+  // Borrowed path identity lets a serial coordinator detect another feature's bind.
+  bool matchesJournal(storage::PublishPaths, DeliveryTicket) const;
   bool matchesSelection(const DownloadSpec&, DeliveryTicket) const;
   uint64_t start(const DownloadSpec&, DownloadSource&, DeliveryTicket current);
   bool resume(uint64_t id, DownloadSource&, DeliveryTicket current);

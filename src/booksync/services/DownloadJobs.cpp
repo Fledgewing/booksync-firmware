@@ -211,6 +211,10 @@ bool DownloadJobs::selectJournal(storage::PublishPaths paths, storage::ScopeView
   journal_ = paths;
   return recover(scope, current);
 }
+bool DownloadJobs::matchesJournal(storage::PublishPaths paths, DeliveryTicket current) const {
+  return same(current) && journal_.current == paths.current && journal_.staging == paths.staging &&
+         journal_.backup == paths.backup;
+}
 bool DownloadJobs::matchesSelection(const DownloadSpec& spec, DeliveryTicket current) const {
   return same(current) && status_.id && sameSelection(record_.spec, spec);
 }
