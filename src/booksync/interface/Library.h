@@ -14,9 +14,9 @@
 #include "booksync/interface/LayoutEdit.h"
 #include "booksync/interface/Queries.h"
 #include "booksync/interface/Reminders.h"
-#include "booksync/interface/Sleep.h"
 #include "booksync/interface/Series.h"
 #include "booksync/interface/SeriesFlow.h"
+#include "booksync/interface/Sleep.h"
 #include "booksync/interface/StatsWidgets.h"
 #include "booksync/interface/PersonalWidgets.h"
 
@@ -93,6 +93,10 @@ class Library {
     out = {};
     return false;
   }
+  virtual CommandStatus browseCatalog(CatalogRoute) { return CommandStatus::Unavailable; }
+  virtual bool requestListBooks(const QueryRequest&, ListKey) { return false; }
+  virtual CommandStatus browseSource(WindowSource) { return CommandStatus::Unavailable; }
+  virtual void retireOpen(BookKey) {}
   virtual CommandStatus showBook(BookKey key) { return open(key); }
   // F36 cached presentation projections. Dispatch/request methods run outside paint.
   virtual CatalogSummary catalogSummary() const { return {}; }
@@ -108,8 +112,6 @@ class Library {
   virtual CommandStatus showCatalogSeries(std::array<char, 64>) { return CommandStatus::Unavailable; }
   virtual CommandStatus showCatalogFilter() { return CommandStatus::Unavailable; }
   virtual CommandStatus showDownloadAccount() { return submit(Intent::OpenAccount); }
-  virtual CommandStatus browseSource(WindowSource) { return CommandStatus::Unavailable; }
-  virtual void retireOpen(BookKey) {}
   virtual CommandStatus open(BookKey) { return CommandStatus::Unavailable; }
   virtual LibraryWindow window() const { return {}; }
   virtual void readWindow(LibraryWindow& out) const { out = window(); }

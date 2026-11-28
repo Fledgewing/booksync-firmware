@@ -11,6 +11,7 @@ static constexpr Size calendarMonth[] = {{2, 1}};
 static constexpr Size compact[] = {{1, 1}};
 static constexpr Size hero[] = {{2, 2}};
 static constexpr Size shelf[] = {{2, 2}};
+static constexpr Size compactCounts[] = {{1, 1}, {2, 2}};
 static constexpr Size browse[] = {{2, 3}, {1, 2}, {2, 1}, {1, 1}, {2, 2}};
 const Size* sizes(WidgetKind kind, unsigned& count) {
   if (kind == WidgetKind::Year) {
@@ -32,6 +33,10 @@ const Size* sizes(WidgetKind kind, unsigned& count) {
   if (kind == WidgetKind::Shelf) {
     count = 1;
     return shelf;
+  }
+  if (kind == WidgetKind::Library || kind == WidgetKind::Lists) {
+    count = 2;
+    return compactCounts;
   }
   count = 5;
   return browse;

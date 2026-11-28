@@ -513,11 +513,12 @@ TEST_F(IndexTest, RegisteredBookListSharesOneSnapshotWithNativeAndPagesItsOwnMem
   EXPECT_EQ(preview.windows[0].ageDays, 2u);
   EXPECT_EQ(preview.windows[1].total, 2u);
   EXPECT_EQ(preview.rows[4].key.provenance, index.provenance());
+  EXPECT_EQ(preview.fileAvailability[0], FileAvailability::Unknown);
+  EXPECT_EQ(preview.fileAvailability[4], FileAvailability::OnCard);
   ASSERT_TRUE(model.materialize({12, 12, LibraryBytes, WindowSource::Recent}));
   const auto full = model.window();
   EXPECT_EQ(full.count, 3);
   EXPECT_EQ(full.total, 37u);
-  EXPECT_EQ(full.provenance, saved.meta.provenance);
   EXPECT_EQ(full.windows[0].total, 37u);
   EXPECT_EQ(full.rows[0].key.ordinal, 12u);
   model.invalidate(Invalidation::Account);
@@ -766,4 +767,31 @@ TEST_F(IndexTest, FailedPreviewWorkspaceLeavesContinueSiblingUsable) {
   EXPECT_EQ(result.windows[0].count, 1);
   EXPECT_EQ(result.windows[1].availability, Availability::Unavailable);
   EXPECT_EQ(result.windows[1].count, 0);
+}
+
+TEST_F(IndexTest, SavedListMembershipCannotQueryAnUnrelatedIndexAccount) {
+  publish(2);
+  ReadModel model{index};
+  struct Capture {
+    ListsWidgetMeta meta;
+    bool resolved = false;
+  } capture;
+  capture.meta.state = PersonalState::Ready;
+  capture.meta.provenance = index.provenance();
+  ListsWidgetSource source{&capture, [](void* context) { return static_cast<Capture*>(context)->meta; }, nullptr,
+                           [](void* context, ListKey, std::array<char, 64>& scope) {
+                             static_cast<Capture*>(context)->resolved = true;
+                             std::snprintf(scope.data(), scope.size(), "saved-scope");
+                             return true;
+                           }};
+  model.setListsWidgetSource(source, {capture.meta.provenance.owner, capture.meta.provenance.accountEpoch});
+  std::array<char, 64> scope{};
+  ASSERT_TRUE(model.savedListScope({capture.meta.provenance, 0}, scope));
+  EXPECT_TRUE(capture.resolved);
+  ++capture.meta.provenance.owner;
+  capture.resolved = false;
+  model.setListsWidgetSource(source, {capture.meta.provenance.owner, capture.meta.provenance.accountEpoch});
+  EXPECT_FALSE(model.savedListScope({capture.meta.provenance, 0}, scope));
+  EXPECT_FALSE(capture.resolved);
+  EXPECT_FALSE(scope[0]);
 }

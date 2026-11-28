@@ -77,6 +77,12 @@ class Queries {
   static constexpr uint16_t Batch = 16;
   explicit Queries(QuerySource source) : source_(source) {}
   bool start(const QueryRequest& request);
+  // Reuse the existing worker request storage, avoiding a multi-KiB stack copy.
+  bool startSavedScope(const QueryRequest& request, const std::array<char, 64>& scope) {
+    request_ = request;
+    request_.scope = scope;
+    return start(request_);
+  }
   bool tick(uint16_t allowance = Batch);
   void cancel();
   void invalidate() { finish(Availability::Unavailable); }
