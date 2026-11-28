@@ -442,6 +442,7 @@ class SeriesActivity final : public Activity {
   // activate() and the controller independently reject disabled row actions.
   bool focusable(uint8_t control) const { return control < controlCount(); }
   uint8_t firstFocus() const {
+    if (series_.scene() == SeriesScene::Count) return 1;
     if (series_.scene() == SeriesScene::Page) return series_.members().count ? 1 : 0;
     if (series_.scene() == SeriesScene::Preview || series_.scene() == SeriesScene::Review) return rowCount();
     if (series_.scene() == SeriesScene::Queue) {
@@ -868,6 +869,7 @@ class SeriesActivity final : public Activity {
   bool scenarioInvariant() {
     if (!focusable(focus_)) return false;
     if (series_.scene() == SeriesScene::Files && focus_ != 0) return false;
+    if (series_.scene() == SeriesScene::Count && focus_ != 1) return false;
     if ((series_.scene() == SeriesScene::Preview || series_.scene() == SeriesScene::Review) &&
         rowCount() > visibleRows()) {
       const auto savedFocus = focus_, savedScroll = scroll_;

@@ -61,7 +61,7 @@ Foreground windows, flow/candidate values and request are embedded in one
 fallibly allocated activity for its lifetime, never on the render/task stack.
 The UI controller is below 48 KiB; X4 adds three 432-byte prepared covers and one
 3,072-byte reusable F25 bitmap. X3 excludes those buffers. The worker flow is
-below 48 KiB (host measurement 29,152 bytes on the host ABI), queue below
+below 48 KiB (host measurement 29,160 bytes on the host ABI), queue below
 16 KiB, and planner below 16 KiB. They reuse fixed member records/options rather
 than allocating in catalog/paint/transfer loops. Owners must retain F11's memory,
 largest-block, reading and storage gates; native RSS and linked RAM do not prove
