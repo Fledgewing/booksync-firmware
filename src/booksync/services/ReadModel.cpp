@@ -33,6 +33,8 @@ bool ReadModel::accepts(const WindowBatchRequest& batch) {
     if (!request.limit || request.limit > LibraryRows || request.bytes > LibraryBytes ||
         request.bytes < sizeof(WindowSpan) + request.limit * sizeof(BookRow))
       return false;
+    if (request.source == WindowSource::LibrarySummary && request.limit > 2) return false;
+    if (request.source == WindowSource::ListsPreview && request.limit > 3) return false;
     if (request.source == WindowSource::Continue &&
         request.bytes < sizeof(WindowSpan) + request.limit * sizeof(BookRow) + sizeof(ContinueValues))
       return false;
@@ -82,6 +84,9 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
   window_.stale = false;
   window_.availability = index_.ready() ? Availability::Ready : Availability::NotSaved;
   bool ok = true;
+  window_.savedLists.clear();
+  window_.expandedLists.clear();
+  window_.librarySummary = {};
   for (unsigned n = 0; n < batch.count; ++n) {
     auto& span = window_.windows[n];
     span.request = batch.windows[n];
@@ -89,6 +94,55 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
     span.total = index_.count();
     span.bytes = sizeof(WindowSpan);
     span.availability = window_.availability;
+    if (span.request.source == WindowSource::LibrarySummary || span.request.source == WindowSource::ListsPreview) {
+      bool valid = false;
+      CollectionWidgetState state = CollectionWidgetState::NotSaved;
+      uint32_t payload = 0;
+      if (span.request.source == WindowSource::LibrarySummary) {
+        LibraryWidgetInput native;
+        native.provenance = index_.provenance();
+        native.state = index_.ready() ? PersonalState::Ready : PersonalState::NotSaved;
+        native.onCard = {index_.count(), index_.ready()};
+        // Native file evidence cannot stand in for the account/library total or
+        // storage/group figures. These remain unknown without their saved source.
+        valid =
+            projectLibraryWidget(libraryInput_ ? *libraryInput_ : native, collectionScope_,
+                                 {static_cast<uint32_t>(span.request.bytes - sizeof(WindowSpan)), span.request.limit},
+                                 window_.librarySummary);
+        const auto& value = window_.librarySummary;
+        state = value.state;
+        span.materializedRows = value.rows;
+        payload = value.bytes;
+        span.total = value.booksKnown ? value.books : 0;
+        span.stale = value.stale;
+        span.ageKnown = value.ageKnown;
+        span.ageDays = value.ageDays;
+      } else {
+        auto& listValue = span.request.limit == 1 ? window_.savedLists : window_.expandedLists;
+        valid = projectListsWidget(listsSource_, collectionScope_,
+                                   {static_cast<uint32_t>(span.request.bytes - sizeof(WindowSpan)), span.request.limit},
+                                   listValue);
+        const auto& value = listValue;
+        state = value.state;
+        span.materializedRows = value.count;
+        payload = value.bytes;
+        span.total = value.total;
+        span.stale = value.stale;
+        span.ageKnown = value.ageKnown;
+        span.ageDays = value.ageDays;
+      }
+      span.bytes += payload;
+      span.availability = state == CollectionWidgetState::Ready || state == CollectionWidgetState::Empty
+                              ? Availability::Ready
+                          : state == CollectionWidgetState::Off         ? Availability::Off
+                          : state == CollectionWidgetState::Unsupported ? Availability::Unsupported
+                          : state == CollectionWidgetState::Error || state == CollectionWidgetState::Oversize
+                              ? Availability::Unavailable
+                              : Availability::NotSaved;
+      if (state == CollectionWidgetState::Oversize) span.bytes = span.request.bytes + 1;
+      ok &= valid;
+      continue;
+    }
     if (span.request.source == WindowSource::Continue) {
       span.bytes += sizeof(ContinueValues);  // Charge all summary/context fields to this caller.
       span.availability = Availability::Ready;
@@ -101,7 +155,8 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
       }
       continue;
     }
-    if (bookListSource_.peek || span.request.presentation == WindowPresentation::Preview) {
+    if (bookListSource_.peek || span.request.source == WindowSource::Random ||
+        span.request.presentation == WindowPresentation::Preview) {
       if (!materializeList(span)) ok = false;
       continue;
     }
@@ -258,6 +313,12 @@ void ReadModel::invalidate(Invalidation reason) {
     window_.fileAvailability.fill(FileAvailability::Unknown);
     window_.windows.fill({});
     window_.resume = {};
+    window_.librarySummary = {};
+    window_.savedLists.clear();
+    window_.expandedLists.clear();
+    libraryInput_ = nullptr;
+    listsSource_ = {};
+    collectionScope_ = {};
     continueProgressResolved_ = false;
     window_.provenance = {};
     window_.request = {};

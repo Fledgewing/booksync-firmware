@@ -3,6 +3,7 @@
 #include "HistorySource.h"
 #include "booksync/storage/Index.h"
 #include "widgets/BookList.h"
+#include "widgets/Collections.h"
 namespace booksync {
 struct PersonalCard;
 enum class Invalidation { Files, Capture, Generation, Account };
@@ -15,6 +16,39 @@ class ReadModel {
   void setContinue(const BookRow& row, bool available, const PersonalCard* resolved = nullptr);
   void copyWindow(LibraryWindow& out) const { out = window_; }
   void setBookListScratch(BookListProjection* scratch) { bookListScratch_ = scratch; }
+  void setLibraryWidgetSource(const LibraryWidgetInput* input, ReadingScope scope) {
+    libraryInput_ = input;
+    collectionScope_ = scope;
+  }
+  void setListsWidgetSource(ListsWidgetSource source, ReadingScope scope) {
+    listsSource_ = source;
+    collectionScope_ = scope;
+  }
+  bool savedListScope(ListKey key, std::array<char, 64>& out) const {
+    out.fill(0);
+    if (!listsSource_.peek || !listsSource_.membership) return false;
+    const auto meta = listsSource_.peek(listsSource_.context);
+    const auto indexed = index_.provenance();
+    if (!index_.ready() || meta.provenance.owner != indexed.owner ||
+        meta.provenance.accountEpoch != indexed.accountEpoch)
+      return false;
+    if (meta.state != PersonalState::Ready || key.provenance != meta.provenance ||
+        (meta.provenance.owner &&
+         (meta.provenance.owner != collectionScope_.owner || meta.provenance.accountEpoch != collectionScope_.epoch)))
+      return false;
+    if (!listsSource_.membership(listsSource_.context, key, out) || !out[0] || out.back() ||
+        !(listsSource_.peek(listsSource_.context) == meta)) {
+      out.fill(0);
+      return false;
+    }
+    return true;
+  }
+  bool materializeSavedLists(SavedListsRequest request, SavedListsPage& out) {
+    const bool result = projectSavedListsPage(listsSource_, collectionScope_, request, out);
+    publishChanged();
+    out.publication = sequence_;
+    return result;
+  }
   // Borrowed frozen selection, retired before its owner is released. Only the
   // normalized source owner supplies membership/order/year and saved age.
   void setBookListSource(BookListSource source, ReadingScope scope, uint16_t year) {
@@ -46,6 +80,9 @@ class ReadModel {
   storage::Index& index_;
   LibraryWindow window_{};
   BookRow continue_{};
+  const LibraryWidgetInput* libraryInput_ = nullptr;  // Borrowed frozen F39 source, retired with account.
+  ListsWidgetSource listsSource_{};
+  ReadingScope collectionScope_{};
   BookListProjection* bookListScratch_ = nullptr;  // Optional X4 worker lifetime, owned by facade.
   BookListSource bookListSource_{};
   ReadingScope bookListScope_{};

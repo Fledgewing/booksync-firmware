@@ -24,7 +24,23 @@ enum class Label : uint8_t {
   UnopenedSavedData,
   AllBooks,
   EmptyShelf,
-  BookProgress
+  BookProgress,
+  LibraryTitle,
+  LibraryBooksNumber,
+  OnCardNumber,
+  LibraryBooksCaption,
+  OnCardCaption,
+  StorageFree,
+  AuthorsLink,
+  SeriesLink,
+  CollectionsLink,
+  ListsTitle,
+  AllLists,
+  EmptyLists,
+  ListBooks,
+  ListCountLink,
+  ListBooksNumber,
+  ListBooksCaption
 };
 struct Box {
   int x = 0, y = 0, w = 0, h = 0;
@@ -33,7 +49,18 @@ struct Box {
 // Another is 50 wide, five pixels immediately to its left.
 inline Box allHeaderBox(int width) { return {width - 86, 0, 79, 50}; }
 inline Box anotherHeaderBox(int width) { return {width - 141, 0, 50, 50}; }
-enum class Drawing : uint8_t { Fill, Border, Text, Title, SerifTitle, BookJacket, OnCardMark };
+enum class Drawing : uint8_t {
+  Fill,
+  Border,
+  Text,
+  Title,
+  SerifTitle,
+  BooksIcon,
+  BookJacket,
+  ShuffleIcon,
+  StarIcon,
+  OnCardMark
+};
 struct PaintCommand {
   Box box{};
   uint64_t first = 0, second = 0;
@@ -62,6 +89,7 @@ class Canvas {
     }
   }
   void onCard(Box b) { appendPaint(b, Drawing::OnCardMark, true); }
+  void books(Box b) { appendPaint(b, Drawing::BooksIcon, true); }
   void title(Box b, const char* paintCaption, bool black, bool bold = false, uint16_t scale = 0) {
     if (auto* c = appendPaint(b, Drawing::Title, black)) {
       c->caption = paintCaption;
@@ -86,6 +114,12 @@ class Canvas {
       c->first = first;
       c->second = second;
     }
+  }
+
+  void microText(Box b, Label label, bool black, uint64_t first = 0, uint64_t second = 0) {
+    const auto before = count;
+    text(b, label, black, false, first, second);
+    if (count != before) commands[count - 1].scale = 192;
   }
 
  private:

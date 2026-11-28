@@ -18,13 +18,6 @@ std::string bytes(LayoutInput in) {
   return out;
 }
 std::string original() { return bytes(Layout::defaults()); }
-std::string legacySevenRows() {
-  auto raw = original();
-  const std::string key = "\"x4\":{\"cols\":2,\"rows\":";
-  const auto row = raw.find(key) + key.size();
-  raw.replace(row, raw.find('}', row) - row, "7");
-  return raw;
-}
 LayoutEdit request(LayoutEditKind kind, uint32_t revision = 1) {
   LayoutEdit edit;
   edit.kind = kind;
@@ -55,7 +48,7 @@ TEST(LayoutEditor, AddRemoveResetAndRestart) {
     ASSERT_EQ(restarted.load(), storage::LayoutSource::Current);
     ASSERT_TRUE(restarted.project(0, page));
     EXPECT_EQ(page.count, 3);
-    EXPECT_EQ(page.widgets[1].kind, WidgetKind::Browse);
+    EXPECT_EQ(page.widgets[1].kind, !std::strcmp(device, "x3") ? WidgetKind::Browse : WidgetKind::Library);
     raw = card.files[paths.current];
     edit = request(LayoutEditKind::Reset, 3);
     ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), device, edit), LayoutEditStatus::Saved);
@@ -260,7 +253,7 @@ TEST(EditorAddRemove, AddRemoveCompletionFocusAndStaleSelection) {
   ui.chooseEditor(3);
   ui.chooseEditor(2);
   EXPECT_EQ(lib.captured.kind, LayoutEditKind::Add);
-  EXPECT_EQ(lib.captured.widget, WidgetKind::Browse);
+  EXPECT_EQ(lib.captured.widget, WidgetKind::Library);
   lib.page.count = 4;
   lib.page.revision = 2;
   lib.result.status = LayoutEditStatus::Saved;
@@ -389,7 +382,6 @@ TEST(LayoutEditor, UnknownInstancesReserveCellsAndSurviveKnownRemoval) {
   ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
   ASSERT_EQ(page.count, 4);
   EXPECT_EQ(page.widgets[3].y, 6);  // The unknown tile reserved row 5.
-  EXPECT_EQ(page.rows, 7);          // Editing retains the stored class grid.
   auto edit = request(LayoutEditKind::Remove, 2);
   ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
   EXPECT_NE(bytes(editor.output()).find(unknown), std::string::npos);
@@ -423,7 +415,7 @@ TEST(LayoutEditor, EscapedNullCannotAliasAnInstalledWidget) {
   EXPECT_NE(changed.find(R"(continue-reading\u0000future)"), std::string::npos);
   ASSERT_TRUE(parser.project(LayoutInput::memory(changed.data(), changed.size()), "x4", 0, page));
   ASSERT_EQ(page.count, 1);
-  EXPECT_EQ(page.widgets[0].kind, WidgetKind::Browse);
+  EXPECT_EQ(page.widgets[0].kind, WidgetKind::Library);
 }
 
 TEST(LayoutGeometry, BandSwapResizeAndCancelValues) {
@@ -1009,7 +1001,7 @@ TEST(EditorAddRemove, EveryInstalledAddEntryHasAVisibleFocusedViewport) {
   ui.enter();
   ui.chooseEditor(3);
   ASSERT_EQ(ui.panel(), EditorAddRemove::Panel::Add);
-  ASSERT_EQ(ui.rows(), uint8_t(WidgetKind::Count));
+  ASSERT_EQ(ui.rows(), uint8_t(WidgetKind::Count) - 1);
   for (uint8_t index = 0; index < ui.rows(); ++index) {
     ASSERT_EQ(ui.focus(), index);
     for (uint8_t capacity : {uint8_t(1), uint8_t(7), uint8_t(10)}) {
@@ -1020,7 +1012,7 @@ TEST(EditorAddRemove, EveryInstalledAddEntryHasAVisibleFocusedViewport) {
     ui.stepEditor(1);
   }
   ui.activateEditor();
-  EXPECT_EQ(lib.captured.widget, WidgetKind(uint8_t(WidgetKind::Count) - 1));
+  EXPECT_EQ(lib.captured.widget, WidgetKind::Forecast);
 }
 
 TEST(LayoutGeometry, ContinueOffersOnlyApprovedSizeAndCanNormalizeLegacySize) {

@@ -3,7 +3,9 @@
 #include <array>
 #include <cstdint>
 
+#include "booksync/interface/CollectionWidgets.h"
 #include "booksync/interface/ContinueValues.h"
+#include "booksync/interface/Identity.h"
 
 namespace booksync {
 // Presentation values, never wire IDs, credentials or mutable store handles.
@@ -22,21 +24,6 @@ struct Snapshot {
 namespace booksync {
 constexpr uint16_t LibraryRows = 24;
 constexpr uint32_t LibraryBytes = 16384;
-struct Provenance {
-  uint32_t generation = 0, accountEpoch = 1;
-  uint64_t owner = 0, capture = 0;
-  bool operator==(Provenance other) const {
-    if (generation != other.generation) return false;
-    if (accountEpoch != other.accountEpoch) return false;
-    if (owner != other.owner) return false;
-    return capture == other.capture;
-  }
-};
-struct BookKey {
-  Provenance provenance{};
-  uint32_t ordinal = 0;
-  bool operator==(BookKey other) const { return provenance == other.provenance ? ordinal == other.ordinal : false; }
-};
 enum class WindowSource : uint8_t {
   OnDevice,
   Continue,
@@ -49,14 +36,19 @@ enum class WindowSource : uint8_t {
   PickBackUp,
   AlsoReading,
   AllFinished,
+  LibrarySummary,
+  ListsPreview,
   Unknown
 };
-enum class CatalogDestination : uint8_t { Library, BookList };
+
+enum class CatalogDestination : uint8_t { Library, Authors, Series, Collections, Lists, SavedList, BookList };
 struct CatalogRoute {
   CatalogDestination destination = CatalogDestination::Library;
+  ListKey list{};
   WindowSource source = WindowSource::Unknown;
   std::array<char, 64> caption{};
 };
+
 enum class WindowPresentation : uint8_t { Full, Preview };
 struct WindowRequest {
   uint32_t offset = 0;
@@ -82,7 +74,7 @@ struct WindowBatchRequest {
 struct WindowSpan {
   WindowRequest request{};
   uint32_t total = 0, bytes = 0, ageDays = 0;
-  uint16_t first = 0, count = 0, year = 0;
+  uint16_t first = 0, count = 0, materializedRows = 0, year = 0;
   Availability availability = Availability::NotSaved;
   bool stale = false, ageKnown = false;
 };
@@ -97,6 +89,8 @@ struct BookRow {
 enum class FileAvailability : uint8_t { Unknown, OnCard, ServerOnly };
 struct LibraryWindow {
   ContinueValues resume{};
+  LibraryWidgetValues librarySummary{};
+  ListsWidgetValues savedLists{}, expandedLists{};
   uint64_t publication = 0;  // Non-reused in-process content revision, independent of catalog/capture IDs.
   Provenance provenance{};
   WindowRequest request{};

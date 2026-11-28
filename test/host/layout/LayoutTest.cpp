@@ -340,7 +340,7 @@ TEST(LayoutProjection, DefaultMatchesApprovedStarterAndDeviceOverrides) {
     EXPECT_EQ(page.widgets[1].kind, WidgetKind::Shelf);
     EXPECT_EQ(page.widgets[1].y, 2);
     EXPECT_EQ(page.widgets[1].source, WindowSource::Recent);
-    EXPECT_EQ(page.widgets[2].kind, WidgetKind::Browse);
+    EXPECT_EQ(page.widgets[2].kind, std::string(device) == "x3" ? WidgetKind::Browse : WidgetKind::Library);
     EXPECT_EQ(page.widgets[2].y, 4);
     EXPECT_EQ(page.textOnly, std::string(device) == "x3");
   }

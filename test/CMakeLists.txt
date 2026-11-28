@@ -327,3 +327,6 @@ add_subdirectory(host/continue_widget)
 add_subdirectory(host/booklist_widget)
 
 add_subdirectory(host/booklist_renderer)
+
+add_subdirectory(host/collection_widgets)
+add_subdirectory(host/collection_renderers)
