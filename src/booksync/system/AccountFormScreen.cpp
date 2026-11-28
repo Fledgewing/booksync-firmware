@@ -11,13 +11,16 @@
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #include "booksync/ui/account/AccountForm.h"
+#include "components/BookSyncPresentation.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 namespace booksync {
 namespace {
 namespace fui = freeink::ui;
+namespace kit = BookSyncPresentation;
 #ifdef SIMULATOR
 uint32_t formPaints = 0;
+Rect formTargets[64];
 #endif
 class AccountFormActivity final : public Activity {
   AccountForm form;
@@ -27,32 +30,49 @@ class AccountFormActivity final : public Activity {
   uint64_t qrRevision = 0;
   bool qrReady = false, shifted = false, symbols = false;
   uint8_t control = 0;
-  Rect safe() const { return UITheme::getInstance().getScreenSafeArea(renderer, true, false); }
+  kit::Frame presentation() const { return kit::frame(renderer, mappedInput.hasTouch(), gpio.deviceIsX3()); }
   int formContentTop() const {
-    const auto s = safe();
-    const auto h = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, s);
-    return h.y + h.height + 12;
+    const auto f = presentation();
+    return f.content().y + f.unit(26);
+  }
+  int bodyTop() const {
+    const auto f = presentation();
+    return formContentTop() + kit::paragraphHeight(renderer, f, f.content().width, title(), kit::Type::Title) +
+           f.unit(16);
+  }
+  int detailsTop() const {
+    const auto f = presentation();
+    return bodyTop() + kit::paragraphHeight(renderer, f, f.content().width, body()) + f.unit(22);
   }
   Rect keyboardBounds() const {
-    const auto s = safe();
-    const int height = renderer.getLineHeight(UI_10_FONT_ID) * 5 + 130;
-    return Rect{s.x + 8, s.y + s.height - 48 - height, s.width - 16, height};
+    const auto f = presentation();
+    return Rect{f.content().x, f.footer().y - f.unit(144), f.content().width, f.unit(132)};
   }
   Rect fieldBounds(uint8_t index) const {
-    const auto s = safe();
-    const int height = renderer.getLineHeight(UI_10_FONT_ID) + 22;
-    return Rect{s.x + 16, formContentTop() + 132 + index * (height + 8), s.width - 32, height};
+    const auto f = presentation();
+    return f.row(detailsTop() + index * f.unit(62));
   }
-  Rect actionBounds(uint8_t index) const {
-    const auto s = safe();
-    const int height = renderer.getLineHeight(UI_10_FONT_ID) + 24;
-    const bool manual = form.view().scene == AccountScene::Manual;
-    const int y = manual ? keyboardBounds().y - height - 12 : s.y + s.height - 56 - form.actions() * (height + 8);
-    if (manual) return Rect{s.x + 16 + index * (s.width / 2), y, s.width / 2 - 24, height};
-    return Rect{s.x + 16, y + index * (height + 8), s.width - 32, height};
+  int actionTop() const {
+    const auto f = presentation();
+    const auto scene = form.view().scene;
+    int y = detailsTop();
+    if (scene == AccountScene::Out || scene == AccountScene::In || scene == AccountScene::Limited ||
+        scene == AccountScene::Manual)
+      y += f.unit(186 + 22);
+    if (scene == AccountScene::Phone && form.view().link[0]) y = linkTop() + linkHeight() + f.unit(22);
+    return y;
   }
+  int qrScale() const { return std::strlen(form.view().link.data()) > 128 ? 1 : 3; }
+  int qrTop() const { return detailsTop(); }
+  int linkTop() const { return qrTop() + (qrReady ? (qr.size + 8) * qrScale() : 0) + presentation().unit(16); }
+  int linkHeight() const {
+    const auto f = presentation();
+    return kit::paragraphHeight(renderer, f, f.content().width, form.view().link.data(), kit::Type::Caption);
+  }
+  TouchActionButtons::Layout actionLayout() const { return presentation().actions(actionTop(), form.actions()); }
+  Rect actionBounds(uint8_t index) const { return actionLayout().buttons[index]; }
   const fui::KeyboardLayout& formKeyboardLayout() const {
-    return fui::builtinKeyboardLayout(fui::KeyboardLayoutId::QwertyEn, shifted, symbols, true);
+    return fui::builtinKeyboardLayout(fui::KeyboardLayoutId::QwertyEn, shifted, symbols, false);
   }
   uint8_t keyCount() const {
     uint8_t count = 0;
@@ -92,7 +112,7 @@ class AccountFormActivity final : public Activity {
     if (form.view().revision == qrRevision) return;
     qrRevision = form.view().revision;
     qrReady = false;
-    if ((form.view().scene == AccountScene::Phone || form.view().scene == AccountScene::Wait) && form.view().link[0]) {
+    if ((form.view().scene == AccountScene::Phone) && form.view().link[0]) {
       qrReady = qrcode_getBufferSize(10) <= sizeof(qrBytes) &&
                 qrcode_initText(&qr, qrBytes, 10, ECC_LOW, form.view().link.data()) == 0;
       if (!qrReady) LOG_ERR("BSA", "Cannot encode public approval link");
@@ -171,44 +191,6 @@ class AccountFormActivity final : public Activity {
         return index == 0 ? tr(STR_ACCOUNT_FROM_PHONE) : tr(STR_CANCEL);
     }
   }
-  // Bounded wrapping preserves the complete public link, including long path
-  // segments. It never truncates a link into a different approval URL.
-  int textLines(const char* text, int y, int maxLines, int font = UI_10_FONT_ID, int spacing = 4) const {
-    const auto s = safe();
-    const int line = renderer.getLineHeight(font) + spacing;
-    char chunk[96]{};
-    for (int row = 0; row < maxLines && *text; ++row) {
-      unsigned n = 0, lastSpace = 0;
-      while (text[n]) {
-        const auto lead = static_cast<unsigned char>(text[n]);
-        const unsigned bytes = lead < 0x80 ? 1 : (lead & 0xe0) == 0xc0 ? 2 : (lead & 0xf0) == 0xe0 ? 3 : 4;
-        if (n + bytes >= sizeof(chunk)) break;
-        unsigned copied = 0;
-        while (copied < bytes && text[n + copied]) {
-          chunk[n + copied] = text[n + copied];
-          ++copied;
-        }
-        chunk[n + copied] = 0;
-        if (renderer.getTextWidth(font, chunk) > s.width - 32) {
-          chunk[n] = 0;
-          break;
-        }
-        if (text[n] == ' ') lastSpace = n;
-        n += copied;
-      }
-      if (!n) break;
-      unsigned consumed = n;
-      if (text[n] && lastSpace) {
-        chunk[lastSpace] = 0;
-        consumed = lastSpace + 1;
-      }
-      renderer.drawText(font, s.x + 16, y, chunk);
-      text += consumed;
-      while (*text == ' ') ++text;
-      y += line;
-    }
-    return y;
-  }
   void activateControl() {
     if (control < 2)
       form.chooseForm(control);
@@ -242,6 +224,9 @@ class AccountFormActivity final : public Activity {
   }
   void onExit() override {
     form.retireForm();
+#ifdef SIMULATOR
+    for (auto& target : formTargets) target = Rect{};
+#endif
     std::memset(qrBytes, 0, sizeof(qrBytes));
     Activity::onExit();
   }
@@ -255,8 +240,7 @@ class AccountFormActivity final : public Activity {
     if (changed) control = 0;
     int x = 0, y = 0;
     const bool tapped = mappedInput.wasScreenTapped(x, y);
-    const auto s = safe();
-    if (mappedInput.wasReleased(MappedInputManager::Button::Back) || (tapped && inside(Rect{s.x, s.y, 100, 70}, x, y)))
+    if (mappedInput.wasReleased(MappedInputManager::Button::Back) || (tapped && inside(presentation().back(), x, y)))
       form.retireForm();
     else if (form.view().scene == AccountScene::Manual) {
       if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Down))) {
@@ -317,12 +301,19 @@ class AccountFormActivity final : public Activity {
     if (!form.live()) return;
 #ifdef SIMULATOR
     ++formPaints;
+    for (auto& target : formTargets) target = Rect{};
+    for (uint8_t i = 0; i < form.actions(); ++i) formTargets[i] = actionBounds(i);
+    if (form.view().scene == AccountScene::Manual) {
+      for (uint8_t i = 0; i < 3; ++i) formTargets[i + 2] = fieldBounds(i);
+      for (uint8_t i = 0; i < keyCount() && i + 5 < 64; ++i) formTargets[i + 5] = keyBounds(i);
+    }
 #endif
     renderer.clearScreen();
-    const auto s = safe();
-    renderer.drawText(UI_10_FONT_ID, s.x + 16, s.y + 8, tr(STR_BACK));
-    renderer.drawText(BITTER_14_FONT_ID, s.x + 16, formContentTop(), title());
-    textLines(body(), formContentTop() + 44, 3);
+    const auto f = presentation();
+    const auto c = f.content();
+    kit::header(renderer, f, tr(STR_ACCOUNT_YOUR_SERVER));
+    kit::paragraph(renderer, f, Rect{c.x, formContentTop(), c.width, f.unit(80)}, title(), kit::Type::Title);
+    kit::paragraph(renderer, f, Rect{c.x, bodyTop(), c.width, f.unit(120)}, body());
     const auto scene = form.view().scene;
     if (scene == AccountScene::Out || scene == AccountScene::In || scene == AccountScene::Limited) {
       const auto& a = form.view().account;
@@ -331,11 +322,10 @@ class AccountFormActivity final : public Activity {
       const bool ready[] = {a.signedIn, a.syncReady, a.catalogReady};
       for (uint8_t i = 0; i < 3; ++i) {
         const auto r = fieldBounds(i);
-        renderer.drawText(UI_10_FONT_ID, r.x, r.y, labels[i]);
-        renderer.drawText(UI_10_FONT_ID, r.x + r.width / 2, r.y,
-                          !supported[i] ? tr(STR_ACCOUNT_NOT_SUPPORTED)
-                          : ready[i]    ? (i == 0 ? tr(STR_ACCOUNT_SIGNED_IN) : tr(STR_ACCOUNT_AVAILABLE))
-                                        : (i == 0 ? tr(STR_ACCOUNT_NOT_SIGNED_IN) : tr(STR_ACCOUNT_NOT_SET)));
+        kit::row(renderer, f, r, labels[i],
+                 !supported[i] ? tr(STR_ACCOUNT_NOT_SUPPORTED)
+                 : ready[i]    ? (i == 0 ? tr(STR_ACCOUNT_SIGNED_IN) : tr(STR_ACCOUNT_AVAILABLE))
+                               : (i == 0 ? tr(STR_ACCOUNT_NOT_SIGNED_IN) : tr(STR_ACCOUNT_NOT_SET)));
       }
     }
     if (scene == AccountScene::Manual) {
@@ -343,50 +333,39 @@ class AccountFormActivity final : public Activity {
       const char* values[] = {form.entry().server.data(), form.entry().user.data(), tr(STR_ACCOUNT_MASKED)};
       for (uint8_t i = 0; i < 3; ++i) {
         const auto r = fieldBounds(i);
-        renderer.drawRect(r.x, r.y, r.width, r.height, form.field() == i ? 3 : 1, true);
-        renderer.drawText(UI_10_FONT_ID, r.x + 8, r.y + 7, labels[i]);
-        const int valueX = r.x + r.width * 2 / 5;
-        renderer.beginTextClip(valueX, r.y + 4, r.width * 3 / 5 - 8, r.height - 8);
-        renderer.drawText(UI_10_FONT_ID, valueX, r.y + 7, values[i][0] ? values[i] : tr(STR_ACCOUNT_NOT_ENTERED));
-        renderer.endTextClip();
+        kit::row(renderer, f, r, labels[i], values[i][0] ? values[i] : tr(STR_ACCOUNT_NOT_ENTERED), control == i + 2,
+                 false, control >= 5 && form.field() == i);
       }
       for (uint8_t i = 0; i < keyCount(); ++i) {
         const auto r = keyBounds(i);
         const auto* key = keyAt(i);
-        renderer.drawRect(r.x, r.y, r.width, r.height, control == i + 5 ? 3 : 1, true);
+        renderer.drawRoundedRect(r.x, r.y, r.width, r.height, control == i + 5 ? 2 : 1, f.unit(4), true);
         const char* label = key->label;
         if (!label)
           label = key->kind == fui::KeyKind::Shift          ? tr(STR_ACCOUNT_SHIFT)
                   : key->value == fui::QWERTY_KEY_BACKSPACE ? tr(STR_ACCOUNT_DELETE)
                   : key->value == fui::QWERTY_KEY_ENTER     ? tr(STR_ACCOUNT_NEXT_FIELD)
                                                             : tr(STR_ACCOUNT_SPACE);
-        renderer.drawText(SMALL_FONT_ID, r.x + 4, r.y + 7, label);
+        kit::text(renderer, f, Rect{r.x + 3, r.y + 2, r.width - 6, r.height - 4}, label, kit::Type::Body, true);
       }
     }
-    if ((scene == AccountScene::Phone || scene == AccountScene::Wait) && form.view().link[0]) {
-      const bool longLink = std::strlen(form.view().link.data()) > 128;
-      const int qrY = formContentTop() + (longLink ? 132 : 148);
-      const int scale = longLink ? 2 : 3;
-      const int qrX = s.x + (s.width - (qr.size + 8) * scale) / 2 + 4 * scale;
+    if (scene == AccountScene::Phone && form.view().link[0]) {
+      const int scale = qrScale(), qrY = qrTop();
+      const int qrX = f.area.x + (f.area.width - qr.size * scale) / 2;
       if (qrReady) {
         for (uint8_t y = 0; y < qr.size; ++y)
           for (uint8_t x = 0; x < qr.size; ++x)
             if (qrcode_getModule(&qr, x, y)) renderer.fillRect(qrX + x * scale, qrY + y * scale, scale, scale, true);
       }
-      const int linkY = qrReady ? qrY + (qr.size + 4) * scale : qrY;
-      const int linkFont = longLink ? SMALL_FONT_ID : UI_10_FONT_ID;
-      const int spacing = longLink ? 0 : 4;
-      const int linkLines = (actionBounds(0).y - linkY - 8) / (renderer.getLineHeight(linkFont) + spacing);
-      textLines(form.view().link.data(), linkY, linkLines, linkFont, spacing);
+      // Full live link is wrapped, never ellipsized into a different URL.
+      kit::paragraph(renderer, f, Rect{c.x, linkTop(), c.width, linkHeight()}, form.view().link.data(),
+                     kit::Type::Caption);
     }
-    for (uint8_t i = 0; i < form.actions(); ++i) {
-      const auto r = actionBounds(i);
-      const bool focused = scene == AccountScene::Manual ? control == i : form.focus() == i;
-      renderer.drawRect(r.x, r.y, r.width, r.height, focused ? 3 : 1, true);
-      renderer.drawText(UI_10_FONT_ID, r.x + 12, r.y + 10, actionLabel(i));
-    }
-    const auto hints = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_HOME_PREV), tr(STR_HOME_NEXT));
-    GUI.drawButtonHints(renderer, hints.btn1, hints.btn2, hints.btn3, hints.btn4);
+    const char* labels[3]{};
+    for (uint8_t i = 0; i < form.actions(); ++i) labels[i] = actionLabel(i);
+    kit::drawActions(renderer, f, actionLayout(), labels, 0,
+                     scene == AccountScene::Manual ? control < 2 ? control : -1 : form.focus());
+    kit::footer(renderer, f, title());
     renderer.displayBuffer(HalDisplay::FAST_REFRESH);
   }
 };
@@ -403,6 +382,14 @@ void showAccountForm(GfxRenderer& renderer, MappedInputManager& input, Library& 
   activityManager.replaceActivity(std::move(screen));
 }
 #ifdef SIMULATOR
+bool accountFormControlCenter(uint8_t index, int& x, int& y) {
+  RenderLock lock;
+  if (index >= 64 || formTargets[index].width <= 0) return false;
+  const auto r = formTargets[index];
+  x = r.x + r.width / 2;
+  y = r.y + r.height / 2;
+  return true;
+}
 uint32_t accountFormPaints() {
   RenderLock lock;
   return formPaints;

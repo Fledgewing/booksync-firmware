@@ -8,21 +8,37 @@
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #include "booksync/ui/account/ServiceChoice.h"
+#include "components/BookSyncPresentation.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 namespace booksync {
 namespace {
+namespace kit = BookSyncPresentation;
 #ifdef SIMULATOR
 uint32_t paints = 0;
+Rect choiceTargets[4];
 #endif
 class ServiceChoiceActivity final : public Activity {
   ServiceChoice choice;
   Library& library;
+  kit::Frame presentation() const { return kit::frame(renderer, mappedInput.hasTouch(), gpio.deviceIsX3()); }
+  int titleTop() const {
+    const auto f = presentation();
+    return f.content().y + f.unit(26);
+  }
+  int bodyTop() const {
+    const auto f = presentation();
+    return titleTop() +
+           kit::paragraphHeight(renderer, f, f.content().width, tr(STR_ACCOUNT_CHOOSE_SERVICE), kit::Type::Title) +
+           f.unit(16);
+  }
+  int rowsTop() const {
+    const auto f = presentation();
+    return bodyTop() + kit::paragraphHeight(renderer, f, f.content().width, tr(STR_ACCOUNT_SETUP_LATER)) + f.unit(22);
+  }
   Rect row(uint8_t index) const {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
-    const int height = renderer.getLineHeight(UI_10_FONT_ID) * 2 + 28;
-    return Rect{safe.x + 20, header.y + header.height + 110 + index * (height + 12), safe.width - 40, height};
+    const auto f = presentation();
+    return index < 2 ? f.row(rowsTop() + index * f.unit(62)) : f.actions(rowsTop() + f.unit(146), 2).buttons[index - 2];
   }
   const char* label(uint8_t index) const {
     if (index == 0) return choice.view().serviceLabel[0] ? choice.view().serviceLabel.data() : tr(STR_HOME_UNAVAILABLE);
@@ -41,6 +57,9 @@ class ServiceChoiceActivity final : public Activity {
   }
   void onExit() override {
     choice.retireChoice();
+#ifdef SIMULATOR
+    for (auto& target : choiceTargets) target = Rect{};
+#endif
     Activity::onExit();
   }
   void loop() override {
@@ -54,9 +73,10 @@ class ServiceChoiceActivity final : public Activity {
     bool changed = false;
     int x = 0, y = 0;
     const bool tapped = mappedInput.wasScreenTapped(x, y);
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     if (mappedInput.wasReleased(MappedInputManager::Button::Back) ||
-        (tapped && x >= safe.x && x < safe.x + 100 && y >= safe.y && y < safe.y + 70)) {
+        (tapped &&
+         TouchActionButtons::indexAt(
+             TouchActionButtons::vertical(presentation().back(), 1, presentation().back().height, 0), x, y) == 0)) {
       choice.retireChoice();
     } else if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Down))) {
       choice.stepChoice(1);
@@ -90,36 +110,27 @@ class ServiceChoiceActivity final : public Activity {
     if (!choice.live()) return;  // A queued draw cannot revive a retired presentation.
 #ifdef SIMULATOR
     ++paints;
+    for (uint8_t i = 0; i < 4; ++i) choiceTargets[i] = row(i);
 #endif
     // All values were captured outside paint. No Library reads or dispatch here.
     renderer.clearScreen();
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
-    // Draw the approved static header directly; the retained theme header also
-    // reads native device status, which is outside this Library presentation.
-    renderer.drawText(UI_10_FONT_ID, header.x + 12, header.y + 8, tr(STR_BACK));
-    renderer.drawLine(header.x, header.y + header.height, header.x + header.width, header.y + header.height);
-    renderer.beginTextClip(safe.x + 20, header.y + header.height + 8, safe.width - 40, 40);
-    renderer.drawText(BITTER_14_FONT_ID, safe.x + 20, header.y + header.height + 8, tr(STR_ACCOUNT_CHOOSE_SERVICE));
-    renderer.endTextClip();
-    renderer.drawText(UI_10_FONT_ID, safe.x + 20, row(0).y - 60, tr(STR_ACCOUNT_SETUP_LATER));
-    for (uint8_t i = 0; i < 4; ++i) {
-      const auto r = row(i);
-      const bool selected = i < 2 && i == choice.selected();
-      const bool focused = i == choice.focus();
-      renderer.drawRect(r.x, r.y, r.width, r.height, focused ? 3 : 1, true);
-      if (selected) renderer.drawRect(r.x + 5, r.y + 5, r.width - 10, r.height - 10);
-      renderer.beginTextClip(r.x + 12, r.y + 8, r.width - 24, r.height - 16);
-      renderer.drawText(UI_10_FONT_ID, r.x + 12, r.y + 10, label(i));
-      if (i < 2)
-        renderer.drawText(UI_10_FONT_ID, r.x + 12, r.y + renderer.getLineHeight(UI_10_FONT_ID) + 14,
-                          i == 1                    ? tr(STR_ACCOUNT_NO_SIGNIN)
-                          : choice.view().available ? tr(STR_ACCOUNT_AVAILABLE)
-                                                    : tr(STR_HOME_UNAVAILABLE));
-      renderer.endTextClip();
-    }
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_HOME_PREV), tr(STR_HOME_NEXT));
-    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+    const auto f = presentation();
+    const auto c = f.content();
+    kit::header(renderer, f, tr(STR_ACCOUNT_CHOOSE_SERVICE));
+    kit::section(renderer, f, Rect{c.x, c.y, c.width, f.unit(16)}, tr(STR_ACCOUNT_READY));
+    kit::paragraph(renderer, f, Rect{c.x, titleTop(), c.width, f.unit(100)}, tr(STR_ACCOUNT_CHOOSE_SERVICE),
+                   kit::Type::Title);
+    kit::paragraph(renderer, f, Rect{c.x, bodyTop(), c.width, f.unit(80)}, tr(STR_ACCOUNT_SETUP_LATER));
+    for (uint8_t i = 0; i < 2; ++i)
+      kit::row(renderer, f, row(i), label(i),
+               i == 1                    ? tr(STR_ACCOUNT_NO_SIGNIN)
+               : choice.view().available ? tr(STR_ACCOUNT_AVAILABLE)
+                                         : tr(STR_HOME_UNAVAILABLE),
+               choice.focus() < 2 && choice.focus() == i, false, choice.selected() == i);
+    const char* labels[] = {label(2), label(3)};
+    kit::drawActions(renderer, f, f.actions(rowsTop() + f.unit(146), 2), labels, 0,
+                     choice.focus() >= 2 ? choice.focus() - 2 : -1);
+    kit::footer(renderer, f, tr(STR_ACCOUNT_CHOOSE_SERVICE));
     renderer.displayBuffer(HalDisplay::FAST_REFRESH);
   }
 };
@@ -135,6 +146,14 @@ void showServiceChoice(GfxRenderer& renderer, MappedInputManager& input, Library
   activityManager.pushActivity(std::move(screen));
 }
 #ifdef SIMULATOR
+bool serviceChoiceControlCenter(uint8_t index, int& x, int& y) {
+  RenderLock lock;
+  if (index >= 4 || choiceTargets[index].width <= 0) return false;
+  const auto r = choiceTargets[index];
+  x = r.x + r.width / 2;
+  y = r.y + r.height / 2;
+  return true;
+}
 uint32_t serviceChoicePaints() {
   RenderLock lock;
   return paints;

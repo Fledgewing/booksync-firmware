@@ -55,7 +55,7 @@ class Fixture final : public Library {
   CommandStatus submitAccount(AccountFormRequest, AccountEntry& entry) override {
     ++writes;
     ++formSubmissions;
-    if (entry.password[0] != '1') std::_Exit(33);
+    if (entry.password[0] != 'q') std::_Exit(33);
     entry.clear();
     if (entry.password[0]) std::_Exit(34);
     formValue.scene = AccountScene::Busy;
@@ -66,7 +66,7 @@ class Fixture final : public Library {
     value.service = 7;
     value.available = true;
     value.ticket = {8, 5};
-    std::memcpy(value.serviceLabel.data(), "Library service", 16);
+    std::memcpy(value.serviceLabel.data(), "BookOrbit", 10);
   }
   Capabilities capabilities() const override { return {}; }
   Snapshot snapshot() const override { return {}; }
@@ -140,17 +140,9 @@ inline bool formTick() {
 #if CROSSINK_APP_CAP_TOUCH
   touchForm = mappedInputManager.hasTouch();
   if (touchForm && (f == 114 || f == 118 || f == 126 || f == 164)) {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
-    const int height = renderer.getLineHeight(UI_10_FONT_ID) + 24;
-    const int keyboardY = safe.y + safe.height - 48 - (renderer.getLineHeight(UI_10_FONT_ID) * 5 + 130);
-    int x = safe.x + 24, y = keyboardY + 16;
-    if (f == 114) y = header.y + header.height + 12 + 132 + 2 * (height + 6) + 12;
-    if (f == 126) {
-      x = safe.x + safe.width * 3 / 4;
-      y = keyboardY - height - 4;
-    }
-    if (f == 164) y = safe.y + safe.height - 56 - 3 * (height + 8) + 16;
+    int x = 0, y = 0;
+    const uint8_t control = f == 114 ? 4 : f == 118 ? 5 : f == 126 ? 1 : 0;
+    if (!accountFormControlCenter(control, x, y)) std::_Exit(37);
     mappedInputManager.simulatorInjectTouchDown(x, y);
     mappedInputManager.simulatorInjectTouchRelease(x, y);
   }
@@ -222,11 +214,8 @@ inline bool tick() {
 #if CROSSINK_APP_CAP_TOUCH
   touchChoice = mappedInputManager.hasTouch();
   if (touchChoice && (f == 24 || f == 40)) {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
-    const int height = renderer.getLineHeight(UI_10_FONT_ID) * 2 + 28;
-    const int index = f == 24 ? 1 : 2;
-    const int x = safe.x + 50, y = header.y + header.height + 110 + index * (height + 12) + 15;
+    int x = 0, y = 0;
+    if (!serviceChoiceControlCenter(f == 24 ? 1 : 2, x, y)) std::_Exit(38);
     mappedInputManager.simulatorInjectTouchDown(x, y);
     mappedInputManager.simulatorInjectTouchRelease(x, y);
   }

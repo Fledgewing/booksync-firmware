@@ -41,7 +41,7 @@ void header(const GfxRenderer& renderer, const Frame& frame, const char* subtitl
 void footer(const GfxRenderer& renderer, const Frame& frame, const char* screen);
 void section(const GfxRenderer& renderer, const Frame& frame, Rect container, const char* label);
 void row(const GfxRenderer& renderer, const Frame& frame, Rect bounds, const char* label, const char* value,
-         bool focused = false, bool chevron = false);
-void actions(const GfxRenderer& renderer, const Frame& frame, const TouchActionButtons::Layout& layout,
-             const char* const* labels, int primary, int focused);
+         bool focused = false, bool chevron = false, bool selected = false);
+void drawActions(const GfxRenderer& renderer, const Frame& frame, const TouchActionButtons::Layout& layout,
+                 const char* const* labels, int primary, int focused);
 }  // namespace BookSyncPresentation

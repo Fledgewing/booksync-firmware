@@ -8,6 +8,8 @@ import time
 import subprocess
 import sys
 import tempfile
+from PIL import Image
+from presentation_kit import check_geometry
 root = Path(__file__).resolve().parents[2]
 profile = sys.argv[1]
 if profile not in ('x4-pro-simulator', 'x4-classic-simulator', 'simulator-X3'):
@@ -19,12 +21,16 @@ with tempfile.TemporaryDirectory(prefix='booksync-account-forms-') as temporary:
     sd.mkdir()
     env = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy',
                BOOKSYNC_ACCOUNT_FORMS=str(out), CROSSPOINT_SIM_SD=str(sd))
+    geometry = out / 'geometry.txt'
+    geometry.write_text('')
+    env['BOOKSYNC_KIT_GEOMETRY'] = str(geometry)
     started = time.monotonic()
     result = subprocess.run([str(root / '.pio/build' / profile / 'program')],
                             cwd=temporary, env=env, capture_output=True, text=True, timeout=90)
     (out / 'scenario.log').write_text(result.stdout + result.stderr)
     if result.returncode or 'BookSync F37b PASS' not in result.stdout + result.stderr:
         raise SystemExit(f'F37b failed; see reports/{profile}/account-forms/scenario.log')
+    assert 'Cannot encode public approval link' not in result.stdout + result.stderr
     assert len(list(out.glob('*.pgm'))) == 14
     rss = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
     (out / 'metrics.json').write_text(json.dumps({
@@ -35,4 +41,12 @@ with tempfile.TemporaryDirectory(prefix='booksync-account-forms-') as temporary:
         'account_view_bound_bytes': 368, 'controller_bound_bytes': 2048,
         'note': 'Native RSS includes simulator/SDL; ESP32 heap and stack are unavailable. One bounded foreground entry and QR workspace; no extra framebuffer.'
     }, indent=2) + '\n')
+check_geometry(geometry)
+# Positive control retains the phone QR; both waiting variants have a clear
+# middle panel, so a stale QR or readable link cannot silently reappear.
+with Image.open(out / 'account-phone.pgm') as phone:
+    assert phone.crop((phone.width // 4, 260, phone.width * 3 // 4, 400)).getextrema()[0] == 0
+for name in ('account-wait', 'account-long-wait'):
+    with Image.open(out / (name + '.pgm')) as waiting:
+        assert waiting.crop((waiting.width // 4, 400, waiting.width * 3 // 4, waiting.height - 100)).getextrema() == (255, 255)
 print(f'BookSync F37b {profile}: 14 captures, picker/entry/Check/Back/epoch/closed-form/paint PASS')

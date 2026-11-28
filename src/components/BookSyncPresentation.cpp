@@ -185,10 +185,11 @@ void footer(const GfxRenderer& r, const Frame& f, const char* screen) {
 void section(const GfxRenderer& r, const Frame& f, Rect box, const char* label) {
   text(r, f, box, label, Type::Section);
 }
-void row(const GfxRenderer& r, const Frame& f, Rect b, const char* label, const char* value, bool focused,
-         bool chevron) {
+void row(const GfxRenderer& r, const Frame& f, Rect b, const char* label, const char* value, bool focused, bool chevron,
+         bool selected) {
   r.drawLine(b.x, b.y + b.height - 1, b.x + b.width - 1, b.y + b.height - 1);
-  if (focused && !f.touch) r.drawRoundedRect(b.x, b.y, b.width, b.height, 2, f.textDevice ? 0 : f.unit(9), true);
+  if ((focused && !f.touch) || selected)
+    r.drawRoundedRect(b.x, b.y, b.width, b.height, focused && !f.touch ? 2 : 1, f.textDevice ? 0 : f.unit(9), true);
   const int pad = f.unit(10), reserved = chevron ? f.unit(22) : 0;
   const int valueWidth = value && *value ? std::min(b.width / 2, r.getTextWidth(font(Type::Value), value)) : 0;
   text(r, f, Rect{b.x + pad, b.y + 2, b.width - 2 * pad - reserved - valueWidth - (valueWidth ? pad : 0), b.height - 4},
@@ -198,8 +199,8 @@ void row(const GfxRenderer& r, const Frame& f, Rect b, const char* label, const 
          Type::Value);
   if (chevron) text(r, f, Rect{b.x + b.width - reserved, b.y + 2, reserved, b.height - 4}, "›", Type::Label);
 }
-void actions(const GfxRenderer& r, const Frame& f, const TouchActionButtons::Layout& layout, const char* const* labels,
-             int primary, int focused) {
+void drawActions(const GfxRenderer& r, const Frame& f, const TouchActionButtons::Layout& layout,
+                 const char* const* labels, int primary, int focused) {
   // The retained helper owns shapes/focus and shared hit-test geometry; the
   // kit owns bounded typography, including long translated action labels.
   const char* empty[] = {"", "", "", ""};
@@ -228,6 +229,6 @@ extern "C" void booksync_presentation_link(const GfxRenderer& renderer) {
   kit::section(renderer, f, f.row(c.y), tr(STR_UPGRADE_CARRIED));
   kit::paragraph(renderer, f, c, tr(STR_ACCOUNT_OUT_BODY), kit::Type::Title);
   const char* labels[] = {tr(STR_ACCOUNT_SIGN_IN), tr(STR_CANCEL)};
-  kit::actions(renderer, f, f.actions(c.y, 2), labels, 0, 0);
-  kit::actions(renderer, f, f.actions(c.y, 2, false), labels, 0, 0);
+  kit::drawActions(renderer, f, f.actions(c.y, 2), labels, 0, 0);
+  kit::drawActions(renderer, f, f.actions(c.y, 2, false), labels, 0, 0);
 }

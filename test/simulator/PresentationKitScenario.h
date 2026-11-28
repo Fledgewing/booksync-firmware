@@ -26,7 +26,7 @@ inline bool tick() {
       kit::row(renderer, f, f.row(c.y + f.unit(62)), tr(STR_ACCOUNT_SYNC), tr(STR_ACCOUNT_AVAILABLE), false, true);
     } else if (i == 2 || i == 3) {
       const char* labels[] = {tr(STR_ACCOUNT_SIGN_IN), tr(STR_CANCEL)};
-      kit::actions(renderer, f, f.actions(c.y + f.unit(100), 2, i == 2), labels, 0, 0);
+      kit::drawActions(renderer, f, f.actions(c.y + f.unit(100), 2, i == 2), labels, 0, 0);
     } else if (i == 4) {
       int y = kit::paragraph(renderer, f, Rect{c.x, c.y, c.width, f.unit(80)}, tr(STR_ACCOUNT_YOUR_SERVER),
                              kit::Type::Title);

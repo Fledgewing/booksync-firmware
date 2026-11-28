@@ -14991,7 +14991,7 @@
     },
     "src/booksync/system/Bootstrap.cpp": {
       "role": "system",
-      "rationale": "The X3 Settings entry owns only Home widgets and cannot root native SettingsActivity. F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F34 projects Library-only widget values into foreground drawing and mapped input; fonts prepare on entry, and snapshot/focus mutation is serialized by RenderLock. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O. F36a handles an explicit Library browse intent and restores the parent batch on return. R1 suppresses due overlays during the Home editor or activation notice."
+      "rationale": "The X3 Settings entry owns only Home widgets and cannot root native SettingsActivity. F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F34 projects Library-only widget values into foreground drawing and mapped input; fonts prepare on entry, and snapshot/focus mutation is serialized by RenderLock. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O. F36a handles an explicit Library browse intent and restores the parent batch on return. R1 suppresses due overlays during the Home editor or activation notice. FK moves cached account/service/upgrade painting and its hit targets onto the shared presentation kit; waiting omits QR/link, manual actions stack, and simulator-only probes expose rendered targets. No worker, Library or reader policy changes."
     },
     "src/booksync/system/Bootstrap.h": {
       "role": "system",
@@ -15628,7 +15628,7 @@
     },
     "src/booksync/system/AccountScreen.cpp": {
       "role": "system",
-      "rationale": "F37a service picker and F37b approved account flow: Library-only values/intents; foreground render host owns bounded entry and QR workspace; no paint-time service calls."
+      "rationale": "F37a service picker and F37b approved account flow: Library-only values/intents; foreground render host owns bounded entry and QR workspace; no paint-time service calls. FK moves cached account/service/upgrade painting and its hit targets onto the shared presentation kit; waiting omits QR/link, manual actions stack, and simulator-only probes expose rendered targets. No worker, Library or reader policy changes."
     },
     "src/booksync/server/bookorbit/LifecycleProgress.h": {
       "role": "server",
@@ -15771,7 +15771,7 @@
     },
     "src/booksync/system/AccountFormScreen.cpp": {
       "role": "system",
-      "rationale": "F37b approved foreground Library form rendering/input host; SDK keyboard tables and QR encoding prepared outside paint, bounded lifetime buffers, no transport or reader changes."
+      "rationale": "F37b approved foreground Library form rendering/input host; SDK keyboard tables and QR encoding prepared outside paint, bounded lifetime buffers, no transport or reader changes. FK moves cached account/service/upgrade painting and its hit targets onto the shared presentation kit; waiting omits QR/link, manual actions stack, and simulator-only probes expose rendered targets. No worker, Library or reader policy changes."
     },
     "src/booksync/server/bookorbit/LiveAdapter.h": {
       "role": "server",

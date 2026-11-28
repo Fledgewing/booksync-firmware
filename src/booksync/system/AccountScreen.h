@@ -8,6 +8,8 @@ namespace booksync {
 void showAccountForm(GfxRenderer&, MappedInputManager&, Library&);
 void showServiceChoice(GfxRenderer&, MappedInputManager&, Library&);
 #ifdef SIMULATOR
+bool serviceChoiceControlCenter(uint8_t index, int& x, int& y);
+bool accountFormControlCenter(uint8_t index, int& x, int& y);
 uint32_t serviceChoicePaints();
 uint32_t accountFormPaints();
 #endif
