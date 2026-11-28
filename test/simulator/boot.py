@@ -124,4 +124,5 @@ subprocess.run([sys.executable, 'test/simulator/sleep.py', profile], cwd=root, e
 subprocess.run([sys.executable, 'test/simulator/series_queue.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/series_surfaces.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, "test/simulator/catalog_surface.py", profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, "test/simulator/native_personal.py", profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

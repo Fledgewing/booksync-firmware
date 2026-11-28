@@ -28,6 +28,12 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/services/widgets/Streak.cpp
   ${REPO_ROOT}/src/booksync/services/ReadingStats.cpp
   ${REPO_ROOT}/src/booksync/storage/PageJournal.cpp
+  ${REPO_ROOT}/src/booksync/services/NativePersonalSource.cpp
+  ${REPO_ROOT}/src/booksync/services/SavedNativePassages.cpp
+  ${REPO_ROOT}/src/booksync/services/PersonalWorker.cpp
+  ${REPO_ROOT}/src/booksync/services/PersonalReading.cpp
+  ${REPO_ROOT}/src/booksync/services/Clock.cpp
+  ${REPO_ROOT}/lib/uzlib/src/uzlib_checksums.c
   ${REPO_ROOT}/src/booksync/services/Library.cpp
   ${REPO_ROOT}/src/booksync/services/Reminders.cpp
   ${REPO_ROOT}/src/booksync/services/RemindersFacade.cpp
@@ -35,5 +41,13 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/services/SdIndexSource.cpp)
 target_include_directories(BookSyncIndexTest BEFORE PRIVATE ${REPO_ROOT}/lib/Memory)
 target_include_directories(BookSyncIndexTest PRIVATE ../file_publish/stubs ${REPO_ROOT}/src ${REPO_ROOT}/lib/Memory)
+target_include_directories(BookSyncIndexTest PRIVATE ../file_publish/stubs ${REPO_ROOT}/src ${REPO_ROOT}/lib/Memory ${REPO_ROOT}/lib/uzlib/src)
 target_link_libraries(BookSyncIndexTest PRIVATE crosspoint_test_common GTest::gtest_main)
 gtest_discover_tests(BookSyncIndexTest)
+
+if(NOT APPLE)
+  find_package(OpenSSL REQUIRED)
+  target_link_libraries(BookSyncIndexTest PRIVATE OpenSSL::Crypto)
+endif()
+
+set_source_files_properties(${REPO_ROOT}/src/booksync/services/PersonalReading.cpp PROPERTIES COMPILE_DEFINITIONS SIMULATOR)

@@ -3,17 +3,19 @@
 
 #include <Logging.h>
 
+#include "booksync/interface/PersonalWidgets.h"
 #include "booksync/interface/StatsWidgets.h"
 namespace booksync {
 bool ReadModel::accepts(const WindowBatchRequest& batch) {
   constexpr uint32_t Metadata = sizeof(LibraryWindow) - sizeof(BookRow) * LibraryRows;
-  if (!batch.count || batch.count > LibraryBatchRequests || !batch.rows || batch.rows > LibraryRows ||
-      batch.bytes > LibraryBytes || batch.bytes < Metadata)
+  if ((!batch.count && !batch.personalWidgets) || batch.personalWidgets > 15 || batch.personalPick > 1000000000 ||
+      batch.count > LibraryBatchRequests || !batch.rows || batch.rows > LibraryRows || batch.bytes > LibraryBytes ||
+      batch.bytes < Metadata)
     return false;
   constexpr uint16_t StatsMask = (1u << StatsWidgetCount) - 1;
   if (batch.statsWidgets & ~StatsMask) return false;
   const uint32_t statsBytes = batch.statsWidgets ? sizeof(StatsWidgetBatch) : 0;
-  uint32_t rows = 0;
+  uint32_t rows = personalWidgetRows(batch.personalWidgets);
   for (unsigned i = 0; i < batch.count; ++i) {
     const auto request = batch.windows[i];
     if (!request.limit || request.limit > LibraryRows || request.bytes > LibraryBytes ||
@@ -21,11 +23,13 @@ bool ReadModel::accepts(const WindowBatchRequest& batch) {
       return false;
     rows += request.limit;
   }
-  return rows <= batch.rows && Metadata + rows * sizeof(BookRow) + statsBytes <= batch.bytes;
+  return rows <= batch.rows && Metadata + (rows - personalWidgetRows(batch.personalWidgets)) * sizeof(BookRow) +
+                                       statsBytes + personalWidgetBytes(batch.personalWidgets) <=
+                                   batch.bytes;
 }
 bool ReadModel::materialize(WindowRequest request) {
   WindowBatchRequest
-      batch;  // Bounded 264-byte metadata descriptor; avoids a heap allocation and carries no row payload.
+      batch;  // Bounded <=288-byte metadata descriptor; avoids a heap allocation and carries no row payload.
   batch.windows[0] = request;
   batch.bytes = request.bytes;
   batch.count = 1;
@@ -41,7 +45,7 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
   window_.count = 0;
   window_.windowCount = batch.count;
   window_.request = batch.windows[0];
-  window_.bytes = Metadata;
+  window_.bytes = Metadata + personalWidgetBytes(batch.personalWidgets);
   window_.provenance = index_.provenance();
   window_.total = index_.count();
   window_.stale = false;
