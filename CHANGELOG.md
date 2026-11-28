@@ -20,6 +20,7 @@
 - BookSync Home adds compact When you read and Reading records widgets on X4 Pro and Classic, with local-hour history and explicit per-record source availability.
 - BookSync can publish daily native saved highlights through Library without changing original clipping files; incomplete, scoped and oversized captures stay explicit.
 - BookSync prepares a bounded current-book chapter route from the native reader’s TOC and measured timing, preserving unknown pace and retiring old-book observations.
+- BookSync prepares a bounded daily word from native saved lookup captures without copying history into another store or writing lookup results twice.
 
 - BookSync publishes timezone-aware clock and date values only after live or retained clock provenance is known; a persisted expiry floor cannot produce a Home clock.
 - BookSync adds compact Series pages and exact next-1–10 download review on X4 Pro touch, X4 Classic buttons and X3, with offline/Back behavior, frozen file choices and restart-safe account-scoped queues through Library.
@@ -28,6 +29,8 @@
 - BookSync Home adds compact This week and Reading streak summaries on X4 Pro and Classic, with explicit missing/off/stale/error states and unchanged X3 availability.
 - BookSync exposes checked battery and frontlight values and queues native Wi-Fi, night and rotation controls through Library; stale commands cannot change newer device state.
 - BookSync adds Settings → Reminders with local bedtime and eye-rest editors, explicit Save/Back controls, and unknown-clock or storage recovery states on Pro, Classic and X3.
+
+- BookSync can read saved native word lookups through a bounded capture seam, preserving full Unicode lookup targets and reporting missing, partial, changed or oversized sources without altering reader history. The Home Word widget follows separately.
 
 - BookSync adds the approved compact Library and scoped/grouped lists on touch, buttons and X3 text, with explicit offline download consent, cached file choices, cancel/resume states and Back restoration. The live catalog/download facade remains a separate integration.
 

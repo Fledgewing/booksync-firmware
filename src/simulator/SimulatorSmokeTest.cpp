@@ -37,6 +37,7 @@
 #include "../../test/simulator/LayoutScenario.h"
 #include "../../test/simulator/ClockScenario.h"
 #include "../../test/simulator/RemindersScenario.h"
+#include "../../test/simulator/LookupCaptureScenario.h"
 #include "../../test/simulator/UpdateScenario.h"
 #include "../../test/simulator/VersionScenario.h"
 #include "../../test/simulator/UpdateInstallScenario.h"
@@ -53,6 +54,7 @@
 #include "../../test/simulator/NativePersonalScenario.h"
 #include "../../test/simulator/DeviceBridgeScenario.h"
 #include "booksync/reader/ChapterCapture.h"
+#include "../../test/simulator/LookupPoolScenario.h"
 
 #include <Epub.h>
 #include <Epub/WordSpacing.h>
@@ -12250,6 +12252,8 @@ void prepareSimulatorSmokeState() {
   runClockProvenanceScenario();
   runDeviceBridgeScenario();
   runRemindersScenario();
+  runLookupPoolScenario();
+  runLookupCaptureScenario();
   runVersionScenario();
   runUpdateScenario();
   // Smoke tests and scripted-input harnesses (scripts/test_*.py) expect to drive Home directly.

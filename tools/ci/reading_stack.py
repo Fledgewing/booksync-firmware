@@ -75,3 +75,7 @@ env.AddBuildMiddleware(bounded_reminder_frame, "*/ui/reminders/Settings.cpp")
 
 env.AddBuildMiddleware(bounded_reminder_frame, "*/ReminderText.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/ChapterCapture.cpp")
+
+# Lookup words remain in caller-owned workspaces, including aggregate resets.
+env.AddBuildMiddleware(bounded_reading_frame, "*/LookupPool.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/LookupHistorySource.cpp")

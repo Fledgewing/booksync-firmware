@@ -324,3 +324,6 @@ add_subdirectory(host/device_bridge)
 
 add_subdirectory(host/reminder_settings)
 add_subdirectory(host/chapter_capture)
+add_subdirectory(host/lookup_capture)
+
+add_subdirectory(host/lookup_pool)
