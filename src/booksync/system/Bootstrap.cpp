@@ -30,6 +30,8 @@
 #include "booksync/ui/EditorAddRemove.h"
 #include "booksync/ui/Home.h"
 #include "booksync/ui/WidgetHost.h"
+#include "booksync/ui/widgets/Forecast.h"
+#include "booksync/ui/widgets/Goal.h"
 #include "booksync/ui/widgets/Monthly.h"
 #include "booksync/ui/widgets/Pages.h"
 #include "booksync/ui/widgets/Records.h"
@@ -193,6 +195,8 @@ class ShellActivity final : public Activity {
     }
   }
   const char* widgetTitle(WidgetKind kind) const {
+    if (kind == WidgetKind::Goal) return tr(STR_HOME_STATS_GOAL);
+    if (kind == WidgetKind::Forecast) return tr(STR_HOME_STATS_FORECAST);
     if (kind == WidgetKind::When) return tr(STR_HOME_STATS_WHEN);
     if (kind == WidgetKind::Records) return tr(STR_HOME_STATS_RECORDS);
     if (kind == WidgetKind::Today) return tr(STR_HOME_STATS_TODAY);
@@ -375,6 +379,10 @@ class ShellActivity final : public Activity {
       renderer.drawRoundedRect(left + 2, top + 2, edge - 4, edge - 4, 1, (edge - 4) / 2, true);
       stroke(12, 6, 12, 12);
       stroke(12, 12, 16, 15);
+    } else if (widgets->page().widgets[index].kind == WidgetKind::Goal) {
+      renderer.drawRoundedRect(left + 2, top + 2, edge - 4, edge - 4, 1, (edge - 4) / 2, true);
+      renderer.drawRoundedRect(left + 6, top + 6, edge - 12, edge - 12, 1, (edge - 12) / 2, true);
+      stroke(12, 12, 22, 2);
     } else if (widgets->page().widgets[index].kind == WidgetKind::Records) {
       stroke(7, 3, 17, 3);
       stroke(17, 3, 17, 10);
@@ -401,7 +409,8 @@ class ShellActivity final : public Activity {
       stroke(10, 19, 4, 19);
       stroke(4, 19, 4, 4);
       stroke(12, 6, 12, 21);
-    } else if (widgets->page().widgets[index].kind == WidgetKind::Year) {
+    } else if ((widgets->page().widgets[index].kind == WidgetKind::Year ||
+                widgets->page().widgets[index].kind == WidgetKind::Forecast)) {
       stroke(3, 5, 21, 5);
       stroke(21, 5, 21, 21);
       stroke(21, 21, 3, 21);
@@ -568,6 +577,73 @@ class ShellActivity final : public Activity {
       paintStatText(UI_10_FONT_ID, r.x + r.width - 182, r.y + 8, text, 142, 160 * unit / 108);
     }
   }
+  void paintGoalStats(uint8_t index, const StatsCard& card) const {
+    const auto* goal = widgets->statsGoal(index);
+    if (!goal) return;
+    const auto r = tileRect(index);
+    const int unit = std::min(r.height, 108);
+    char number[32], text[80];
+    formatStatsCount(card.value.value, number);
+    const int width = std::min(r.width * 2 / 3, renderer.getTextWidth(BITTER_14_FONT_ID, number) * unit / 108);
+    paintStatText(BITTER_14_FONT_ID, r.x + 10, r.y + 21 * unit / 108, number, r.width * 2 / 3, 256 * unit / 108);
+    std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_GOAL_TARGET_FORMAT), (unsigned long long)card.best.value);
+    paintStatText(UI_10_FONT_ID, r.x + 16 + width, r.y + 31 * unit / 108, text, r.width - width - 26, 192 * unit / 108);
+    widgets::StatsMark bar;
+    if (widgets::Goal::progressBar(card, *goal, widgetBox(index), bar)) {
+      renderer.drawRect(r.x + bar.x, r.y + bar.y, r.width - 20, bar.height);
+      if (bar.width > 0) renderer.fillRect(r.x + bar.x, r.y + bar.y, bar.width, bar.height);
+    }
+    std::snprintf(text, sizeof(text),
+                  goal->ahead ? tr(STR_HOME_STATS_GOAL_AHEAD_FORMAT) : tr(STR_HOME_STATS_GOAL_BEHIND_FORMAT),
+                  unsigned(goal->year), unsigned(goal->paceTenths / 10), unsigned(goal->paceTenths % 10),
+                  (unsigned long long)goal->difference);
+    paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 76 * unit / 108, text, r.width - 20, 144 * unit / 108);
+    if (card.stale) {
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_SAVED_AGE_FORMAT), (unsigned long long)card.ageDays);
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 90 * unit / 108, text, r.width - 20, 144 * unit / 108);
+    }
+  }
+  void paintForecastStats(uint8_t index, const StatsCard& card) const {
+    const auto* detail = widgets->statsForecast(index);
+    if (!detail) return;
+    const auto r = tileRect(index);
+    widgets::StatsSummary positions;
+    if (!widgets::Forecast::summaryPositions(card, widgetBox(index), positions)) return;
+    const int unit = std::min(r.height, 108);
+    char text[80];
+    if (card.hours)
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_FORECAST_HOURS_FORMAT), (unsigned long long)card.hours);
+    else
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_FORECAST_MINUTES_FORMAT), unsigned(card.minutes));
+    const int numberWidth = std::min(r.width * 2 / 3, renderer.getTextWidth(BITTER_14_FONT_ID, text) * unit / 108);
+    paintStatText(BITTER_14_FONT_ID, r.x + 10, r.y + positions.numberY, text, r.width * 2 / 3, 256 * unit / 108);
+    paintStatText(UI_10_FONT_ID, r.x + 16 + numberWidth, r.y + positions.numberY + 10 * unit / 108,
+                  tr(STR_HOME_STATS_LEFT), r.width - numberWidth - 26, 224 * unit / 108);
+    if (detail->dateKnown && detail->month >= 1 && detail->month <= 12 && detail->day >= 1 && detail->day <= 31) {
+      static constexpr StrId weekdays[] = {StrId::STR_HOME_STATS_SUNDAY,   StrId::STR_HOME_STATS_MONDAY,
+                                           StrId::STR_HOME_STATS_TUESDAY,  StrId::STR_HOME_STATS_WEDNESDAY,
+                                           StrId::STR_HOME_STATS_THURSDAY, StrId::STR_HOME_STATS_FRIDAY,
+                                           StrId::STR_HOME_STATS_SATURDAY};
+      static constexpr StrId months[] = {
+          StrId::STR_HOME_STATS_JAN, StrId::STR_HOME_STATS_FEB, StrId::STR_HOME_STATS_MAR, StrId::STR_HOME_STATS_APR,
+          StrId::STR_HOME_STATS_MAY, StrId::STR_HOME_STATS_JUN, StrId::STR_HOME_STATS_JUL, StrId::STR_HOME_STATS_AUG,
+          StrId::STR_HOME_STATS_SEP, StrId::STR_HOME_STATS_OCT, StrId::STR_HOME_STATS_NOV, StrId::STR_HOME_STATS_DEC};
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_FINISH_DATE_FORMAT), I18N.get(weekdays[detail->weekday % 7]),
+                    unsigned(detail->day), I18N.get(months[detail->month - 1]));
+    } else
+      std::snprintf(text, sizeof(text), "%s", tr(STR_HOME_STATS_FINISH_UNKNOWN));
+    paintStatText(UI_10_FONT_ID, r.x + 10, r.y + positions.captionY, text, r.width - 20, 160 * unit / 108);
+    const int titleWidth = r.width * 11 / 20 - 10;
+    paintStatText(UI_10_FONT_ID, r.x + 10, r.y + positions.sourceY,
+                  detail->title[0] ? detail->title.data() : tr(STR_HOME_STATS_CURRENT_BOOK), titleWidth,
+                  144 * unit / 108);
+    paintStatText(UI_10_FONT_ID, r.x + 10 + titleWidth, r.y + positions.sourceY, tr(STR_HOME_STATS_MEASURED_PACE),
+                  r.width - titleWidth - 20, 144 * unit / 108);
+    if (card.stale) {
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_SAVED_AGE_FORMAT), (unsigned long long)card.ageDays);
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + positions.footerY, text, r.width - 20, 144 * unit / 108);
+    }
+  }
   void paintStatsWidget(uint8_t index) const {
     const auto r = tileRect(index);
     const auto kind = widgets->page().widgets[index].kind;
@@ -587,17 +663,21 @@ class ShellActivity final : public Activity {
     paintStatsHeaderIcon(index);
     if (view.viewState != WidgetState::Known || !card) {
       const char* message = view.viewState == WidgetState::Empty
-                                ? (kind == WidgetKind::When      ? tr(STR_HOME_STATS_WHEN_EMPTY)
-                                   : kind == WidgetKind::Records ? tr(STR_HOME_STATS_RECORDS_EMPTY)
-                                   : kind == WidgetKind::Today   ? tr(STR_HOME_STATS_TODAY_EMPTY)
-                                   : kind == WidgetKind::Pages   ? tr(STR_HOME_STATS_PAGES_EMPTY)
-                                   : kind == WidgetKind::Year    ? tr(STR_HOME_STATS_YEAR_EMPTY)
-                                   : kind == WidgetKind::Monthly ? tr(STR_HOME_STATS_MONTHLY_EMPTY)
-                                   : kind == WidgetKind::Week    ? tr(STR_HOME_STATS_WEEK_EMPTY)
-                                                                 : tr(STR_HOME_STATS_STREAK_EMPTY))
+                                ? (kind == WidgetKind::Goal       ? tr(STR_HOME_STATS_GOAL_EMPTY)
+                                   : kind == WidgetKind::Forecast ? tr(STR_HOME_STATS_FINISHED)
+                                   : kind == WidgetKind::When     ? tr(STR_HOME_STATS_WHEN_EMPTY)
+                                   : kind == WidgetKind::Records  ? tr(STR_HOME_STATS_RECORDS_EMPTY)
+                                   : kind == WidgetKind::Today    ? tr(STR_HOME_STATS_TODAY_EMPTY)
+                                   : kind == WidgetKind::Pages    ? tr(STR_HOME_STATS_PAGES_EMPTY)
+                                   : kind == WidgetKind::Year     ? tr(STR_HOME_STATS_YEAR_EMPTY)
+                                   : kind == WidgetKind::Monthly  ? tr(STR_HOME_STATS_MONTHLY_EMPTY)
+                                   : kind == WidgetKind::Week     ? tr(STR_HOME_STATS_WEEK_EMPTY)
+                                                                  : tr(STR_HOME_STATS_STREAK_EMPTY))
                             : view.viewState == WidgetState::Unsupported ? tr(STR_HOME_STATS_UNSUPPORTED)
                             : view.viewState == WidgetState::Oversize    ? tr(STR_HOME_STATS_OVERSIZE)
-                                                                         : stateText(view.viewState);
+                            : kind == WidgetKind::Forecast && view.viewState == WidgetState::NotSaved
+                                ? tr(STR_HOME_STATS_FORECAST_MISSING)
+                                : stateText(view.viewState);
       paragraph(message, r.x + 10, r.y + line + 8, r.width - 20, 2);
       if (card && card->stale && view.viewState == WidgetState::Empty) {
         char age[64];
@@ -606,6 +686,10 @@ class ShellActivity final : public Activity {
       }
       if (view.viewState == WidgetState::Oversize || view.viewState == WidgetState::Error)
         renderer.drawText(font, r.x + 10, r.y + r.height - line - 6, tr(STR_RETRY));
+    } else if (kind == WidgetKind::Goal) {
+      paintGoalStats(index, *card);
+    } else if (kind == WidgetKind::Forecast) {
+      paintForecastStats(index, *card);
     } else if (kind == WidgetKind::When) {
       paintHoursStats(index, *card);
     } else if (kind == WidgetKind::Records) {

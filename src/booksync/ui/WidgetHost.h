@@ -32,6 +32,8 @@ class WidgetHost {
   const StatsMonths* statsMonths(uint8_t widget) const;
   const StatsHours* statsHours(uint8_t widget) const;
   const StatsRecords* statsRecords(uint8_t widget) const;
+  const StatsGoal* statsGoal(uint8_t widget) const;
+  const StatsForecast* statsForecast(uint8_t widget) const;
   auto widgetCell(uint8_t widget, WidgetBox itemBox, uint8_t itemIndex, WidgetCell& itemCell) const -> bool;
   uint8_t widgetRows(uint8_t widget, WidgetBox itemBox) const;
   uint8_t hitWidgetRow(uint8_t widget, WidgetBox itemBox, int x, int y) const;
@@ -49,6 +51,6 @@ class WidgetHost {
   uint8_t wanted_ = 0;
   bool pending_ = true, accepted_ = false;
 };
-static_assert(sizeof(WidgetHost) <= 9 * 1024);
+static_assert(sizeof(WidgetHost) <= 10 * 1024);
 WidgetView boundedWidget(const LibraryWindow&, const WindowSpan&, WindowRequest);
 }  // namespace booksync

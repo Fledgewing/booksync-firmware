@@ -16,12 +16,15 @@ enum class WidgetKind : uint8_t {
   Pages,
   When,
   Records,
+  Goal,
+  Forecast,
   Count
 };
 constexpr bool isStatsWidget(WidgetKind kind) {
   return kind == WidgetKind::Week || kind == WidgetKind::Streak || kind == WidgetKind::Year ||
          kind == WidgetKind::Monthly || kind == WidgetKind::Today || kind == WidgetKind::Pages ||
-         kind == WidgetKind::When || kind == WidgetKind::Records;
+         kind == WidgetKind::When || kind == WidgetKind::Records || kind == WidgetKind::Goal ||
+         kind == WidgetKind::Forecast;
 }
 constexpr StatsWidget statsWidgetKind(WidgetKind kind) {
   return kind == WidgetKind::Week      ? StatsWidget::Week
@@ -31,7 +34,9 @@ constexpr StatsWidget statsWidgetKind(WidgetKind kind) {
          : kind == WidgetKind::Today   ? StatsWidget::Today
          : kind == WidgetKind::Pages   ? StatsWidget::Pages
          : kind == WidgetKind::When    ? StatsWidget::When
-                                       : StatsWidget::Records;
+         : kind == WidgetKind::Records ? StatsWidget::Records
+         : kind == WidgetKind::Goal    ? StatsWidget::Goal
+                                       : StatsWidget::Forecast;
 }
 struct WidgetPlacement {
   WidgetKind kind = WidgetKind::Continue;

@@ -148,3 +148,26 @@ TEST(StatsToday, AccountOnlyIsKnownWithoutInventingNativeZero) {
   EXPECT_EQ(out.state, StatsCardState::NotSaved);
   EXPECT_FALSE(out.account.known);
 }
+
+TEST(StatsToday, ReaderPrimaryRetainsAccountSecondaryAge) {
+  StatsSnapshot stats;
+  StatsProjection options;
+  StatsCard out;
+  options.provenance.owner = 7;
+  options.provenance.accountEpoch = 2;
+  options.now = 200000;
+  stats.nativeToday = {1440, true};
+  stats.nativeTodayCoverage = {ReadingOrigin::ThisReader, {}, 1, 200000, true, true};
+  stats.accountToday = {720, true};
+  stats.accountTodayCoverage = {ReadingOrigin::Account, {7, 2}, 1, 20000, true, true};
+  projectToday(stats, options, out);
+  EXPECT_EQ(out.value.value, 24);
+  EXPECT_EQ(out.account.value, 12);
+  EXPECT_TRUE(out.stale);
+  EXPECT_EQ(out.ageDays, 2);
+  options.provenance.accountEpoch = 3;
+  projectToday(stats, options, out);
+  EXPECT_EQ(out.value.value, 24);
+  EXPECT_FALSE(out.account.known);
+  EXPECT_FALSE(out.stale);
+}

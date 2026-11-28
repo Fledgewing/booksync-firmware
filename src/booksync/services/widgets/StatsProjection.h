@@ -6,6 +6,7 @@ namespace booksync {
 struct StatsProjection {
   Provenance provenance{};
   uint64_t savedAt = 0, now = 0;
+  int64_t today = 0;
   uint32_t ageDays = 0;
   StatsCardState availability = StatsCardState::Ready;
   bool enabled = true, stale = false;

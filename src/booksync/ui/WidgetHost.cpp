@@ -198,3 +198,15 @@ const StatsRecords* WidgetHost::statsRecords(uint8_t widget) const {
              : nullptr;
 }
 }  // namespace booksync
+
+namespace booksync {
+const StatsGoal* WidgetHost::statsGoal(uint8_t widget) const {
+  return widget < page_.count && page_.widgets[widget].kind == WidgetKind::Goal && statsCard(widget) ? &stats_.goal
+                                                                                                     : nullptr;
+}
+const StatsForecast* WidgetHost::statsForecast(uint8_t widget) const {
+  return widget < page_.count && page_.widgets[widget].kind == WidgetKind::Forecast && statsCard(widget)
+             ? &stats_.forecast
+             : nullptr;
+}
+}  // namespace booksync

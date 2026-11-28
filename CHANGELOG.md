@@ -13,6 +13,8 @@
 
 ### Added
 
+- BookSync Home adds compact account Reading goal and measured Finish forecast cards on X4 Pro and Classic, with explicit missing evidence and automatic clock/date freshness.
+
 - BookSync Home adds compact When you read and Reading records widgets on X4 Pro and Classic, with local-hour history and explicit per-record source availability.
 
 - BookSync publishes timezone-aware clock and date values only after live or retained clock provenance is known; a persisted expiry floor cannot produce a Home clock.

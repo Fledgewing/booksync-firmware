@@ -101,6 +101,7 @@ class ReadingStats {
              StatsCalendar calendar = {});
   bool tick(uint16_t allowance = Batch);
   bool busy() const { return busy_; }
+  void discard();
   const LocalReadingStats& local() const { return published_; }
   void combine(const RemoteReadingStats*, ReadingScope current, bool offline, int64_t today, StatsSnapshot&) const;
 
