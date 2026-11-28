@@ -76,7 +76,7 @@ class Fixture final : public Library {
       std::snprintf(row.daysLabel, sizeof(row.daysLabel), "Every day");
       std::snprintf(row.sourceLabel, sizeof(row.sourceLabel), "On this device");
     }
-    if (state == 16) {
+    if (state == 16 || state == 22) {
       value.rows[1].source = ReminderSource::Managed;
       value.rows[1].editable = false;
       std::snprintf(value.rows[1].sourceLabel, sizeof(value.rows[1].sourceLabel), "Family");
@@ -122,7 +122,7 @@ inline bool tick() {
     fixture.configure(0);
     showReminderSettingsScene(renderer, mappedInputManager, fixture);
   }
-  if (f >= 24 && caseIndex < 22) {
+  if (f >= 24 && caseIndex < 24) {
     if ((f - 24) % 8 == 0) {
       fixture.configure(caseIndex);
       prepareReminderSettingsScene(caseIndex);
@@ -138,7 +138,7 @@ inline bool tick() {
       ++caseIndex;
     }
   }
-  if (f == 210) {
+  if (f == 226) {
     for (unsigned i = 0; i < 8; ++i) {
       fixture.response = i == 3 || i == 5 ? ReminderStatus::Unavailable : ReminderStatus::Saved;
       RenderLock lock;
@@ -193,14 +193,14 @@ inline bool tick() {
     press.key.keysym.scancode = SDL_SCANCODE_DOWN;
     SDL_PushEvent(&press);
   }
-  if (f == 211) {
+  if (f == 227) {
     if (reminderSceneInputCount() != inputBaseline + 1) std::_Exit(65);
     SDL_Event release{};
     release.type = SDL_KEYUP;
     release.key.keysym.scancode = SDL_SCANCODE_DOWN;
     SDL_PushEvent(&release);
   }
-  if (f == 212) {
+  if (f == 228) {
     if (reminderSceneInputCount() != inputBaseline + 1) std::_Exit(66);
     if (mappedInputManager.hasTouch()) {
       SDL_Event down{};
@@ -211,7 +211,7 @@ inline bool tick() {
       SDL_PushEvent(&down);
     }
   }
-  if (f == 213 && mappedInputManager.hasTouch()) {
+  if (f == 229 && mappedInputManager.hasTouch()) {
     if (reminderSceneInputCount() != inputBaseline + 2) std::_Exit(67);
     SDL_Event move{};
     move.type = SDL_MOUSEMOTION;
@@ -219,7 +219,7 @@ inline bool tick() {
     move.motion.y = 154;
     SDL_PushEvent(&move);
   }
-  if (f == 214 && mappedInputManager.hasTouch()) {
+  if (f == 230 && mappedInputManager.hasTouch()) {
     if (reminderSceneInputCount() != inputBaseline + 2) std::_Exit(68);
     SDL_Event up{};
     up.type = SDL_MOUSEBUTTONUP;
@@ -228,10 +228,17 @@ inline bool tick() {
     up.button.y = 154;
     SDL_PushEvent(&up);
   }
-  if (f == 215 && mappedInputManager.hasTouch() && reminderSceneInputCount() != inputBaseline + 2) std::_Exit(69);
-  if (f == 216) {
+  if (f == 231 && mappedInputManager.hasTouch() && reminderSceneInputCount() != inputBaseline + 2) std::_Exit(69);
+  if (f == 232) activityManager.goHome();
+  if (f == 236) {
+    if (activityManager.requestUpdateAndWait() != RequestUpdateResult::Rendered) std::_Exit(70);
+    RenderLock lock;
+    paintReminderScene(renderer, fixture, 0);
+    pixels(directory, "due-home");
+  }
+  if (f == 238) {
     LOG_INF("BSR",
-            "BookSync R1 reminder UI PASS: captures=32 input-routes=%u settings-input=%u fresh-edges=%u snapshot=%u "
+            "BookSync R1 reminder UI PASS: captures=35 input-routes=%u settings-input=%u fresh-edges=%u snapshot=%u "
             "draft=%u",
             testedInputs, testedSettingsInputs, mappedInputManager.hasTouch() ? 2u : 1u, unsigned(sizeof(ReminderList)),
             unsigned(sizeof(ReminderDraft)));

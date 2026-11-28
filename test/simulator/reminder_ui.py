@@ -18,6 +18,6 @@ with tempfile.TemporaryDirectory(prefix='booksync-reminder-ui-') as directory:
     (out/'scenario.log').write_text(result.stdout+result.stderr)
     if result.returncode or 'BookSync R1 reminder UI PASS' not in result.stdout+result.stderr:
         raise SystemExit(f'reminder UI failed: {result.returncode}; see reports/{profile}/reminder-ui/scenario.log')
-    if len(list(out.glob('*.pgm')))!=32:
+    if len(list(out.glob('*.pgm')))!=35:
         raise SystemExit('incomplete reminder captures')
-print(f'BookSync R1 {profile}: 32 captures, memo-only paint, independent safe input routes PASS')
+print(f'BookSync R1 {profile}: 35 captures, memo-only paint, independent safe input routes PASS')

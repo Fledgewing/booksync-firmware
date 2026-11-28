@@ -372,7 +372,7 @@ class ReminderSettingsActivity final : public Activity {
     model.enterReminders();
     focus = 0;
     dayPage = 0;
-    if ((state >= 4 && state <= 12) || state == 17 || state == 21) {
+    if ((state >= 4 && state <= 11) || state == 17 || state == 21) {
       model.addReminderDraft();
       if (state == 5 || state == 17) model.openReminderChild(ReminderScreen::Time);
       if (state == 21) {
@@ -391,11 +391,14 @@ class ReminderSettingsActivity final : public Activity {
       }
       if (state == 9) model.openReminderChild(ReminderScreen::Message);
       if (state == 10) model.saveReminderDraft();
-      if (state == 12) model.toggleReminderDraft();
       if (state == 11) {
         model.saveReminderDraft();
         model.pollReminders();
       }
+    }
+    if (state == 12 || state == 23) {
+      model.editReminderDraft(1);
+      if (state == 12) model.toggleReminderDraft();
     }
     if (state == 13) {
       model.editReminderDraft(1);
@@ -612,9 +615,7 @@ class ReminderSettingsActivity final : public Activity {
           const auto a = row(i);
           std::snprintf(text, sizeof(text), tr(STR_REMINDER_ROW_FORMAT),
                         value.fields.kind == ReminderKind::Interval ? tr(STR_REMINDER_EYE_NAME) : value.timeLabel,
-                        value.source != ReminderSource::Local ? tr(STR_REMINDER_FAMILY)
-                        : value.fields.enabled                ? tr(STR_REMINDER_ON)
-                                                              : tr(STR_REMINDER_OFF));
+                        value.fields.enabled ? tr(STR_REMINDER_ON) : tr(STR_REMINDER_OFF));
           if constexpr (CROSSINK_APP_REMINDER_TEXT_LAYOUT) {
             char numbered[96]{};
             std::snprintf(numbered, sizeof(numbered), tr(STR_REMINDER_NUMBERED_FORMAT), index + 1, text);
@@ -627,13 +628,24 @@ class ReminderSettingsActivity final : public Activity {
             else
               std::snprintf(text, sizeof(text), tr(STR_REMINDER_EYE_SUBTITLE_FORMAT),
                             unsigned(value.fields.intervalMinutes));
+          } else if (value.source != ReminderSource::Local) {
+            std::snprintf(text, sizeof(text), "%s · %s · %s", value.daysLabel, value.sourceLabel,
+                          tr(STR_REMINDER_READONLY_BADGE));
           } else if (!model.memo().clockKnown)
             std::snprintf(text, sizeof(text), "%s", tr(STR_REMINDER_WAITING));
           else
             std::snprintf(text, sizeof(text), tr(STR_REMINDER_ROW_FORMAT), value.daysLabel,
                           value.fields.message[0] ? value.fields.message : tr(STR_REMINDER_DEFAULT));
+          if (value.fields.kind == ReminderKind::Interval && value.source != ReminderSource::Local) {
+            const auto used = std::strlen(text);
+            std::snprintf(text + used, sizeof(text) - used, " · %s · %s", value.sourceLabel,
+                          tr(STR_REMINDER_READONLY_BADGE));
+          }
           int detailY = a.y + renderer.getLineHeight(UI_10_FONT_ID) + 10;
           paintReminderText(text, a.x + 10, detailY, a.w - 20);
+          if (value.source != ReminderSource::Local && value.fields.kind == ReminderKind::Time)
+            paintReminderText(value.fields.message[0] ? value.fields.message : tr(STR_REMINDER_DEFAULT), a.x + 10,
+                              detailY, a.w - 20);
         }
         if (!model.timeCount()) {
           int y = row(1).y;
