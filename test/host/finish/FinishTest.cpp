@@ -381,3 +381,45 @@ TEST_F(FinishTest, GuardResultIsDurableBeforeAcknowledgmentAndSurvivesRestartUnt
   EXPECT_EQ(adapter.guarded, 1U);
   EXPECT_TRUE(adapter.applied);
 }
+TEST_F(FinishTest, QueuedUndoInheritsTheReconciledResultWithoutOverwritingItsOwnCheckpoint) {
+  class Results : public Toy {
+   public:
+    unsigned restored = 0;
+    PhaseOutcome finishPhase(const SyncWriterToken&, const FinishRequest& r) override {
+      if (!r.intent.undoOf) {
+        if (r.phase == LifecyclePhase::Stats) {
+          if (!r.reconcile) return PhaseOutcome::Uncertain;
+          *r.confirmedCheckpoint = "reconciled-original";
+        } else if (r.phase == LifecyclePhase::Annotations) {
+          EXPECT_EQ(r.entry.checkpoint, "reconciled-original");
+          *r.confirmedCheckpoint = "settled-original";
+        } else {
+          EXPECT_EQ(r.entry.checkpoint, "settled-original");
+        }
+      } else if (r.phase == LifecyclePhase::Annotations) {
+        EXPECT_EQ(r.entry.checkpoint, "settled-original");
+        *r.confirmedCheckpoint = "undo-result";
+        ++restored;
+      } else {
+        EXPECT_EQ(r.entry.checkpoint, "undo-result");
+      }
+      return PhaseOutcome::Confirmed;
+    }
+  } adapter;
+  enqueue();
+  {
+    SyncOwner owner(journal, adapter, "toy:grove", "scope:fern", scratch.data(), scratch.size(), nullptr, nullptr,
+                    &finish);
+    ASSERT_EQ(owner.activate(), SyncResult::Ready);
+    for (int i = 0; i < 6; ++i) ASSERT_EQ(owner.step(), i == 5 ? SyncResult::Completed : SyncResult::Advanced);
+    ASSERT_EQ(owner.step(), SyncResult::Uncertain);
+    uint64_t undo = 0;
+    ASSERT_EQ(finish.undo(intent, "toy:grove", "scope:fern", undo), JournalResult::Ok);
+  }
+  card.restart();
+  SyncOwner owner(journal, adapter, "toy:grove", "scope:fern", scratch.data(), scratch.size(), nullptr, nullptr,
+                  &finish);
+  ASSERT_EQ(owner.activate(), SyncResult::Ready);
+  drain(owner);
+  EXPECT_EQ(adapter.restored, 1U);
+}

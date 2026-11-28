@@ -53,9 +53,10 @@ owner then skips both ordinary State and final Progress; stats and annotations
 remain normal lifecycle work. It sends no finish/status/rating operation.
 
 After progress may have committed, or any finish operation was attempted, Undo
-appends an immutable compensation. The original reconciles first. A compensation
-queued before the position barrier inherits the resolved checkpoint from the
-completed original receipt before its first attempt. Unknown previous fields
+appends an immutable compensation. The original reconciles first. A queued compensation inherits the final resolved/guard-result checkpoint from
+the completed original receipt before its first operation, even if it was queued
+after the position barrier while the original result was unknown. Once compensation
+starts, its own result checkpoints are preserved. Unknown previous fields
 are never synthesized: restoring them is refused. Compensation uses the original
 desired values as its expected remote state and the known prior values as its
 desired state. A newer local choice invalidates an old Undo. A newer unattempted

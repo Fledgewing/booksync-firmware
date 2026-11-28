@@ -227,7 +227,7 @@ SyncResult Finish::step(const SyncWriterToken& token, ServerAdapter& adapter, co
     if (journal_.read(v.undoOf, original, scratch_, capacity_) != JournalResult::Ok || original.adapter != e.adapter ||
         original.owner != e.owner || original.document != e.document || !settled(original))
       return SyncResult::Unavailable;
-    if (e.checkpoint.empty()) {
+    if (!e.attempting && e.acknowledged == 1 && e.checkpoint != original.checkpoint) {
       if (journal_.checkpoint(e.id, original.checkpoint) != JournalResult::Ok) return SyncResult::StorageError;
       return SyncResult::Advanced;
     }
