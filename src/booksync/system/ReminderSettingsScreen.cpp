@@ -96,7 +96,7 @@ class ReminderSettingsActivity final : public Activity {
     }
     return true;
   }
-  unsigned actions() const {
+  unsigned reminderSettingsActions() const {
     switch (model.screen()) {
       case ReminderScreen::List:
         return model.memo().storage == ReminderStorage::Unreadable ? 2 : model.memo().clockKnown ? 7 : 8;
@@ -126,7 +126,7 @@ class ReminderSettingsActivity final : public Activity {
     return i < 19 || (i >= 20 && i < 27) || i == 30 || i == 32 || i == 34 || i == 37 || i == 39;
   }
   void changeFocus(int delta) {
-    const auto n = actions();
+    const auto n = reminderSettingsActions();
     if (!n) return;
     do {
       focus = uint8_t((static_cast<int>(focus) + delta + static_cast<int>(n)) % static_cast<int>(n));
@@ -208,7 +208,7 @@ class ReminderSettingsActivity final : public Activity {
           }
         } else if (touch && focus < 4) {
           timeField = focus;
-        } else if (focus == actions() - 1)
+        } else if (focus == reminderSettingsActions() - 1)
           model.finishReminderChild();
         else if (focus == 4)
           model.setReminderMinute((model.draft().child.minute + 720) % 1440);
@@ -297,9 +297,9 @@ class ReminderSettingsActivity final : public Activity {
     }
     if (screen == ReminderScreen::Time) {
       const auto r = safe();
-      for (unsigned i = 0; i < actions() - 1; ++i) {
-        Region a{r.x + 12 + static_cast<int>(i) * (r.w - 24) / static_cast<int>(actions()), r.y + 146,
-                 (r.w - 24) / static_cast<int>(actions()) - 4, 40};
+      for (unsigned i = 0; i < reminderSettingsActions() - 1; ++i) {
+        Region a{r.x + 12 + static_cast<int>(i) * (r.w - 24) / static_cast<int>(reminderSettingsActions()), r.y + 146,
+                 (r.w - 24) / static_cast<int>(reminderSettingsActions()) - 4, 40};
         if (a.contains(x, y)) return i;
       }
       if (mappedInput.hasTouch())
@@ -308,7 +308,7 @@ class ReminderSettingsActivity final : public Activity {
                    (r.w - 24) / 3 - 4, 42};
           if (a.contains(x, y)) return 32 + i;
         }
-      if (!mappedInput.hasTouch() && footer(0).contains(x, y)) return actions() - 1;
+      if (!mappedInput.hasTouch() && footer(0).contains(x, y)) return reminderSettingsActions() - 1;
       return 255;
     }
     if (screen == ReminderScreen::List) {
@@ -443,7 +443,7 @@ class ReminderSettingsActivity final : public Activity {
       prepareScene(which == 10 ? 17 : 5);
       if (mappedInput.hasTouch()) {
         const auto r = safe();
-        Region field{r.x + 12, r.y + 146, (r.w - 24) / static_cast<int>(actions()) - 4, 40};
+        Region field{r.x + 12, r.y + 146, (r.w - 24) / static_cast<int>(reminderSettingsActions()) - 4, 40};
         if (!touchAction(field)) return false;
         Region zero{r.x + 12 + (r.w - 24) / 3, r.y + r.h - 184 + 3 * 44, (r.w - 24) / 3 - 4, 42};
         if (!touchAction(zero)) return false;
@@ -452,7 +452,7 @@ class ReminderSettingsActivity final : public Activity {
       } else {
         focus = 1;
         activate();
-        focus = actions() - 1;
+        focus = reminderSettingsActions() - 1;
         activate();
       }
       return model.screen() == ReminderScreen::Editor && model.draft().draftMutation.fields.minute < 1440;
@@ -766,9 +766,9 @@ class ReminderSettingsActivity final : public Activity {
                         I18N.get(model.memo().twelveHour ? StrId::STR_REMINDER_TIME12 : StrId::STR_REMINDER_TIME24));
       const auto minute = model.draft().child.minute;
       const unsigned h = model.memo().twelveHour ? (minute / 60 % 12 ? minute / 60 % 12 : 12) : minute / 60;
-      for (unsigned i = 0; i < actions() - 1; ++i) {
-        Region a{r.x + 12 + static_cast<int>(i) * (r.w - 24) / static_cast<int>(actions()), r.y + 146,
-                 (r.w - 24) / static_cast<int>(actions()) - 4, 40};
+      for (unsigned i = 0; i < reminderSettingsActions() - 1; ++i) {
+        Region a{r.x + 12 + static_cast<int>(i) * (r.w - 24) / static_cast<int>(reminderSettingsActions()), r.y + 146,
+                 (r.w - 24) / static_cast<int>(reminderSettingsActions()) - 4, 40};
         const unsigned digit = i == 0 ? h / 10 : i == 1 ? h % 10 : i == 2 ? minute % 60 / 10 : minute % 10;
         std::snprintf(text, sizeof(text), "%u", digit);
         box(a, i == 4 ? I18N.get(minute >= 720 ? StrId::STR_PM : StrId::STR_AM) : text, focus == i);
@@ -781,7 +781,7 @@ class ReminderSettingsActivity final : public Activity {
           box(a, i == 9 ? tr(STR_REMINDER_BACKSPACE) : i == 11 ? tr(STR_DONE) : text, false);
         }
       } else
-        box(footer(0), tr(STR_DONE), focus == actions() - 1);
+        box(footer(0), tr(STR_DONE), focus == reminderSettingsActions() - 1);
     } else if (screen == ReminderScreen::Message) {
       int y = r.y + 62;
       paintReminderText(tr(STR_REMINDER_MESSAGE_LIMIT), r.x + 12, y, r.w - 24);

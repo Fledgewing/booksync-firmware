@@ -2,6 +2,7 @@
 #pragma once
 #include <Logging.h>
 #include <Memory.h>
+#include <SDL.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -97,7 +98,8 @@ inline bool tick() {
   const char* directory = std::getenv("BOOKSYNC_REMINDER_UI");
   if (!directory) return false;
   static Fixture fixture;
-  static unsigned frame = 0, caseIndex = 0;
+  static unsigned frame = 0, caseIndex = 0, testedInputs = 0, testedSettingsInputs = 0;
+  static uint64_t inputBaseline = 0;
   const unsigned f = frame++;
   mappedInputManager.simulatorClearInputFrame();
   if (f == 0) {
@@ -152,7 +154,7 @@ inline bool tick() {
       std::snprintf(name, sizeof(name), "due-%02u", i);
       pixels(directory, name);
     }
-    unsigned settingsInputs = 0;
+    unsigned& settingsInputs = testedSettingsInputs;
     for (unsigned i = 0; i < 11; ++i) {
       fixture.configure(i == 8 ? 20 : i == 9 ? 16 : i == 10 ? 17 : 1);
       fixture.writes = 0;
@@ -163,7 +165,7 @@ inline bool tick() {
       if (fixture.writes != unsigned(i == 0 || i == 1 || i == 3)) std::_Exit(64);
       ++settingsInputs;
     }
-    unsigned inputs = 0;
+    unsigned& inputs = testedInputs;
     for (unsigned i = 0; i < 9; ++i) {
       if ((i == 6 || i == 7) && !mappedInputManager.hasTouch()) continue;
       if (i == 5 && mappedInputManager.hasTouch()) continue;
@@ -185,11 +187,58 @@ inline bool tick() {
       }
       ++inputs;
     }
-    LOG_INF("BSR", "BookSync R1 reminder UI PASS: captures=32 input-routes=%u settings-input=%u snapshot=%u draft=%u",
-            inputs, settingsInputs, unsigned(sizeof(ReminderList)), unsigned(sizeof(ReminderDraft)));
+    inputBaseline = reminderSceneInputCount();
+    SDL_Event press{};
+    press.type = SDL_KEYDOWN;
+    press.key.keysym.scancode = SDL_SCANCODE_DOWN;
+    SDL_PushEvent(&press);
+  }
+  if (f == 211) {
+    if (reminderSceneInputCount() != inputBaseline + 1) std::_Exit(65);
+    SDL_Event release{};
+    release.type = SDL_KEYUP;
+    release.key.keysym.scancode = SDL_SCANCODE_DOWN;
+    SDL_PushEvent(&release);
+  }
+  if (f == 212) {
+    if (reminderSceneInputCount() != inputBaseline + 1) std::_Exit(66);
+    if (mappedInputManager.hasTouch()) {
+      SDL_Event down{};
+      down.type = SDL_MOUSEBUTTONDOWN;
+      down.button.button = SDL_BUTTON_LEFT;
+      down.button.x = 120;
+      down.button.y = 150;
+      SDL_PushEvent(&down);
+    }
+  }
+  if (f == 213 && mappedInputManager.hasTouch()) {
+    if (reminderSceneInputCount() != inputBaseline + 2) std::_Exit(67);
+    SDL_Event move{};
+    move.type = SDL_MOUSEMOTION;
+    move.motion.x = 124;
+    move.motion.y = 154;
+    SDL_PushEvent(&move);
+  }
+  if (f == 214 && mappedInputManager.hasTouch()) {
+    if (reminderSceneInputCount() != inputBaseline + 2) std::_Exit(68);
+    SDL_Event up{};
+    up.type = SDL_MOUSEBUTTONUP;
+    up.button.button = SDL_BUTTON_LEFT;
+    up.button.x = 124;
+    up.button.y = 154;
+    SDL_PushEvent(&up);
+  }
+  if (f == 215 && mappedInputManager.hasTouch() && reminderSceneInputCount() != inputBaseline + 2) std::_Exit(69);
+  if (f == 216) {
+    LOG_INF("BSR",
+            "BookSync R1 reminder UI PASS: captures=32 input-routes=%u settings-input=%u fresh-edges=%u snapshot=%u "
+            "draft=%u",
+            testedInputs, testedSettingsInputs, mappedInputManager.hasTouch() ? 2u : 1u, unsigned(sizeof(ReminderList)),
+            unsigned(sizeof(ReminderDraft)));
     std::fflush(nullptr);
     std::_Exit(0);
   }
+
   return true;
 }
 }  // namespace reminderUiScenario
