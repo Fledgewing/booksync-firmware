@@ -12185,7 +12185,8 @@ SimulatorSmokeTest smokeTest;
 }  // namespace
 
 void runSimulatorSmokeTestTick() {
-  if (!catalogSurfaceScenario::tick() && !seriesSurfaceScenario::tick() && !upgradeNoticeScenario::tick() && !accountSurfaceScenario::tick() && !editorScenario::tick() &&
+  if (!catalogSurfaceScenario::tick() && !seriesSurfaceScenario::tick() && !upgradeNoticeScenario::tick() &&
+      !accountSurfaceScenario::tick() && !editorScenario::tick() &&
       !statsWidgetScenario::tick() && !widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() &&
       !EpubReaderCompletionSmokeTest::sleepScenarioTick() &&
       !EpubReaderCompletionSmokeTest::readerCaptureScenarioTick() &&

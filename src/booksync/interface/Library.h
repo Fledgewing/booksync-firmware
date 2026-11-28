@@ -5,7 +5,6 @@
 #include "Models.h"
 #include "booksync/interface/AccountForm.h"
 #include "booksync/interface/AccountView.h"
-#include "booksync/interface/Clock.h"
 #include "booksync/interface/CatalogView.h"
 #include "booksync/interface/Clock.h"
 #include "booksync/interface/Covers.h"
