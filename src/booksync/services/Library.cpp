@@ -46,6 +46,7 @@ static_assert(sizeof(LocalState) <= 28 * 1024);
 // buffers and the <=4 KiB editor splice workspace exceed the task stack; releasing them before reader entry keeps C3
 // buffers out of the reader lifetime. HAL owns its bounded directory-handle allocations.
 std::unique_ptr<LocalState> local;
+ClockStatus currentClock{};
 AccountView accountPresentation{};
 bool noticeDismissalPending = false;
 // Presentation retirement spans Home instances, independently of SD checkpoint
@@ -59,6 +60,7 @@ class OfflineLibrary final : public Library {
   bool openRequested = false;
   BookRow lastBook{};
   Capabilities capabilities() const override { return {true, true, false}; }
+  ClockStatus clockStatus() const override { return currentClock; }
   AccountView accountView() const override { return accountPresentation; }
   CommandStatus selectService(ServiceSelection selection) override {
     const auto& current = accountPresentation;
@@ -175,6 +177,7 @@ OfflineLibrary& shellLibrary() {
 }
 }  // namespace
 Library& offlineLibrary() { return shellLibrary(); }
+void publishClockStatus(ClockStatus value) { currentClock = value; }
 void publishAccountView(AccountView value) {
   value.serviceLabel.back() = 0;
   accountPresentation = value;

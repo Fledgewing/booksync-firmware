@@ -3,6 +3,7 @@
 #include "Capabilities.h"
 #include "Commands.h"
 #include "Models.h"
+#include "booksync/interface/Clock.h"
 #include "booksync/interface/AccountView.h"
 #include "booksync/interface/Covers.h"
 #include "booksync/interface/Downloads.h"
@@ -18,6 +19,7 @@ class Library {
   virtual ~Library() = default;
   virtual Capabilities capabilities() const = 0;
   virtual Snapshot snapshot() const = 0;
+  virtual ClockStatus clockStatus() const { return {}; }
   virtual AccountView accountView() const { return {}; }
   virtual CommandStatus selectService(ServiceSelection) { return CommandStatus::Unavailable; }
   // Called outside paint; one pending visible window, repeated requests coalesce.

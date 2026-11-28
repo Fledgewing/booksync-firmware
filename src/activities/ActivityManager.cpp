@@ -1,4 +1,5 @@
 #include "ActivityManager.h"
+#include "booksync/system/ClockRuntime.h"
 
 #include "booksync/system/NetworkPhase.h"
 
@@ -535,6 +536,7 @@ void ActivityManager::renderTaskLoop() {
 }
 
 void ActivityManager::loop() {
+  booksync::publishRuntimeClock();
   booksync::networkAdmissionTick();
   if (currentActivity && currentActivity->requiresExclusiveStorageLoop()) {
     currentActivity->loop();
