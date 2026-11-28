@@ -83,6 +83,7 @@ struct QueryResult {
   std::array<uint32_t, 3> deviceCounts{};
   bool statusCountsKnown = false, deviceCountsKnown = false;
   bool hasMore = false;
+  bool membershipComplete = true, pending = false;
   void clear() {
     for (uint16_t i = 0; i < LibraryRows; ++i) entries[i].clear();
     provenance = {};
@@ -92,7 +93,8 @@ struct QueryResult {
     availability = Availability::NotSaved;
     statuses.fill(0);
     deviceCounts.fill(0);
-    statusCountsKnown = deviceCountsKnown = hasMore = false;
+    statusCountsKnown = deviceCountsKnown = hasMore = pending = false;
+    membershipComplete = true;
   }
 };
 static_assert(sizeof(QueryResult) <= LibraryBytes);

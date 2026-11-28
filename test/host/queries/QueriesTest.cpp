@@ -415,3 +415,22 @@ TEST(StoredQueries, NativeReadingPagesDoNotClaimBibliographicLength) {
 }
 
 }  // namespace
+
+TEST_F(QueryFixture, GroupPreviewKeepsAndroidPrimarySemanticsAndContextWindowsStayAvailable) {
+  request.kind = QueryKind::Groups;
+  request.filter.group = QueryGroup::Series;
+  request.limit = 5;
+  run();
+  ASSERT_EQ(result.availability, Availability::Ready);
+  ASSERT_EQ(result.count, 1);
+  EXPECT_STREQ(result.entries[0].groupKey.data(), "series-primary");
+  EXPECT_EQ(result.entries[0].books, 80u);
+  EXPECT_STREQ(result.entries[0].book.title.data(), "Book 000");
+  request.kind = QueryKind::Books;
+  request.filter.group = QueryGroup::None;
+  std::strcpy(request.seriesKey.data(), "series-secondary");
+  request.filter.sort = QuerySort::Series;
+  run();
+  ASSERT_EQ(result.availability, Availability::Ready);
+  EXPECT_EQ(result.entries[0].book.key.ordinal, 79u);
+}

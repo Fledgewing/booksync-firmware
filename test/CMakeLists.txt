@@ -316,3 +316,4 @@ add_subdirectory(host/series_queue)
 
 add_subdirectory(host/series_ui)
 add_subdirectory(host/stats_widgets)
+add_subdirectory(host/catalog_surface)

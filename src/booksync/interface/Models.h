@@ -79,11 +79,14 @@ struct BookRow {
   uint32_t page = 0, pages = 0, seconds = 0;
   bool identityKnown = false, readingKnown = false, statsKnown = false, titleTruncated = false;
 };
+enum class FileAvailability : uint8_t { Unknown, OnCard, ServerOnly };
 struct LibraryWindow {
   uint64_t publication = 0;  // Non-reused in-process content revision, independent of catalog/capture IDs.
   Provenance provenance{};
   WindowRequest request{};
   std::array<BookRow, LibraryRows> rows{};
+  // File truth belongs to this published window, independently of identity/cover.
+  std::array<FileAvailability, LibraryRows> fileAvailability{};
   std::array<WindowSpan, LibraryBatchRequests> windows{};
   uint8_t windowCount = 0;
   uint32_t total = 0, bytes = 0;
