@@ -92,13 +92,16 @@ inline void capture(const char* directory, const char* name) {
 inline void enterSettingsEditor(unsigned frame, bool textOnly) {
   if (frame != 12 || textOnly) return;
   if (!activityManager.isCurrentActivityNamed("Settings")) std::_Exit(50);
+#if CROSSINK_APP_CAP_TOUCH
   if (mappedInputManager.hasTouch()) {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
     const int y = header.y + header.height + renderer.getLineHeight(UI_10_FONT_ID) + 48;
     mappedInputManager.simulatorInjectTouchDown(safe.x + 50, y);
     mappedInputManager.simulatorInjectTouchRelease(safe.x + 50, y);
-  } else mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
+  } else
+#endif
+    mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
 }
 inline bool geometryTick() {
   const char* directory = std::getenv("BOOKSYNC_GEOMETRY_CAPTURES");
