@@ -74,3 +74,4 @@ env.AddBuildMiddleware(bounded_reminder_frame, "*/ReminderSettingsScreen.cpp")
 env.AddBuildMiddleware(bounded_reminder_frame, "*/ui/reminders/Settings.cpp")
 
 env.AddBuildMiddleware(bounded_reminder_frame, "*/ReminderText.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/ChapterCapture.cpp")

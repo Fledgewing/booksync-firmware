@@ -989,6 +989,44 @@ BookMetadataCache::TocEntry BookMetadataCache::getTocEntry(const int index) {
   return entry;
 }
 
+bool BookMetadataCache::readTocLabel(int index, char* out, size_t capacity, int16_t& spine, bool& truncated) {
+  spine = -1;
+  truncated = false;
+  if (!out || !capacity) return false;
+  out[0] = 0;
+  const auto fail = [&]() {
+    out[0] = 0;
+    spine = -1;
+    truncated = false;
+    LOG_ERR("BMC", "Bounded TOC label unavailable; native cache retained");
+    return false;
+  };
+  if (!loaded || index < 0 || index >= static_cast<int>(tocCount) || capacity > 4096) return fail();
+  bool ioFailure = false;
+  size_t start = 0, end = 0;
+  if (!readEntryBounds(false, index, start, end, ioFailure) || !bookFile.seek(start)) return fail();
+  for (unsigned field = 0; field < 3; ++field) {
+    uint32_t length = 0;
+    if (!readPodChecked(bookFile, length, end) || length > MAX_BUILD_ENTRY_STRING_BYTES) return fail();
+    const auto position = bookFile.position();
+    if (position > end || length > end - position) return fail();
+    if (!field) {
+      const size_t count = std::min<size_t>(length, capacity - 1);
+      if (count && bookFile.read(out, count) != static_cast<int>(count)) return fail();
+      const auto safe = utf8SafeTruncateBuffer(out, static_cast<int>(count));
+      if (static_cast<size_t>(safe) < count && count == length) return fail();
+      out[safe] = 0;
+      truncated = count < length;
+      if (std::memchr(out, 0, static_cast<size_t>(safe))) return fail();
+    }
+    if (!bookFile.seek(position + length)) return fail();
+  }
+  uint8_t level = 0;
+  if (!readPodChecked(bookFile, level, end) || !readPodChecked(bookFile, spine, end) || bookFile.position() != end)
+    return fail();
+  return true;
+}
+
 bool BookMetadataCache::readEntryBounds(const bool spineEntry, const int index, size_t& start, size_t& end,
                                         bool& ioFailure) {
   const size_t fileSize = bookFile.size();

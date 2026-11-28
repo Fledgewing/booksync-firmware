@@ -1,3 +1,5 @@
+#include <Utf8.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -95,6 +97,7 @@ class BookMetadataCache {
   SpineEntry getSpineEntry(int index);
   size_t getSpineCumulativeSize(int index);
   TocEntry getTocEntry(int index);
+  bool readTocLabel(int index, char* out, size_t capacity, int16_t& spine, bool& truncated);
   bool readEntryBounds(bool spineEntry, int index, size_t& start, size_t& end, bool& ioFailure);
   void invalidateReadCache(bool discardCache);
 };
@@ -220,7 +223,63 @@ void checkInvalidCumulativeScan() {
   }
 }
 
+void makeLabelCache(BookMetadataCache& cache, const std::string& title) {
+  makeValidCache(cache);
+  uint32_t offset = 0;
+  std::memcpy(&offset, cache.bookFile.bytes.data() + cache.lutOffset + 4, 4);
+  cache.bookFile.bytes.resize(offset);
+  appendString(cache.bookFile, title);
+  appendString(cache.bookFile, std::string(1000, 'h'));
+  appendString(cache.bookFile, std::string(1000, 'a'));
+  append(cache.bookFile, uint8_t{2});
+  append(cache.bookFile, int16_t{0});
+}
+void checkBoundedTocLabels() {
+  BookMetadataCache cache;
+  makeValidCache(cache);
+  char label[96];
+  int16_t spine = -1;
+  bool truncated = false;
+  assert(cache.readTocLabel(0, label, sizeof(label), spine, truncated));
+  assert(std::string(label) == "Chapter One" && spine == 0 && !truncated && cache.loaded);
+  assert(cache.getTocEntry(0).title == "Chapter One");
+  assert(cache.readTocLabel(0, label, 5, spine, truncated));
+  assert(std::string(label) == "Chap" && truncated && cache.loaded && !Storage.removals);
+  makeLabelCache(cache, "水水水");
+  assert(cache.readTocLabel(0, label, 8, spine, truncated));
+  assert(std::string(label) == "水水" && truncated && spine == 0);
+  makeValidCache(cache);
+  const auto complete = cache.bookFile.bytes;
+  uint32_t offset = 0;
+  std::memcpy(&offset, complete.data() + cache.lutOffset + 4, 4);
+  for (size_t n = offset; n < complete.size(); ++n) {
+    cache.bookFile.bytes = complete;
+    cache.bookFile.bytes.resize(n);
+    std::strcpy(label, "old");
+    assert(!cache.readTocLabel(0, label, sizeof(label), spine, truncated));
+    assert(!label[0] && spine == -1 && cache.loaded && !Storage.removals);
+  }
+  makeValidCache(cache);
+  writeAt(cache.bookFile, offset, MAX_BUILD_ENTRY_STRING_BYTES + 1);
+  assert(!cache.readTocLabel(0, label, sizeof(label), spine, truncated));
+  assert(cache.loaded && !Storage.removals);
+  makeValidCache(cache);
+  cache.bookFile.failAt = offset + 4;
+  assert(!cache.readTocLabel(0, label, sizeof(label), spine, truncated));
+  assert(!label[0] && cache.loaded && !Storage.removals);
+  makeValidCache(cache);
+  cache.bookFile.failSeek = true;
+  assert(!cache.readTocLabel(0, label, sizeof(label), spine, truncated));
+  assert(cache.loaded && !Storage.removals);
+  makeValidCache(cache);
+  assert(!cache.readTocLabel(-1, label, sizeof(label), spine, truncated));
+  assert(!cache.readTocLabel(0, nullptr, 0, spine, truncated));
+  assert(!cache.readTocLabel(0, label, 0, spine, truncated));
+  assert(cache.loaded && !Storage.removals);
+}
+
 int main() {
+  checkBoundedTocLabels();
   for (uint16_t count : {0, 1, 144, 1024, 1025}) {
     checkCumulativeScan(count, false);
     checkCumulativeScan(count, true);

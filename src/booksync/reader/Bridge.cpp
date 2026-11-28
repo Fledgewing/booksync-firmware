@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Bridge.h"
+#include "ChapterCapture.h"
 
 #include <Logging.h>
 
@@ -39,8 +40,11 @@ bool prepare() {
 }  // namespace
 Bridge::Bridge() : capture_(journal), pages_(pageQueue) {}
 void Bridge::open(std::string_view path, uint16_t format) {
-  if (capture_.id() || !prepare()) return;
+  if (capture_.id()) return;
+  chapterCapture().begin(0, format);
+  if (!prepare()) return;
   const auto result = capture_.open(path, format);
+  chapterCapture().begin(capture_.id(), format);
   if (result != storage::JournalResult::Ok) LOG_ERR("BSC", "Local book capture unavailable: %u", unsigned(result));
 }
 namespace {

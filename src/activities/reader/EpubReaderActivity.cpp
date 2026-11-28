@@ -1,4 +1,5 @@
 #include "EpubReaderActivity.h"
+#include "booksync/reader/ChapterCapture.h"
 
 #include <Arduino.h>
 #include <BidiUtils.h>
@@ -2742,6 +2743,7 @@ void EpubReaderActivity::onExit() {
   flushPendingSyncMark();  // before a Read-folder move below renames the entry
 
   observeBookSync(true);
+  observeChapterRoute();
 
   BOOKMARKS.unload();
   CLIPPINGS.unload();
@@ -9038,4 +9040,52 @@ void EpubReaderActivity::observeBookSync(bool closed, bool refreshNative) {
   sample.forwardTurns = stats.totalPagesTurned;
   sample.counter = stats.counterId.bytes;
   booksyncCapture.observe(sample, epub->getCachePath(), closed, refreshNative);
+}
+
+void EpubReaderActivity::observeChapterRoute() {
+  std::optional<RenderLock> lock;
+  if (!RenderLock::heldByCurrentTask()) lock.emplace();
+  if (!epub || activeFootnotePreview || !section || section->isBuilding()) return;
+  auto& capture = booksync::reader::chapterCapture();
+  booksync::reader::ChapterInput input;
+  input.open = booksyncCapture.nativeOpen();
+  input.book = epub->getTitle();
+  const int count = epub->getTocItemsCount();
+  int current = section->getTocIndexForPage(section->currentPage);
+  if (current < 0) current = epub->getTocIndexForSpineIndex(currentSpineIndex);
+  input.tocKnown = count > 0 && current >= 0 && current < count;
+  if (!input.tocKnown) {
+    capture.publish(input);
+    return;
+  }
+  input.chapter = static_cast<uint32_t>(current);
+  input.count = static_cast<uint32_t>(count);
+  if (count > 4096) {
+    capture.publish(input);
+    return;
+  }
+  int16_t currentSpine = -1, nextSpine = -1;
+  bool currentTruncated = false, nextTruncated = false;
+  if (!epub->readTocLabel(current, booksyncCurrentChapter.data(), booksyncCurrentChapter.size(), currentSpine,
+                          currentTruncated)) {
+    capture.publish(input);
+    return;
+  }
+  booksyncNextChapter.fill(0);
+  if (current + 1 < count && !epub->readTocLabel(current + 1, booksyncNextChapter.data(), booksyncNextChapter.size(),
+                                                 nextSpine, nextTruncated)) {
+    capture.publish(input);
+    return;
+  }
+  input.current = booksyncCurrentChapter.data();
+  input.next = booksyncNextChapter.data();
+  input.labelsTruncated = currentTruncated || nextTruncated;
+  int groupFirst = currentSpineIndex, groupLast = currentSpineIndex;
+  epub->resolveChapterGroupRange(currentSpineIndex, groupFirst, groupLast);
+  // Native chapter ETA addresses a spine group, not arbitrary same-spine TOC
+  // anchors. Preserve unknown timing unless the next TOC boundary proves it.
+  input.toNextKnown =
+      current + 1 < count && nextSpine == groupLast + 1 && estimateTimeLeftSeconds(false, input.toNextSeconds);
+  input.toEndKnown = estimateTimeLeftSeconds(true, input.toEndSeconds);
+  capture.publish(input);
 }

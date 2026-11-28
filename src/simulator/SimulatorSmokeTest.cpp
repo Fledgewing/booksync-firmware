@@ -52,6 +52,7 @@
 #include "../../test/simulator/UpgradeNoticeScenario.h"
 #include "../../test/simulator/NativePersonalScenario.h"
 #include "../../test/simulator/DeviceBridgeScenario.h"
+#include "booksync/reader/ChapterCapture.h"
 
 #include <Epub.h>
 #include <Epub/WordSpacing.h>
