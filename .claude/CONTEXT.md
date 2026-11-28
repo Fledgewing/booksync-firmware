@@ -44,3 +44,8 @@ Refer to https://freeink.org/llms.txt for guidance.
 
 - POSIX TZ signs are inverted from ISO 8601 in `TimeStore::applyTimezone()`: `"UTC-1"` means UTC+1.
 - `LyraTheme::drawHeader()` does not call `BaseTheme::drawHeader()`, so header changes in the base theme must be duplicated in Lyra if needed.
+
+## BookSync transport
+
+- BookSync's legacy sync TLS policy verifies ISRG roots plus a host-scoped trusted anchor. The generic CrossInk downloader's insecure setting is not that policy.
+- `tools/e2e/kit.py` captures `Admin`/`Device` default server addresses at import. Isolated fixtures must pass `base=` explicitly to both; changing `kit.SERVER` alone does not redirect their calls.

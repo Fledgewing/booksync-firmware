@@ -137,7 +137,7 @@ AuthError Account::removeLogin(LoginKind kind, DeliveryTicket expected) {
   if (kind != LoginKind::Sync && kind != LoginKind::Acquisition) return AuthError::Invalid;
   const unsigned slot = kind == LoginKind::Sync ? 0 : 1;
   if (retirer_[slot] && !retirer_[slot](kind, retirement_[slot])) return AuthError::Unavailable;
-  const auto error = adapter.removeLogin(kind);
+  const auto error = adapter.removeLogin(kind, kind == LoginKind::Sync ? state.syncOwner : state.acquisitionOwner);
   if (error != AuthError::None) return error;
   setConnector(kind, 0, LoginOrigin::None);
   ++state.ticket.epoch;

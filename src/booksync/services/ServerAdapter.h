@@ -51,6 +51,13 @@ class ServerAdapter : public AuthAdapter {
   virtual bool cachedReadingStats(RemoteReadingStats&) const { return false; }
   // Borrowed worker cursor, absent until authenticated catalog transport is available.
   virtual CatalogSource* catalogSource() { return nullptr; }
+  // Serialized worker session selection; connector tokens are process-local.
+  // No credential or protocol value crosses this boundary. A failed selection
+  // clears the previous selection, never falling back to a different login.
+  virtual bool selectSyncSession(uint32_t) { return false; }
+  virtual void endSyncSession() {}
+  virtual bool startCatalog(std::string_view) { return false; }
+  virtual AuthError sessionError() const { return AuthError::Unavailable; }
   virtual DownloadSource* downloadSource() { return nullptr; }
   virtual PhaseOutcome syncPhase(const SyncWriterToken&, const PhaseRequest&) { return PhaseOutcome::Unavailable; }
   virtual PhaseOutcome finishPhase(const SyncWriterToken&, const FinishRequest&) { return PhaseOutcome::Unavailable; }

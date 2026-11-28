@@ -91,6 +91,9 @@ class AuthAdapter {
   }
   virtual AuthResult useAccountLogin(LoginKind) { return {}; }
   virtual AuthError removeLogin(LoginKind) { return AuthError::Unsupported; }
+  // Shared adapters must revoke this connector only. The compatibility default
+  // keeps adapters with one private session unchanged.
+  virtual AuthError removeLogin(LoginKind kind, uint32_t) { return removeLogin(kind); }
   // Local revocation is mandatory, synchronous and cannot depend on connectivity.
   // Erase account tokens/candidates and account-derived connector secrets.
   // Explicit user logins remain independent; removeLogin erases those separately.

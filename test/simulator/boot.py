@@ -80,6 +80,7 @@ subprocess.run([sys.executable, "test/simulator/sync_owner.py", profile], cwd=ro
 subprocess.run([sys.executable, 'test/simulator/layout.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/account.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/update.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, "test/simulator/live_adapter.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/catalog_jobs.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/download_jobs.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/queries.py', profile], cwd=root, env=env, check=True)
