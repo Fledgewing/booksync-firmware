@@ -2688,19 +2688,21 @@ current BSL1 record only by publishing Retired. It never authorizes Live, and
 an uncommitted staging receipt is never selected as data. Read-only/full-card
 failure keeps that scope unavailable and preserves every original/backup.
 
-## BookSync download job envelope (BSDL v2)
+## BookSync download/copy job envelope (BSDL v3)
 
 F23 uses F06 publication for one active account-scoped selection per worker. The
 caller reserves a private journal path plus `.tmp`/`.bak`; recovery selects a
-complete current or backup without writing. The exact 911-byte, little-endian
-record has no C++ padding: magic `BSDL`, version byte 2 and three zero bytes (8),
+complete current or backup without writing. F24 writes a 943-byte, little-endian
+record with no C++ padding: magic `BSDL`, version byte 3 and three zero bytes (8),
 run ID (u64), canceled flag (u8), canonical book UUID (16), edition UUID (16),
 source SHA-256 (32; initially zero if not yet acquired), five NUL-terminated
 64-byte fields (server token, account
 token, opaque book alias, file alias, variant), opaque selected version (64),
 opaque adapter verification proof (65), frozen absolute SD path (240),
 expected length (u64), known-length flag (u8), strong revision validator (128),
-and FNV-1a-32 of the preceding 907 bytes (u32). Flags accept only 0/1. Unknown,
+old source SHA-256 (32; zero for a first acquisition),
+and FNV-1a-32 of the preceding 939 bytes (u32). Version 2 (911 bytes, without
+the old SHA-256) remains readable and is rewritten as v3 only on a normal save. Flags accept only 0/1. Unknown,
 torn, mismatched-scope and malformed records are retained and block work.
 Credentials, acquisition URLs and expiring locators are never persisted here.
 
@@ -2719,6 +2721,40 @@ complete bytes on explicit Resume. The final book and reader sidecars are never
 removed by Cancel. Unrelated destination collisions fail; F24 owns replacement.
 A durable canceled flag precedes staging removal. Restart never starts transport,
 links a file or creates an automatic-open intent.
+
+
+F24 copy replacement uses the same single pending job, frozen path and account
+scope. Only unique same-book/same-edition evidence with a known old SHA-256 and
+new SHA-256 or adapter proof can enter replacement. Current, missing, ambiguous
+or unverifiable copies are left alone. The replacement-only book-lifetime port must prove the target is closed, even
+under Home/panels; missing proof defers work and late entry pauses it. The old
+bytes must still hash to the journaled revision before transfer; externally modified copies fail closed.
+The new staging file is verified against the new proof before either rename.
+Publication may validate the old revision only to retain/recover it, never to
+report the new download complete. The old EPUB stays at the exact `.bak` sibling through verified publication and
+identity linking. After successful linking it is verified and durably retired
+before the worker can advance to another book. Failed cleanup stays pending;
+retry never downloads again and no unowned backup is removed.
+
+Copy recovery restores a validated backup to a missing original filename under
+the main-loop serialized SD writer/open gate before Library exposes that path.
+It checks reading/job exclusion without activating network admission, transport
+or display parking; recovery works offline.
+A failed restore blocks that path; there is no open intent or transport on boot.
+The owner must serialize reader opens and recovery, and call CopyJobs recovery
+before exposing queued paths. A cut after publication or failed link retries the
+idempotent identity link without re-downloading. Failed publication restores the
+old native filename where possible; full/read-only failures retain the backup
+for recovery. Cancel leaves complete EPUBs and sidecars intact.
+
+CrossInk keys native EPUB state by the book path (FNV-1a-64 cache directory), not
+its content revision. Replacement keeps that exact path and canonical book/edition
+UUIDs, and never deletes, moves or rewrites native progress, links, bookmarks,
+clippings, stats, reader settings or unknown sidecar files. The final link port
+updates only the account-scoped file revision. No reader cache binary changes or
+cache reset are required for the metadata-only same-edition fixtures. Live
+refresh/wake/sleep scheduling and its setting presentation join through Library
+in later slices; this service introduces no second timer, task or writer.
 
 ### BookSync private pending progress checkpoint (`BSP1`)
 

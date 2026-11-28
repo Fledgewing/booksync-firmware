@@ -21,6 +21,7 @@
 
 #include "../../test/simulator/DownloadJobsScenario.h"
 #include "../../test/simulator/QueriesScenario.h"
+#include "../../test/simulator/CopyJobsScenario.h"
 #include "../../test/simulator/DeviceIndexScenario.h"
 #include "../../test/simulator/LayoutScenario.h"
 #include "../../test/simulator/UpdateScenario.h"
@@ -12197,6 +12198,7 @@ void prepareSimulatorSmokeState() {
   runAccountScenario();
   runQueriesScenario();
   runCatalogJobsScenario();
+  runCopyJobsScenario();
   runDownloadJobsScenario();
   runCatalogScenario();
   runCredentialsScenario();

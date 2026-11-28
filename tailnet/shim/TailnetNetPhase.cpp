@@ -50,6 +50,7 @@ extern "C" bool tailnet_service_permitted(void) {
   const uint32_t current = state.load();
   return !(current & kReading) && (current & kJobMask) && (current & kReady);
 }
+extern "C" bool tailnet_service_idle(void) { return !(state.load() & (kReading | kJobMask)); }
 extern "C" bool tailnet_display_park(void) {
   const uint32_t current = state.load();
   return !(current & kReading) && (current & kJobMask) && (current & kReleased) && (current & kReady);

@@ -13,7 +13,7 @@
 #endif
 namespace booksync {
 namespace {
-constexpr std::array<uint8_t, 8> Magic{'B', 'S', 'D', 'L', 2, 0, 0, 0};
+constexpr std::array<uint8_t, 8> Magic{'B', 'S', 'D', 'L', 3, 0, 0, 0};
 uint32_t checksum(const void* data, size_t n, uint32_t hash = 2166136261u) {
   const auto* p = static_cast<const uint8_t*>(data);
   while (n--) hash = (hash ^ *p++) * 16777619u;
@@ -38,6 +38,19 @@ bool sameSelection(const DownloadSpec& a, const DownloadSpec& b) {
 }
 bool scopeMatches(const DownloadSpec& s, storage::ScopeView scope) {
   return scope.server == s.server.data() && scope.account == s.account.data();
+}
+// One completion log, with 130 bytes of bounded stack scratch and no heap.
+void logReplacement(const DownloadSpec& spec, const storage::Revision& previous) {
+  static constexpr char Hex[] = "0123456789abcdef";
+  char oldHash[65], newHash[65];
+  for (size_t i = 0; i < previous.bytes.size(); ++i) {
+    oldHash[i * 2] = Hex[previous.bytes[i] >> 4];
+    oldHash[i * 2 + 1] = Hex[previous.bytes[i] & 15];
+    newHash[i * 2] = Hex[spec.identity.revision.bytes[i] >> 4];
+    newHash[i * 2 + 1] = Hex[spec.identity.revision.bytes[i] & 15];
+  }
+  oldHash[64] = newHash[64] = 0;
+  LOG_INF("BSC", "Copy replaced: %s (%s -> %s)", spec.path.data(), oldHash, newHash);
 }
 // The hash state is under 256 bytes; the shared chunk workspace belongs to the
 // worker. Every read is bounded and checks admission, including final validation.
@@ -69,18 +82,29 @@ DownloadJobs::~DownloadJobs() {
 bool DownloadJobs::same(DeliveryTicket current) const {
   return scoped_ && current.owner == owner_.owner && current.epoch == owner_.epoch;
 }
+bool DownloadJobs::replacementClosed() const {
+  return !nonzero(record_.previous.bytes) ||
+         (ports_.replacementClosed && ports_.replacementClosed(ports_.context, record_.spec.path.data()));
+}
+bool DownloadJobs::permitted() const { return admission_.permitted() && replacementClosed(); }
+bool DownloadJobs::canRecover() const { return admission_.storageIdle() && replacementClosed(); }
 bool DownloadJobs::recordValid(FsFile& file, void*) {
-  if (file.fileSize() != JournalBytes) return false;
+  const auto length = file.fileSize();
+  if (length != JournalBytes && length != JournalBytes - 32) return false;
   // Streaming validation avoids a second record on the task stack. Explicit
   // version/size plus checksum rejects torn and unknown records; retain bytes.
   uint8_t bytes[128];
   uint32_t hash = 2166136261u;
-  size_t remaining = JournalBytes - 4;
+  size_t remaining = length - 4;
   bool first = true;
   while (remaining) {
     const auto n = std::min(remaining, sizeof(bytes));
     if (file.read(bytes, n) != int(n)) return false;
-    if (first && std::memcmp(bytes, Magic.data(), Magic.size())) return false;
+    if (first) {
+      const auto version = length == JournalBytes ? 3 : 2;
+      for (size_t i = 0; i < Magic.size(); ++i)
+        if (bytes[i] != (i == 4 ? version : Magic[i])) return false;
+    }
     first = false;
     hash = checksum(bytes, n, hash);
     remaining -= n;
@@ -131,7 +155,11 @@ bool DownloadJobs::codec(bool encode) {
   if (known > 1) return false;
   s.sizeKnown = known;
   bytes(record_.validator.data(), 128);
-  if (offset != JournalBytes - 4) return false;
+  // V2 first-acquisition journals remain readable; V3 adds old-revision proof.
+  const bool legacy = !encode && buffer_[4] == 2;
+  if (!legacy) bytes(record_.previous.bytes.data(), 32);
+  const auto length = legacy ? JournalBytes - 32 : JournalBytes;
+  if (offset != length - 4) return false;
   if (encode) {
     const auto hash = checksum(buffer_.data(), offset);
     for (unsigned i = 0; i < 4; ++i) buffer_[offset + i] = uint8_t(hash >> (8 * i));
@@ -158,7 +186,12 @@ bool DownloadJobs::accepts(const DownloadSpec& s) const {
   if (!std::strcmp(last, ".") || !std::strcmp(last, "..")) return false;
   // Reserve only an EPUB destination and its exact staging siblings. F24 owns
   // replacement; this worker refuses unrelated existing files.
-  if (n < 5 || std::strcmp(p + n - 5, ".epub")) return false;
+  if (n < 5) return false;
+  const auto* extension = p + n - 5;
+  if (extension[0] != '.' || (extension[1] != 'e' && extension[1] != 'E') ||
+      (extension[2] != 'p' && extension[2] != 'P') || (extension[3] != 'u' && extension[3] != 'U') ||
+      (extension[4] != 'b' && extension[4] != 'B'))
+    return false;
   if (!std::strcmp(p, journal_.current) || !std::strcmp(p, journal_.staging) || !std::strcmp(p, journal_.backup))
     return false;
   return true;
@@ -194,7 +227,8 @@ bool DownloadJobs::recover(storage::ScopeView scope, DeliveryTicket current) {
       LOG_ERR("BSD", "Download journal open failed");
       return false;
     }
-    const bool read = file.read(buffer_.data(), JournalBytes) == static_cast<int>(JournalBytes);
+    const auto length = file.fileSize();
+    const bool read = length <= buffer_.size() && file.read(buffer_.data(), length) == static_cast<int>(length);
     const bool closed = file.close();
     if (!read || !closed || !codec(false) || !setPaths(record_.spec) || !text(record_.validator, false) ||
         !record_.id || record_.canceled > 1 || !scopeMatches(record_.spec, scope)) {
@@ -258,31 +292,41 @@ void DownloadJobs::settle(DownloadState state, DownloadError error) {
   draining_ = !admission_.finish();
 }
 void DownloadJobs::fail(DownloadError error) {
-  LOG_ERR("BSD", "Download stopped: %u", unsigned(error));
+  LOG_ERR("BSD", "%s stopped: %u", nonzero(record_.previous.bytes) ? "Copy update" : "Download", unsigned(error));
   settle(DownloadState::Failed, error);
 }
 bool DownloadJobs::artifactValid(FsFile& file, void* context) {
-  return static_cast<DownloadJobs*>(context)->verify(file);
+  return static_cast<DownloadJobs*>(context)->verify(file, true);
 }
-bool DownloadJobs::verify(FsFile& file) {
-  if (file.fileSize() > MaxBytes || (record_.spec.sizeKnown && file.fileSize() != record_.spec.bytes)) return false;
+bool DownloadJobs::recoveryValid(FsFile& file, void* context) {
+  return static_cast<DownloadJobs*>(context)->verify(file, true, true);
+}
+bool DownloadJobs::verify(FsFile& file, bool allowPrevious, bool offline) {
+  const bool previousAllowed = allowPrevious && nonzero(record_.previous.bytes);
+  if (file.fileSize() > MaxBytes ||
+      (!previousAllowed && record_.spec.sizeKnown && file.fileSize() != record_.spec.bytes))
+    return false;
   Hash hash;
   if (!hash.begin()) return false;
   uint64_t remaining = file.fileSize();
   if (!remaining) return false;
   while (remaining) {
-    if (!admission_.permitted()) return false;
+    if (offline ? !canRecover() : !permitted()) return false;
     const auto n = static_cast<size_t>(std::min<uint64_t>(remaining, buffer_.size()));
     if (file.read(buffer_.data(), n) != int(n) || !hash.add(buffer_.data(), n)) return false;
     remaining -= n;
   }
-  if (!hash.finish(computed_.bytes.data())) return false;
+  if (!hash.finish(computed_.bytes.data()) || (offline && !canRecover())) return false;
+  if (previousAllowed && computed_ == record_.previous) return true;
+  if (record_.spec.sizeKnown && file.fileSize() != record_.spec.bytes) return false;
   if (nonzero(record_.spec.identity.revision.bytes)) return computed_ == record_.spec.identity.revision;
+  if (offline) return false;  // Boot recovery never asks a transport/verifier for proof.
   DownloadCheck check{buffer_.data(), buffer_.size(),
-                      [](void* p) { return static_cast<DownloadJobs*>(p)->admission_.permitted(); }, this};
-  return proofSource_ && proofSource_->verify(file, record_.spec, check) && admission_.permitted();
+                      [](void* p) { return static_cast<DownloadJobs*>(p)->permitted(); }, this};
+  return proofSource_ && proofSource_->verify(file, record_.spec, check) && permitted();
 }
 bool DownloadJobs::verifyPath(const char* path) {
+  if (!permitted()) return false;
   FsFile file = Storage.open(path, O_RDONLY);
   if (!file) {
     LOG_ERR("BSD", "Download candidate open failed");
@@ -293,6 +337,10 @@ bool DownloadJobs::verifyPath(const char* path) {
   return valid && closed;
 }
 uint64_t DownloadJobs::start(const DownloadSpec& spec, DownloadSource& source, DeliveryTicket current) {
+  return startImpl(spec, {}, source, current);
+}
+uint64_t DownloadJobs::startImpl(const DownloadSpec& spec, storage::Revision previous, DownloadSource& source,
+                                 DeliveryTicket current) {
   if (!same(current)) return 0;
   if (busy()) return sameSelection(record_.spec, spec) ? status_.id : 0;
   // Never replace a paused run implicitly. Resume must name that run.
@@ -303,11 +351,31 @@ uint64_t DownloadJobs::start(const DownloadSpec& spec, DownloadSource& source, D
     LOG_ERR("BSD", "Invalid download selection rejected");
     return 0;
   }
+  if (nonzero(previous.bytes) &&
+      (!ports_.replacementClosed || !ports_.replacementClosed(ports_.context, spec.path.data()))) {
+    LOG_INF("BSC", "Copy deferred: target lifetime unavailable/open");
+    return 0;
+  }
   if (!admit()) return 0;
   setPaths(spec);
   // A rejected request never claims another file's staging or poisons the last
   // job. Keep its identity and allow a different resolved destination to retry.
-  if (Storage.exists(staging_.data()) || Storage.exists(backup_.data())) {
+  const bool ownedBackup = nonzero(previous.bytes) && nonzero(record_.previous.bytes) &&
+                           record_.spec.path == spec.path && record_.spec.server == spec.server &&
+                           record_.spec.account == spec.account && record_.spec.identity.book == spec.identity.book &&
+                           record_.spec.identity.edition == spec.identity.edition &&
+                           record_.spec.identity.revision == previous;
+  // Only the last journaled transaction may retire its retained backup. Verify
+  // both files before accepting another revision; unrelated siblings survive.
+  bool backupSafe = !Storage.exists(backup_.data());
+  if (!backupSafe && ownedBackup && verifyPath(spec.path.data())) {
+    FsFile file = Storage.open(backup_.data(), O_RDONLY);
+    if (file) {
+      backupSafe = verify(file, true) && computed_ == record_.previous;
+      if (!file.close()) backupSafe = false;
+    }
+  }
+  if (Storage.exists(staging_.data()) || !backupSafe) {
     LOG_ERR("BSD", "Unowned download staging/backup retained");
     setPaths(record_.spec);
     settle(status_.state);
@@ -317,6 +385,7 @@ uint64_t DownloadJobs::start(const DownloadSpec& spec, DownloadSource& source, D
   record_ = {};
   record_.id = id;
   record_.spec = spec;
+  record_.previous = previous;
   status_ = {};
   status_.id = id;
   if (!save()) {
@@ -328,7 +397,7 @@ uint64_t DownloadJobs::start(const DownloadSpec& spec, DownloadSource& source, D
 }
 bool DownloadJobs::resume(uint64_t id, DownloadSource& source, DeliveryTicket current) {
   if (!same(current) || !id || id != status_.id || busy() || record_.canceled ||
-      status_.state == DownloadState::Complete)
+      status_.state == DownloadState::Complete || !replacementClosed())
     return false;
   if (!admit()) return false;
   return begin(source);
@@ -336,20 +405,38 @@ bool DownloadJobs::resume(uint64_t id, DownloadSource& source, DeliveryTicket cu
 bool DownloadJobs::begin(DownloadSource& source) {
   status_.error = DownloadError::None;
   proofSource_ = &source;
-  // A cut after rename or failed identity link reuses verified complete bytes.
+  if (!permitted()) {
+    settle(DownloadState::Paused);
+    return false;
+  }
+  if (!restorePrevious()) {
+    fail(DownloadError::StorageFailure);
+    return false;
+  }
+  // A replacement only owns bytes matching its journaled old revision. Existing
+  // unrelated files still fail closed, including an externally changed SD file.
   if (Storage.exists(record_.spec.path.data())) {
-    if (!nonzero(record_.spec.identity.revision.bytes) || !verifyPath(record_.spec.path.data())) {
+    const bool current = nonzero(record_.spec.identity.revision.bytes) && verifyPath(record_.spec.path.data());
+    if (current) {
+      storage::FilePublish published({record_.spec.path.data(), staging_.data(), backup_.data()}, artifactValid, this);
+      if (!published.confirm()) {
+        fail(DownloadError::StorageFailure);
+        return false;
+      }
+      status_.state = DownloadState::Linking;
+      ++status_.sequence;
+      return true;
+    }
+    if (!nonzero(record_.previous.bytes) ||
+        !storage::FilePublish::validateCurrent({record_.spec.path.data(), staging_.data(), backup_.data()},
+                                               artifactValid, this) ||
+        computed_ != record_.previous) {
       fail(DownloadError::Digest);
       return false;
     }
-    storage::FilePublish published({record_.spec.path.data(), staging_.data(), backup_.data()}, artifactValid, this);
-    if (!published.confirm()) {
-      fail(DownloadError::StorageFailure);
-      return false;
-    }
-    status_.state = DownloadState::Linking;
-    ++status_.sequence;
-    return true;
+  } else if (nonzero(record_.previous.bytes)) {
+    fail(DownloadError::StorageFailure);
+    return false;
   }
   status_.received = 0;
   if (Storage.exists(staging_.data()) && record_.validator[0]) {
@@ -372,6 +459,10 @@ bool DownloadJobs::begin(DownloadSource& source) {
   reply_ = {};
   if (!source.open(record_.spec, status_.received, record_.validator.data(), reply_)) {
     fail(source.error());
+    return false;
+  }
+  if (!permitted()) {
+    settle(DownloadState::Paused);
     return false;
   }
   if (reply_.identity != record_.spec.identity) {
@@ -432,10 +523,14 @@ bool DownloadJobs::begin(DownloadSource& source) {
 }
 void DownloadJobs::cancel(uint64_t id, DeliveryTicket current) {
   if (!same(current) || !id || id != status_.id) return;
+  if (!replacementClosed()) {
+    if (running_) settle(DownloadState::Paused);
+    return;
+  }
   // Paused/completed jobs still need storage ownership. Refuse at the reading
   // gate or while another service owns the phase; the caller may retry at Home.
   if (!running_ && !admit()) return;
-  if (!admission_.permitted()) {
+  if (!permitted()) {
     settle(DownloadState::Paused);
     return;
   }
@@ -448,6 +543,10 @@ void DownloadJobs::cancel(uint64_t id, DeliveryTicket current) {
       fail(DownloadError::StorageFailure);
       return;
     }
+  }
+  if (!restorePrevious()) {
+    fail(DownloadError::StorageFailure);
+    return;
   }
   // Durable revocation first: power loss while removing staging cannot resume it.
   record_.canceled = 1;
@@ -464,7 +563,7 @@ void DownloadJobs::tick(DeliveryTicket current) {
     return;
   }
   if (!running_) return;
-  if (!same(current) || !admission_.permitted()) {
+  if (!same(current) || !permitted()) {
     settle(DownloadState::Paused);
     return;
   }
@@ -473,11 +572,20 @@ void DownloadJobs::tick(DeliveryTicket current) {
       settle(DownloadState::Linking, DownloadError::StorageFailure);
       return;
     }
+    if (nonzero(record_.previous.bytes)) {
+      // Do not advance the single journal to another book with an orphaned
+      // rollback file. Retire it only after verified publication AND link.
+      if (!retireReplacementBackup()) {
+        settle(permitted() ? DownloadState::Linking : DownloadState::Paused, DownloadError::StorageFailure);
+        return;
+      }
+      logReplacement(record_.spec, record_.previous);
+    }
     settle(DownloadState::Complete);
     return;
   }
   const int n = source_->read(buffer_.data(), buffer_.size());
-  if (!admission_.permitted()) {
+  if (!permitted()) {
     settle(DownloadState::Paused);
     return;
   }
@@ -519,6 +627,10 @@ void DownloadJobs::tick(DeliveryTicket current) {
   }
   source_->close();
   source_ = nullptr;
+  if (!permitted()) {
+    settle(DownloadState::Paused);
+    return;
+  }
   status_.state = DownloadState::Verifying;
   ++status_.sequence;
   const bool checkpointed = artifact_.checkpoint();
@@ -528,7 +640,7 @@ void DownloadJobs::tick(DeliveryTicket current) {
     return;
   }
   if (!verifyPath(staging_.data())) {
-    if (!admission_.permitted()) {
+    if (!permitted()) {
       settle(DownloadState::Paused);
       return;
     }
@@ -553,7 +665,8 @@ void DownloadJobs::tick(DeliveryTicket current) {
   storage::FilePublish publish({record_.spec.path.data(), staging_.data(), backup_.data()}, artifactValid, this);
   if (!publish.resume(status_.received, status_.received) || !publish.finish()) {
     // F06 final barrier may report failure after the verified rename committed.
-    if (!publish.confirm()) {
+    if (!verifyPath(record_.spec.path.data()) || !publish.confirm()) {
+      if (!restorePrevious()) LOG_ERR("BSC", "Copy rollback requires recovery before reader open");
       fail(DownloadError::StorageFailure);
       return;
     }
@@ -566,6 +679,51 @@ DeliveryResult DownloadJobs::result(uint64_t id, DeliveryTicket current) const {
   if (!same(current) || !id || id != status_.id || record_.canceled) return DeliveryResult::Canceled;
   if (draining_ || running_) return DeliveryResult::Pending;
   return status_.state == DownloadState::Complete ? DeliveryResult::Ready : DeliveryResult::Unavailable;
+}
+bool DownloadJobs::retireReplacementBackup() {
+  storage::FilePublish published({record_.spec.path.data(), staging_.data(), backup_.data()}, artifactValid, this);
+  if (!verifyPath(record_.spec.path.data()) || !published.confirm()) return false;
+  if (Storage.exists(backup_.data())) {
+    FsFile file = Storage.open(backup_.data(), O_RDONLY);
+    if (!file) {
+      LOG_ERR("BSC", "Rollback backup open failed; retirement deferred");
+      return false;
+    }
+    const bool owned = verify(file, true) && computed_ == record_.previous;
+    const bool closed = file.close();
+    if (!owned || !closed) {
+      LOG_ERR("BSC", "Unverified rollback backup retained");
+      return false;
+    }
+    if (!Storage.remove(backup_.data())) {
+      LOG_ERR("BSC", "Rollback backup retirement failed; completed EPUB retained");
+      return false;
+    }
+  }
+  // Also reconciles a cut/failed barrier after removal; the complete current
+  // file is durable before any old bytes are removed. No sidecar is touched.
+  return published.confirm();
+}
+bool DownloadJobs::restorePrevious() {
+  if (!nonzero(record_.previous.bytes) || Storage.exists(record_.spec.path.data())) return true;
+  if (!permitted()) return false;
+  // The publication helper validates the complete old/new file before moving it
+  // back to the native path, and does not erase a conflicting destination.
+  return storage::FilePublish::restoreBackup({record_.spec.path.data(), staging_.data(), backup_.data()}, artifactValid,
+                                             this);
+}
+bool DownloadJobs::restoreReplacement(DeliveryTicket current) {
+  if (!same(current)) return false;
+  if (!nonzero(record_.previous.bytes) || Storage.exists(record_.spec.path.data())) return true;
+  if (!canRecover()) return false;
+  // Boot recovery is local SD work under the caller's serialized writer/open
+  // gate. Network admission would activate Tailnet and park the C3 display.
+  const bool restored = storage::FilePublish::restoreBackup({record_.spec.path.data(), staging_.data(), backup_.data()},
+                                                            recoveryValid, this);
+  status_.error = restored ? DownloadError::None : DownloadError::StorageFailure;
+  ++status_.sequence;
+  if (!restored) LOG_ERR("BSC", "Copy filename recovery failed; path remains blocked");
+  return restored;
 }
 }  // namespace booksync
 extern "C" bool booksync_download_jobs_link_anchor(booksync::DownloadJobs& jobs, const booksync::DownloadSpec& spec,
