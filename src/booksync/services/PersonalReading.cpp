@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include "widgets/BookList.h"
+#include "widgets/Collections.h"
 #if defined(SIMULATOR) && defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
 #elif defined(SIMULATOR)
@@ -301,7 +302,26 @@ struct ReadingLinkInput {
   booksync::ReadingValue watermark;
   uint64_t now;
   int64_t day, pick;
+  const booksync::LibraryWidgetInput* libraryWidget = nullptr;
+  booksync::LibraryWidgetValues* libraryWidgetOut = nullptr;
+  const booksync::ListsWidgetSource* listsWidget = nullptr;
+  booksync::ListsWidgetValues* listsWidgetOut = nullptr;
+  const booksync::CollectionAllowance* collectionAllowance = nullptr;
 };
+// Keep the dynamic link probe's outgoing widget arguments in a separate frame;
+// no runtime instance or additional workspace is introduced.
+// Link-only retention arguments stay in a separate bounded frame; no runtime allocation.
+__attribute__((noinline)) bool projectLinkedCollections(ReadingLinkInput& input) {
+  const auto scope = input.source.scope;
+  bool collections = true;
+  if (input.libraryWidget && input.libraryWidgetOut && input.collectionAllowance)
+    collections &= booksync::projectLibraryWidget(*input.libraryWidget, scope, *input.collectionAllowance,
+                                                  *input.libraryWidgetOut);
+  if (input.listsWidget && input.listsWidgetOut && input.collectionAllowance)
+    collections &=
+        booksync::projectListsWidget(*input.listsWidget, scope, *input.collectionAllowance, *input.listsWidgetOut);
+  return collections;
+}
 // Keep the link-only selector/stats calls in their original bounded frame.
 // No runtime caller or additional workspace is introduced.
 __attribute__((noinline)) bool selectLinkedReading(ReadingLinkInput& input) {
@@ -316,6 +336,9 @@ __attribute__((noinline)) bool selectLinkedReading(ReadingLinkInput& input) {
 }  // namespace
 extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
   const auto scope = input.source.scope;
-  return selectLinkedReading(input) && booksync::projectBookList(input.bookListSource, input.bookListRequest, scope,
-                                                                 input.bookListYear, input.bookList);
+  const bool personal = selectLinkedReading(input);
+  const bool collections = projectLinkedCollections(input);
+  const bool books =
+      booksync::projectBookList(input.bookListSource, input.bookListRequest, scope, input.bookListYear, input.bookList);
+  return personal && collections && books;
 }

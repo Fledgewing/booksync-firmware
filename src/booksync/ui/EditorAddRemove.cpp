@@ -12,7 +12,7 @@ uint8_t EditorAddRemove::rows() const {
   // X3 exposes only Add/Reset/Done; X4 also has six page actions.
   if (panel_ == Panel::Select) return library_.homePage().count + (library_.homePage().textOnly ? 3 : 9);
   if (panel_ == Panel::Name) return touchNaming_ ? 3 : 13;
-  if (panel_ == Panel::Add) return library_.homePage().textOnly ? 3 : uint8_t(WidgetKind::Count);
+  if (panel_ == Panel::Add) return library_.homePage().textOnly ? 3 : uint8_t(WidgetKind::Count) - 1;
   if (panel_ == Panel::Selected || panel_ == Panel::Options) return 2;  // Remove, Done.
   if (panel_ == Panel::Reset) return 2;                                 // Keep first.
   return 1;
@@ -138,7 +138,7 @@ void EditorAddRemove::activateEditor() {
     else
       back();
   } else if (panel_ == Panel::Add)
-    send(LayoutEditKind::Add, static_cast<WidgetKind>(focus_));
+    send(LayoutEditKind::Add, editorAddKind(focus_));
   else if (panel_ == Panel::Reset) {
     if (focus_ == 1)
       send(LayoutEditKind::Reset);

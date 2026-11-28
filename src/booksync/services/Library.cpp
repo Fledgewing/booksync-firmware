@@ -43,6 +43,11 @@ struct LocalState {
   BookKey openKey{};
   std::unique_ptr<BookListProjection> bookListScratch;  // <=1 KiB, allocated once for an X4 preview only.
   std::unique_ptr<LocalQueryState> query;
+  std::unique_ptr<SavedListsPage> listPage;  // <=1.5 KiB, only while the Lists destination is used.
+  CatalogSourceRequest pendingCatalogSources{};
+  CatalogSources catalogSources{};
+  bool catalogSourcesPending = false;
+
   std::unique_ptr<StatsWorker> stats;
   ServerAdapter* savedStatsSource = nullptr;  // Borrowed Home-lifetime provider; Bootstrap owns it.
   std::unique_ptr<PersonalWorker> personal;
@@ -51,8 +56,8 @@ struct LocalState {
   uint64_t queryRequestId = 0;
   bool requested = false, rescan = false, resolveOpen = false, openReady = false;
 };
-static_assert(sizeof(LocalState) <= 28 * 1024);
-// One fallible allocation per Home lifetime, <=28 KiB. These codec/window/history
+static_assert(sizeof(LocalState) <= 30 * 1024);
+// One fallible allocation per Home lifetime, <=30 KiB. These codec/window/history
 // buffers and the <=4 KiB editor splice workspace exceed the task stack; releasing them before reader entry keeps C3
 // buffers out of the reader lifetime. HAL owns its bounded directory-handle allocations.
 std::unique_ptr<LocalState> local;
@@ -189,7 +194,10 @@ class OfflineLibrary final : public Library {
     if (!local || !ReadModel::accepts(batch)) return false;
     if (std::string_view(Layout::deviceClass()) == "x3" && batch.personalWidgets) return false;
     for (uint8_t i = 0; i < batch.count; ++i) {
-      if (batch.windows[i].presentation != WindowPresentation::Preview) continue;
+      const auto source = batch.windows[i].source;
+      if (batch.windows[i].presentation != WindowPresentation::Preview || source == WindowSource::Random ||
+          source == WindowSource::Continue || source == WindowSource::Unknown)
+        continue;
       if (!local->bookListScratch) {
         local->bookListScratch = makeUniqueNoThrow<BookListProjection>();
         if (!local->bookListScratch) LOG_ERR("BSBL", "Cannot allocate bounded Book list preview workspace");
@@ -232,16 +240,57 @@ class OfflineLibrary final : public Library {
       out.clear();
     }
   }
-  void readStatsWidgets(StatsWidgetBatch& out) const override {
-    if (local && local->stats && accountPresentation.ticket.epoch <= UINT32_MAX) {
-      out = local->stats->published();
-      return;
+  CatalogRoute requestedCatalog{};
+  bool catalogPending = false;
+  CommandStatus browseCatalog(CatalogRoute route) override {
+    if (route.destination > CatalogDestination::BookList) return CommandStatus::Unsupported;
+    if (local) {
+      local->resolveOpen = local->openReady = false;
+      local->openKey = {};
     }
-    out.requested = local ? local->pending.statsWidgets : 0;
-    for (auto& statsValue : out.cards) {
-      statsValue.clear();
-      statsValue.state = StatsCardState::Unavailable;
+    requestedCatalog = route;
+    catalogPending = true;
+    return CommandStatus::Accepted;
+  }
+  bool requestCatalogSources(CatalogSourceRequest request) override {
+    if (!local || !request.requestId || request.root != CatalogRoot::Lists) return false;
+    if (!local->listPage) {
+      local->listPage = makeUniqueNoThrow<SavedListsPage>();
+      if (!local->listPage) {
+        LOG_ERR("BSWS", "Cannot allocate saved-list source page");
+        return false;
+      }
     }
+    local->pendingCatalogSources = request;
+    local->catalogSourcesPending = true;
+    return true;
+  }
+  void readCatalogSources(CatalogSources& out) const override {
+    if (local)
+      out = local->catalogSources;
+    else
+      Library::readCatalogSources(out);
+  }
+  bool requestListBooks(const QueryRequest& request, ListKey key) override {
+    if (!local) return false;
+    std::array<char, 64> scope{};
+    if (!local->model.savedListScope(key, scope)) {
+      LOG_ERR("BSWS", "Saved-list membership is unavailable or retired");
+      return false;
+    }
+    if (!local->query) {
+      local->query = makeUniqueNoThrow<LocalQueryState>(local->index);
+      if (!local->query) {
+        LOG_ERR("BSQ", "Cannot allocate saved-list query workspace");
+        return false;
+      }
+    }
+    const bool accepted = local->query->worker.startSavedScope(request, scope);
+    if (accepted) {
+      local->queryChanged = true;
+      local->queryRequestId = request.requestId;
+    }
+    return accepted;
   }
   WindowSource requestedSource = WindowSource::Unknown;
   CommandStatus browseSource(WindowSource source) override {
@@ -256,6 +305,17 @@ class OfflineLibrary final : public Library {
   void retireOpen(BookKey key) override {
     if (!local || !(local->openKey == key)) return;
     local->resolveOpen = local->openReady = false;
+  }
+  void readStatsWidgets(StatsWidgetBatch& out) const override {
+    if (local && local->stats && accountPresentation.ticket.epoch <= UINT32_MAX) {
+      out = local->stats->published();
+      return;
+    }
+    out.requested = local ? local->pending.statsWidgets : 0;
+    for (auto& statsValue : out.cards) {
+      statsValue.clear();
+      statsValue.state = StatsCardState::Unavailable;
+    }
   }
   CommandStatus open(BookKey key) override {
     if (!local || !local->index.ready() || key.provenance != local->index.provenance() ||
@@ -352,6 +412,15 @@ void publishClockStatus(ClockStatus value) {
     local->model.notifyQueryPublication();
   }
 }
+bool bindHomeCollectionSources(const LibraryWidgetInput* summary, ListsWidgetSource lists, ReadingScope scope) {
+  if (!local || (scope.owner &&
+                 (scope.owner != accountPresentation.ticket.owner || scope.epoch != accountPresentation.ticket.epoch)))
+    return false;
+  local->model.setLibraryWidgetSource(summary, scope);
+  local->model.setListsWidgetSource(lists, scope);
+  local->requested = true;
+  return true;
+}
 bool bindHomeBookListSource(BookListSource source, ReadingScope scope, uint16_t year) {
   if (!local || (scope.owner &&
                  (scope.owner != accountPresentation.ticket.owner || scope.epoch != accountPresentation.ticket.epoch)))
@@ -362,12 +431,29 @@ bool bindHomeBookListSource(BookListSource source, ReadingScope scope, uint16_t 
 }
 void bindReminders(RemindersFacade& facade) { reminders = &facade; }
 void publishAccountView(AccountView value) {
-  if (local && (accountPresentation.ticket.owner != value.ticket.owner ||
-                accountPresentation.ticket.epoch != value.ticket.epoch)) {
+  value.serviceLabel.back() = 0;
+  if (local && (value.ticket.owner != accountPresentation.ticket.owner ||
+                value.ticket.epoch != accountPresentation.ticket.epoch)) {
     local->model.invalidate(Invalidation::Account);
     local->openReady = local->resolveOpen = false;
     local->openKey = {};
     local->requested = true;
+    if (local->listPage) local->listPage->clear();
+    local->catalogSourcesPending = false;
+    auto& sources = local->catalogSources;
+    for (auto& entry : sources.rows) entry = {};
+    sources.count = 0;
+    sources.total = 0;
+    sources.provenance = {};
+    sources.requestId = sources.publication = 0;
+    sources.availability = Availability::NotSaved;
+    sources.hasMore = false;
+    if (local->query) {
+      local->query->worker.invalidate();
+      local->queryChanged = true;
+    }
+    shellLibrary().catalogPending = false;
+    shellLibrary().requestedSource = WindowSource::Unknown;
   }
   value.serviceLabel.back() = 0;
   const bool ownerChanged = value.ticket.owner != accountPresentation.ticket.owner ||
@@ -379,6 +465,7 @@ void publishAccountView(AccountView value) {
     local->model.notifyQueryPublication();
   }
 }
+
 void publishUpgradeState(bool pending, bool recovery, bool (*dismiss)()) {
   noticePending = pending;
   upgradeRecovery = recovery;
@@ -397,6 +484,17 @@ void publishHomeBook(bool available, const char* title) {
   shellLibrary().available = available;
   shellLibrary().openRequested = false;
 }
+bool takeCatalogBrowseRequest(CatalogRoute& route) {
+  if (!shellLibrary().catalogPending) return false;
+  route = shellLibrary().requestedCatalog;
+  shellLibrary().catalogPending = false;
+  return true;
+}
+bool takeSourceBrowseRequest(WindowSource& source) {
+  source = shellLibrary().requestedSource;
+  shellLibrary().requestedSource = WindowSource::Unknown;
+  return source != WindowSource::Unknown;
+}
 bool takeCatalogAccountRequest() {
   const bool requested = catalogAccountRequested;
   catalogAccountRequested = false;
@@ -406,11 +504,6 @@ bool takeCatalogRequest() {
   const bool requested = catalogRequested;
   catalogRequested = false;
   return requested;
-}
-bool takeSourceBrowseRequest(WindowSource& source) {
-  source = shellLibrary().requestedSource;
-  shellLibrary().requestedSource = WindowSource::Unknown;
-  return source != WindowSource::Unknown;
 }
 bool takeHomeOpenRequest() {
   const bool requested = shellLibrary().openRequested;
@@ -450,6 +543,8 @@ void notifyDevicePublication() {
   if (local) local->model.notifyQueryPublication();
 }
 void leaveLocalLibrary() {
+  shellLibrary().catalogPending = false;
+  shellLibrary().requestedSource = WindowSource::Unknown;
   if (!local) return;
   local->worker.cancel();
   local->source.close();
@@ -536,6 +631,42 @@ void workLocalLibrary() {
     // ready siblings. beginHistory still checks exact native scope/identity.
     if (state.index.ready() && state.history.start()) state.model.beginHistory(state.history.source());
   }
+  if (state.catalogSourcesPending && state.listPage) {
+    state.catalogSourcesPending = false;
+    state.model.materializeSavedLists({state.pendingCatalogSources.offset, LibraryBytes, CatalogSourceRows},
+                                      *state.listPage);
+    auto& out = state.catalogSources;
+    for (auto& entry : out.rows) entry = {};
+    out.requestId = state.pendingCatalogSources.requestId;
+    out.provenance = state.listPage->provenance;
+    out.publication = state.listPage->publication;
+    out.total = state.listPage->total;
+    out.count = state.listPage->count;
+    out.hasMore = state.listPage->hasMore;
+    const auto status = state.listPage->state;
+    out.availability = status == CollectionWidgetState::Ready || status == CollectionWidgetState::Empty
+                           ? Availability::Ready
+                       : status == CollectionWidgetState::NotSaved    ? Availability::NotSaved
+                       : status == CollectionWidgetState::Unsupported ? Availability::Unsupported
+                       : status == CollectionWidgetState::Off         ? Availability::Unsupported
+                                                                      : Availability::Unavailable;
+    for (uint8_t i = 0; i < out.count; ++i) {
+      const auto& item = state.listPage->entries[i];
+      out.rows[i].title = item.name;
+      out.rows[i].books = {item.books, item.booksKnown ? Availability::Ready : Availability::NotSaved};
+      if (!state.model.savedListScope(item.key, out.rows[i].key)) {
+        LOG_ERR("BSWS", "Saved-list source scope retired");
+        for (auto& entry : out.rows) entry = {};
+        out.count = 0;
+        out.total = 0;
+        out.provenance = {};
+        out.hasMore = false;
+        out.availability = Availability::NotSaved;
+        break;
+      }
+    }
+  }
+
   if (state.stats && state.stats->tick(currentClock)) state.model.notifyQueryPublication();
   if (state.model.historyBusy()) state.model.historyTick(DeviceIndex::Batch);
   if (!state.worker.busy() && state.personalPending) {

@@ -131,4 +131,6 @@ subprocess.run([sys.executable, "test/simulator/device_bridge.py", profile], cwd
 subprocess.run([sys.executable, 'test/simulator/reminder_ui.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/booklist_projection.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, "test/simulator/booklist_cancel.py", profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/collection_widgets_projection.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/collection_cards.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

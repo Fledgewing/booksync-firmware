@@ -45,6 +45,11 @@ class WidgetHost {
   auto retryWidget(uint8_t widget) -> bool;
   CommandStatus dispatchWidget(uint8_t widget, uint8_t itemIndex = 0);
   const ContinueValues& continueValues() const { return data_.resume; }
+  const LibraryWidgetValues& libraryValues() const { return data_.librarySummary; }
+  const ListsWidgetValues& listsValues(uint8_t widget) const {
+    return widget < page_.count && page_.widgets[widget].w >= 2 && page_.widgets[widget].h >= 2 ? data_.expandedLists
+                                                                                                : data_.savedLists;
+  }
   const HomePage& page() const { return page_; }
 
  private:

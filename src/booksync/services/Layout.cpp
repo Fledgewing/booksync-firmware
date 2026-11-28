@@ -607,7 +607,9 @@ bool Layout::installedKind(std::string_view id, bool textOnly, WidgetKind& kind)
   else if (id == "booklist")
     kind = WidgetKind::Shelf;
   else if (id == "library")
-    kind = WidgetKind::Browse;
+    kind = textOnly ? WidgetKind::Browse : WidgetKind::Library;
+  else if (!textOnly && id == "lists")
+    kind = WidgetKind::Lists;
   else if (!textOnly && id == "this-week")
     kind = WidgetKind::Week;
   else if (!textOnly && id == "reading-streak")
@@ -643,7 +645,7 @@ const char* Layout::deviceClass() {
 }
 LayoutInput Layout::defaults() {
   static constexpr char raw[] =
-      R"({"schemaVersion":1,"revision":1,"grids":{"android-tablet":{"cols":4,"rows":8},"x4":{"cols":2,"rows":6},"x3":{"cols":2,"rows":7}},"pages":[{"id":"home","tab":"Home","placements":[{"instance":"resume","widget":"continue-reading","version":1,"x":0,"y":0,"w":4,"h":3,"settings":{}},{"instance":"recent","widget":"booklist","version":1,"x":0,"y":3,"w":2,"h":2,"settings":{"src":"recent","style":0,"sort":0,"cap":1}},{"instance":"library","widget":"library","version":1,"x":2,"y":3,"w":2,"h":1,"settings":{}}]}],"overrides":{"x4":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}},"x3":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}}}})";
+      R"({"schemaVersion":1,"revision":1,"grids":{"android-tablet":{"cols":4,"rows":8},"x4":{"cols":2,"rows":6},"x3":{"cols":2,"rows":7}},"pages":[{"id":"home","tab":"Home","placements":[{"instance":"resume","widget":"continue-reading","version":1,"x":0,"y":0,"w":4,"h":3,"settings":{}},{"instance":"recent","widget":"booklist","version":1,"x":0,"y":3,"w":2,"h":2,"settings":{"src":"recent","style":0,"sort":0,"cap":1}},{"instance":"library","widget":"library","version":1,"x":2,"y":3,"w":2,"h":1,"settings":{}}]}],"overrides":{"x4":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4,"w":1,"h":1}},"x3":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}}}})";
   return LayoutInput::memory(raw, sizeof(raw) - 1);
 }
 }  // namespace booksync
