@@ -64,7 +64,13 @@ bool Reminders::validRecord(const ReminderRecord& r, uint64_t nextId) {
       if (byte) return false;
     return true;
   }
-  return r.id >= 2 && r.id < nextId && r.revision && r.mutation && r.fields.kind == ReminderKind::Time &&
+  const bool snoozeValid =
+      !r.snooze ? r.snoozeDay == -1 && r.snoozeScheduled == 0
+                : r.fields.enabled && r.sequence && r.snoozeDay >= 0 && r.snoozeDay <= 47482 &&
+                      r.highWater >= r.snoozeDay && r.snoozeScheduled >= 0 && r.snoozeScheduled <= 4102444800LL &&
+                      r.snoozeScheduled - (int64_t(r.snoozeDay) * Day + int64_t(r.fields.minute) * 60) >= -840 * 60 &&
+                      r.snoozeScheduled - (int64_t(r.snoozeDay) * Day + int64_t(r.fields.minute) * 60) <= 840 * 60;
+  return snoozeValid && r.id >= 2 && r.id < nextId && r.revision && r.mutation && r.fields.kind == ReminderKind::Time &&
          valid(r.fields) && r.highWater >= -1 && r.highWater <= 47482 && r.after >= -1 && r.after <= 4102444800LL &&
          r.snooze >= 0 && r.snooze <= 4102445400LL;
 }
@@ -297,6 +303,10 @@ ReminderResult Reminders::claim(const ReminderDue& candidate, uint64_t owner, co
   // One bounded arbitration value (<=1 KiB), reused for the claim check;
   // keeping it on the serialized worker stack avoids a resident event copy.
   ReminderDue current{};
+  if (serial_ == UINT64_MAX) {
+    LOG_ERR("BSR", "Reminder grant identity exhausted");
+    return {ReminderStatus::Unavailable};
+  }
   if (!owner || !next(now, current) || !same(candidate, current)) return {ReminderStatus::Stale};
   if (current.kind == ReminderKind::Time) {
     for (auto& r : data_.rows)
@@ -352,6 +362,7 @@ ReminderResult Reminders::respond(uint64_t token, uint64_t owner, ReminderAction
         auto& r = data_.rows[i];
         if (r.revision != grant_.revision) return {ReminderStatus::Stale};
         if (action == ReminderAction::Snooze10) {
+          if (!now.known) return {ReminderStatus::Unavailable};
           if (r.sequence == UINT32_MAX) return {ReminderStatus::Unavailable};
           const auto before = r.snooze;
           const auto beforeDay = r.snoozeDay;

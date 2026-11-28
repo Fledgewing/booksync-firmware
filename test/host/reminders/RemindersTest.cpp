@@ -700,3 +700,43 @@ TEST_F(RemindersTest, SixtyFourByteCharactersUseMaximumMessageBudget) {
     if (row.id) EXPECT_EQ(std::strlen(row.fields.message), 240u);
 }
 }  // namespace
+
+namespace {
+TEST_F(RemindersTest, EverySnoozeFieldIsValidatedBeforePublication) {
+  ASSERT_EQ(add().status, ReminderStatus::Saved);
+  ReminderData changed = service.reminderData();
+  ReminderRecord* row = nullptr;
+  for (auto& candidate : changed.rows)
+    if (candidate.id) row = &candidate;
+  ASSERT_NE(row, nullptr);
+  row->snoozeDay = 1;
+  EXPECT_FALSE(Reminders::valid(changed));
+  row->snoozeDay = -1;
+  row->snoozeScheduled = 1;
+  EXPECT_FALSE(Reminders::valid(changed));
+  row->snooze = now.wall + 600;
+  row->snoozeDay = static_cast<int32_t>(now.wall / 86400);
+  row->snoozeScheduled = now.wall;
+  EXPECT_FALSE(Reminders::valid(changed));  // Missing response sequence/high-water.
+  row->sequence = 1;
+  row->highWater = row->snoozeDay;
+  ASSERT_TRUE(Reminders::valid(changed));
+  row->snoozeDay = INT32_MAX;
+  EXPECT_FALSE(Reminders::valid(changed));
+  row->snoozeDay = row->highWater;
+  row->snoozeScheduled = INT64_MAX;
+  EXPECT_FALSE(Reminders::valid(changed));
+}
+TEST_F(RemindersTest, LosingClockAfterVisibleClaimCannotPersistAnInventedSnoozeWallTarget) {
+  ASSERT_EQ(add().status, ReminderStatus::Saved);
+  now.wall += 60;
+  ReminderDue due;
+  ASSERT_TRUE(service.next(now, due));
+  const auto grant = service.claim(due, 7, now);
+  ASSERT_EQ(grant.status, ReminderStatus::Saved);
+  now.known = false;
+  now.wall = 0;
+  EXPECT_EQ(service.respond(grant.token, 7, ReminderAction::Snooze10, now).status, ReminderStatus::Unavailable);
+  EXPECT_EQ(service.respond(grant.token, 7, ReminderAction::GotIt, now).status, ReminderStatus::Saved);
+}
+}  // namespace
