@@ -31,6 +31,8 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/services/NativePersonalSource.cpp
   ${REPO_ROOT}/src/booksync/services/SavedNativePassages.cpp
   ${REPO_ROOT}/src/booksync/services/PersonalWorker.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Library.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Lists.cpp
   ${REPO_ROOT}/src/booksync/services/PersonalReading.cpp
   ${REPO_ROOT}/src/booksync/services/Clock.cpp
   ${REPO_ROOT}/lib/uzlib/src/uzlib_checksums.c
