@@ -17,7 +17,7 @@ enum class SyncResult : uint8_t {
   Uncertain,
   Unavailable
 };
-enum class SyncCheckpoint : uint8_t { Activated, AttemptStored, RemoteReturned, AckStored, Finished };
+enum class SyncCheckpoint : uint8_t { Activated, AttemptStored, RemoteReturned, AckStored, Finished, PhaseStored };
 // Optional worker diagnostics; callbacks must not retain borrowed values.
 using SyncObserver = void (*)(SyncCheckpoint, uint64_t, unsigned, void*);
 // Worker-only. Exactly one activated owner in this process, including across

@@ -62,8 +62,9 @@ with tempfile.TemporaryDirectory(prefix='booksync-stats-', dir=out) as directory
         return {'sessions': 1, 'seconds': count * 10, 'daily_seconds': daily}
     boot('seed')
     seed = (sd / 'stats/state').read_bytes()
+    # PhaseStored=5 cuts a partial batch; AckStored=3 now cuts only final acknowledgement.
     cases = [('run', None), ('before', None), ('after', None), ('timeout-before', None),
-             ('timeout-after', None)] + [('run', cut) for cut in (1, 2, 3)]
+             ('timeout-after', None)] + [('run', cut) for cut in (1, 2, 3, 5)]
     for mode, cut in cases:
         for path in (sd / 'stats').iterdir():
             if path.is_file(): path.unlink()
@@ -81,10 +82,10 @@ with tempfile.TemporaryDirectory(prefix='booksync-stats-', dir=out) as directory
     boot('run')
     totals = derived(50000)
 (out / 'lifecycle-stats.json').write_text(json.dumps({
-    'profile': profile, 'scenarios': len(cases)+1, 'power_cuts': 5, 'boots': boots,
+    'profile': profile, 'scenarios': len(cases)+1, 'power_cuts': 6, 'boots': boots,
     'result': 'PASS', 'history_rows': 50000, 'history_bytes': 50000*64+782*16,
     'batch_rows': 32, 'explicit_heap_allocations': 0, 'derived': totals,
     'runtime_memory': {'internal_heap': None, 'largest_block': None, 'stack_high_water': None,
         'reason': 'Native HAL does not model ESP32 heap/stack; maintainer hardware acceptance required'}
 }, indent=2)+'\n')
-print(f'BookSync F18b {profile}: {len(cases)+1} scenarios / 5 cuts / {boots} boots PASS')
+print(f'BookSync F18b {profile}: {len(cases)+1} scenarios / 6 cuts / {boots} boots PASS')

@@ -85,7 +85,7 @@ SyncResult SyncOwner::step() {
   if (outcome == PhaseOutcome::Checkpointed) {
     if (checkpoint == entry.checkpoint || journal_.checkpoint(id, checkpoint) != JournalResult::Ok)
       return storageError();
-    observe(SyncCheckpoint::AckStored, id, phase);
+    observe(SyncCheckpoint::PhaseStored, id, phase);
     return SyncResult::Advanced;
   }
   if (outcome != PhaseOutcome::Confirmed) return SyncResult::Unavailable;

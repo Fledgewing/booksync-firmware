@@ -286,3 +286,4 @@ add_subdirectory(host/version)
 add_subdirectory(host/lifecycle_stats)
 
 add_subdirectory(host/layout_editor)
+add_subdirectory(host/lifecycle_state)

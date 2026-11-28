@@ -26,8 +26,10 @@ struct PhaseRequest {
   storage::LifecyclePhase phase;
   bool reconcile;  // Prior attempt may have committed. Never blindly replay.
   // Optional adapter-owned bounded output, borrowed through acknowledge(). The
-  // owner consumes it on Confirmed or Checkpointed; uncertain/unavailable
-  // outcomes retain the prior bytes.
+  // owner consumes it on Confirmed or Checkpointed. Checkpointed persists an
+  // incomplete phase without acknowledging it and reports forward progress.
+  // Unchanged partial output is rejected; attempts still require reconciliation.
+  // Uncertain/unavailable outcomes retain the prior bytes.
   std::string_view* confirmedCheckpoint = nullptr;
 };
 // Checkpointed means a durable partial batch, never phase completion.
