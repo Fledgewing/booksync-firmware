@@ -20,7 +20,13 @@
 #ifndef SIMULATOR
 #include <esp_mac.h>
 #endif
+#include "DeviceRuntime.h"
 #include "NetworkPhase.h"
+#include "activities/network/WifiSelectionActivity.h"
+#include "booksync/services/Layout.h"
+#ifndef SIMULATOR
+#include <WiFi.h>
+#endif
 #include "ReadingGate.h"
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
@@ -137,6 +143,32 @@ class ShellActivity final : public Activity {
   mutable widgets::StatsDrawing statsDrawing;
   uint8_t focus = 0, focusRow = 0;
   bool lastAvailable = false;
+  static bool deviceNavigation(void* context, DeviceCommand command) {
+    if (command.action != DeviceAction::Wifi) return false;
+    auto& self = *static_cast<ShellActivity*>(context);
+    if (command.value) {
+      // Reuse the approved native foreground network picker and its keyboard.
+      // Its controller outlives this frame and is owned by ActivityManager.
+      auto picker = makeUniqueNoThrow<WifiSelectionActivity>(self.renderer, self.mappedInput, true);
+      if (!picker) {
+        LOG_ERR("BSD", "Cannot allocate native Wi-Fi picker");
+        return false;
+      }
+      self.startActivityForResult(std::move(picker),
+                                  [](const ActivityResult&) { activityManager.persistGlobalSettings(); });
+      return true;
+    }
+#ifndef SIMULATOR
+    // DeviceBridge and DeviceRuntime both require the sole network owner idle.
+    // No transport/task is stopped underneath an admitted worker.
+    WiFi.disconnect(false);
+    if (!WiFi.mode(WIFI_OFF)) {
+      LOG_ERR("BSD", "Native Wi-Fi stop deferred");
+      return false;
+    }
+#endif
+    return true;
+  }
   Rect tileRect(uint8_t index) const {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
@@ -1512,6 +1544,7 @@ class ShellActivity final : public Activity {
     ensureScalableBuiltinFamily(renderer, 1);
 #endif
     enterLocalLibrary(&defaultServerAdapter());
+    if (std::string_view(Layout::deviceClass()) != "x3") bindDeviceBridge(&deviceRuntime());
     setNetworkReading(editorOnly || !installNetworkMemory());
     bookPath = APP_STATE.openEpubPath;
     if (bookPath.empty()) {
@@ -1535,6 +1568,8 @@ class ShellActivity final : public Activity {
     requestUpdate();
   }
   void onExit() override {
+    bindDeviceBridge(nullptr);
+    retireDeviceRuntime();
     setNetworkReading(true);
     widgets.reset();
     leaveLocalLibrary();
@@ -1554,6 +1589,7 @@ class ShellActivity final : public Activity {
     }
     {
       RenderLock lock;
+      if (deviceStatusWanted() && workDeviceRuntime({this, deviceNavigation})) notifyDevicePublication();
       if (widgets && widgets->pollWidgets()) {
         if (focus >= widgets->page().count) focus = 0;
         if (focusRow >= focusRows(focus)) focusRow = 0;

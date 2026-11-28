@@ -25,6 +25,7 @@
 - BookSync Home adds compact Today and Pages read summaries on X4 Pro and Classic, keeping native/account time separate and counting timed page visits rather than unique printed pages. X3 remains unchanged.
 - BookSync Home adds Year in reading and Monthly reading on X4 Pro and Classic, including the optional larger year heatmap and explicit unknown dates. X3 remains unchanged.
 - BookSync Home adds compact This week and Reading streak summaries on X4 Pro and Classic, with explicit missing/off/stale/error states and unchanged X3 availability.
+- BookSync exposes checked battery and frontlight values and queues native Wi-Fi, night and rotation controls through Library; stale commands cannot change newer device state.
 
 - BookSync adds the approved compact Library and scoped/grouped lists on touch, buttons and X3 text, with explicit offline download consent, cached file choices, cancel/resume states and Back restoration. The live catalog/download facade remains a separate integration.
 

@@ -76,6 +76,9 @@ class HalPowerManager {
                            void* context = nullptr, void (*afterPoll)(void*, const ChargerStatus&) = nullptr) const;
 #endif
 
+  // Checked telemetry for main-loop services; never called from widget paint.
+  ChargerStatus batteryStatus() const;
+
   // Get battery percentage (range 0-100)
   uint16_t getBatteryPercentage() const;
 

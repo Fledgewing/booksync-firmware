@@ -34,6 +34,7 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/services/PersonalReading.cpp
   ${REPO_ROOT}/src/booksync/services/Clock.cpp
   ${REPO_ROOT}/lib/uzlib/src/uzlib_checksums.c
+  ${REPO_ROOT}/src/booksync/services/DeviceBridge.cpp
   ${REPO_ROOT}/src/booksync/services/Library.cpp
   ${REPO_ROOT}/src/booksync/services/Reminders.cpp
   ${REPO_ROOT}/src/booksync/services/RemindersFacade.cpp
