@@ -159,7 +159,7 @@ class SceneLibrary final : public Library {
     result.matchedBooks = scene == 13 ? 0 : scene == 8 ? 6 : q.scope[0] ? 84 : 10020;
     result.count = scene == 13 || scene == 14 || scene == 16 ? 0 : q.kind == QueryKind::Groups ? 3 : q.limit;
     result.bytes = result.count * sizeof(QueryEntry);
-    result.hasMore = result.count > 0;
+    result.hasMore = result.count > 0 && (q.kind == QueryKind::Groups || q.offset + result.count < result.matchedBooks);
     for (uint16_t i = 0; i < result.count; ++i) {
       auto& entry = result.entries[i];
       entry.book.key = {summary.provenance, q.offset + i};
