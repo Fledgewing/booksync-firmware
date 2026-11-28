@@ -695,7 +695,7 @@ class CatalogActivity final : public Activity {
     }
     if (!offline)
       text(catalogRect(46, top + 109, 388, 50), label,
-           job.state == DownloadState::Failed && job.error == DownloadError::Unavailable ? 16 : 18);
+           job.state == DownloadState::Failed && job.error == DownloadError::Unavailable ? 17 : 18);
     hitCount_ = 0;
     if (choices) {
       for (uint8_t i = 0; i < catalog_->catalogChoices().count; ++i) {
