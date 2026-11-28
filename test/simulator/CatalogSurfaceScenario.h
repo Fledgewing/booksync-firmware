@@ -9,6 +9,7 @@
 #include "../host/catalog_surface/SceneFixture.h"
 #include "activities/Activity.h"
 #include "booksync/system/CatalogScreen.h"
+#include "components/UITheme.h"
 extern GfxRenderer renderer;
 extern MappedInputManager mappedInputManager;
 namespace catalogSurfaceScenario {
@@ -27,6 +28,40 @@ inline bool tick() {
     auto* controller = booksync::catalogSceneController();
     if (!controller) std::_Exit(1);
     catalogFixture::arrange(*controller, library);
+  }
+  // Exercise the actual profile input route for the group header, then Back.
+  if (scene == 6 && frame == 8) {
+    bool touch = false;
+#if CROSSINK_APP_CAP_TOUCH
+    touch = mappedInputManager.hasTouch();
+    if (touch) {
+      const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+      const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+      const int x = safe.x + safe.width - 80, y = header.y + header.height + 77;
+      mappedInputManager.simulatorInjectTouchDown(x, y);
+      mappedInputManager.simulatorInjectTouchRelease(x, y);
+    }
+#endif
+    if (!touch) {
+      RenderLock lock;
+      auto* controller = booksync::catalogSceneController();
+      controller->selectCatalogControl(controller->catalogVisibleRows() + 3);
+      mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
+    }
+  }
+  if (scene == 6 && frame == 11) {
+    RenderLock lock;
+    auto* controller = booksync::catalogSceneController();
+    if (controller->catalogPanel() != booksync::CatalogSurface::Panel::Books || !library.wanted.filter.authors.count)
+      std::_Exit(5);
+    mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Back);
+  }
+  if (scene == 6 && frame == 14) {
+    RenderLock lock;
+    auto* controller = booksync::catalogSceneController();
+    if (controller->catalogPanel() != booksync::CatalogSurface::Panel::Groups ||
+        controller->catalogFocus() != controller->catalogVisibleRows() + 3)
+      std::_Exit(6);
   }
   if (frame < 25) return true;
   const auto reads = library.reads;
