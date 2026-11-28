@@ -13337,6 +13337,7 @@
         "../../test/simulator/ReaderCaptureScenario.h",
         "../../test/simulator/RemindersScenario.h",
         "../../test/simulator/SeriesPlanScenario.h",
+        "../../test/simulator/SeriesQueueScenario.h",
         "../../test/simulator/SleepScenario.h",
         "../../test/simulator/SyncOwnerScenario.h",
         "../../test/simulator/UpdateInstallScenario.h",
@@ -15794,6 +15795,26 @@
     "src/booksync/services/SeriesPlan.cpp": {
       "role": "services",
       "rationale": "F36c bounded worker projection and exact-selection preview token. No heap allocation, UI, transport or catalog mutation."
+    },
+    "src/booksync/interface/SeriesDownloads.h": {
+      "role": "interface",
+      "rationale": "F36c immutable bounded queue rows/status; no mutable jobs, paths or worker handles exposed to UI."
+    },
+    "src/booksync/services/SeriesQueue.h": {
+      "role": "services",
+      "rationale": "F36c four scoped durable queues around the existing single F23 download engine; one fixed record workspace, no task or transport allocation."
+    },
+    "src/booksync/services/SeriesQueue.cpp": {
+      "role": "services",
+      "rationale": "F36c serialized exact-choice queue execution, explicit recovery/resume, completion and cancellation checkpointing; caller retains writer admission."
+    },
+    "src/booksync/storage/SeriesQueueStore.h": {
+      "role": "storage",
+      "rationale": "F36c fixed versioned scoped queue/index storage and immutable projection; streamed F15 publication, no implicit repair/eviction or execution."
+    },
+    "src/booksync/storage/SeriesQueueStore.cpp": {
+      "role": "storage",
+      "rationale": "F36c little-endian scoped checksummed queue publications and exact-ID backup recovery; one file handle, bounded codec scratch."
     }
   },
   "generators": {

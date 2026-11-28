@@ -206,6 +206,18 @@ bool DownloadJobs::setPaths(const DownloadSpec& s) {
   std::memcpy(backup_.data() + n, ".bak", 5);
   return true;
 }
+bool DownloadJobs::selectJournal(storage::PublishPaths paths, storage::ScopeView scope, DeliveryTicket current) {
+  if (busy() || artifactOpen_ || !paths.current || !paths.staging || !paths.backup) return false;
+  journal_ = paths;
+  return recover(scope, current);
+}
+bool DownloadJobs::matchesJournal(storage::PublishPaths paths, DeliveryTicket current) const {
+  return same(current) && journal_.current == paths.current && journal_.staging == paths.staging &&
+         journal_.backup == paths.backup;
+}
+bool DownloadJobs::matchesSelection(const DownloadSpec& spec, DeliveryTicket current) const {
+  return same(current) && status_.id && sameSelection(record_.spec, spec);
+}
 bool DownloadJobs::recover(storage::ScopeView scope, DeliveryTicket current) {
   if (busy() || !current.owner || !current.epoch || scope.server.empty() || scope.account.empty() ||
       scope.server.find('\0') != scope.server.npos || scope.account.find('\0') != scope.account.npos ||
@@ -253,6 +265,14 @@ bool DownloadJobs::recover(storage::ScopeView scope, DeliveryTicket current) {
       return false;
     std::memcpy(record_.spec.server.data(), scope.server.data(), scope.server.size());
     std::memcpy(record_.spec.account.data(), scope.account.data(), scope.account.size());
+  }
+  if (record_.id) {
+    if (record_.id <= highWater_) {
+      if (highWater_ == std::numeric_limits<uint64_t>::max()) return false;
+      record_.id = highWater_ + 1;
+      status_.id = record_.id;
+    }
+    highWater_ = record_.id;
   }
   scoped_ = true;
   return true;
@@ -347,7 +367,7 @@ uint64_t DownloadJobs::startImpl(const DownloadSpec& spec, storage::Revision pre
   if (status_.id && sameSelection(record_.spec, spec) && status_.state != DownloadState::Canceled) return status_.id;
   if (status_.id && status_.state != DownloadState::Complete && status_.state != DownloadState::Canceled) return 0;
   if (!accepts(spec) || spec.server != record_.spec.server || spec.account != record_.spec.account ||
-      record_.id == std::numeric_limits<uint64_t>::max()) {
+      highWater_ == std::numeric_limits<uint64_t>::max()) {
     LOG_ERR("BSD", "Invalid download selection rejected");
     return 0;
   }
@@ -381,7 +401,7 @@ uint64_t DownloadJobs::startImpl(const DownloadSpec& spec, storage::Revision pre
     settle(status_.state);
     return 0;
   }
-  const auto id = record_.id + 1;
+  const auto id = ++highWater_;
   record_ = {};
   record_.id = id;
   record_.spec = spec;

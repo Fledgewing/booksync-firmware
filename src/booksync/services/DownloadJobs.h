@@ -30,6 +30,12 @@ class DownloadJobs {
   DownloadJobs& operator=(const DownloadJobs&) = delete;
   // Boot is read-only and never starts transport or creates an open intent.
   bool recover(storage::ScopeView scope, DeliveryTicket current);
+  // Serialized worker coordinator only: paths remain borrowed until next bind.
+  // A paused journal is never resumed by selecting it.
+  bool selectJournal(storage::PublishPaths, storage::ScopeView, DeliveryTicket);
+  // Borrowed path identity lets a serial coordinator detect another feature's bind.
+  bool matchesJournal(storage::PublishPaths, DeliveryTicket) const;
+  bool matchesSelection(const DownloadSpec&, DeliveryTicket) const;
   uint64_t start(const DownloadSpec&, DownloadSource&, DeliveryTicket current);
   bool resume(uint64_t id, DownloadSource&, DeliveryTicket current);
   void cancel(uint64_t id, DeliveryTicket current);
@@ -67,7 +73,9 @@ class DownloadJobs {
   std::array<uint8_t, Chunk> buffer_{};
   DownloadReply reply_{};
   storage::FilePublish artifact_;
-  uint64_t flushed_ = 0;
+  // Runtime handles never repeat when the single writer changes journals.
+  // A recovered descriptor receives a fresh handle on a later binding.
+  uint64_t flushed_ = 0, highWater_ = 0;
   bool artifactOpen_ = false;
   bool running_ = false, draining_ = false, scoped_ = false;
   static constexpr size_t JournalBytes = 943;
