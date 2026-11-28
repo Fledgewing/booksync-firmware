@@ -668,7 +668,7 @@ class CatalogActivity final : public Activity {
                         : job.state == DownloadState::Canceled ? tr(STR_CATALOG_CANCELED)
                         : job.state == DownloadState::Failed   ? tr(STR_CATALOG_STOPPED)
                                                                : tr(STR_CATALOG_DOWNLOADING);
-    text(catalogRect(46, top + 22, 388, offline ? 60 : 32), title, 23, true);
+    text(catalogRect(46, top + 22, 388, offline ? 62 : 32), title, 23, true);
     text(catalogRect(46, top + (offline ? 99 : 70), 388, 26), catalog_->catalogSelectedBook().title.data(), 18);
     auto& label = label_;
     auto& received = count_;
