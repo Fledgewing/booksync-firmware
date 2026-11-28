@@ -212,10 +212,15 @@ void inputs(Presenter& p, GfxRenderer& renderer, MappedInputManager& input) {
       p.sheet.sheetInput(ReminderSheetInput::PageTurn);
       return;
     }
-    if (input.wasPressed(B::Left) || input.wasPressed(B::Up)) p.sheet.sheetInput(ReminderSheetInput::FocusPrevious);
-    if (input.wasPressed(B::Right) || input.wasPressed(B::Down)) p.sheet.sheetInput(ReminderSheetInput::FocusNext);
-    if (input.wasPressed(B::Confirm)) p.sheet.sheetInput(ReminderSheetInput::SelectDown);
-    if (input.wasReleased(B::Confirm)) p.sheet.sheetInput(ReminderSheetInput::SelectUp);
+    const bool previous = input.wasPressed(B::Left) || input.wasPressed(B::Up);
+    const bool next = input.wasPressed(B::Right) || input.wasPressed(B::Down);
+    if (previous) p.sheet.sheetInput(ReminderSheetInput::FocusPrevious);
+    if (next) p.sheet.sheetInput(ReminderSheetInput::FocusNext);
+    // Duplicate configured bindings must not focus and confirm on one press.
+    if (!previous && !next) {
+      if (input.wasPressed(B::Confirm)) p.sheet.sheetInput(ReminderSheetInput::SelectDown);
+      if (input.wasReleased(B::Confirm)) p.sheet.sheetInput(ReminderSheetInput::SelectUp);
+    }
     const unsigned count = p.sheet.view().due.kind == ReminderKind::Time ? 3 : 2;
     if (input.wasScreenTouchDown(x, y))
       p.sheet.sheetInput(ReminderSheetInput::TouchDown, hit(renderer, p.sheet.view(), x, y, count));
