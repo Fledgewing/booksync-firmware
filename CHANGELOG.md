@@ -6,6 +6,8 @@
 
 ### Added
 
+- BookSync adds shared position conflict, reset, override and decline policy with durable account/edition isolation and stale-answer rejection; late consent uses the existing one-draw reading exception. Live transport and reader presentation remain deferred.
+
 - BookSync admits verified updates only at Home after reading, activation recovery and network/display ownership are clear; local boot receipts prove completion or interruption, and previous-version returns require current durable-state compatibility proof. The installer remains offline with fake ports.
 - BookSync Home can create, name and reorder pages on X4 Pro touch and Classic buttons with revision checks and atomic saves. The Pro naming keyboard stays docked at the bottom; X3 page editing remains disabled.
 - BookSync distinguishes live synchronized, accepted RTC and validated deep-sleep time from a stale persisted expiry floor, so bedtime scheduling can wait for a known clock.

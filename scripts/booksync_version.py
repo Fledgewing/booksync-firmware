@@ -28,7 +28,8 @@ env.AddBuildMiddleware(stamp, '*src/booksync/system/Version.cpp')
 # Xtensa ignores retain; force the dormant F31 budget root into hardware links.
 # LINKFLAGS avoids putting a linker-only change in every compile command.
 if 'simulator' not in env['PIOENV']:
-    env.Append(LINKFLAGS=['-Wl,--undefined=booksync_update_pick_link'])
+    env.Append(LINKFLAGS=['-Wl,--undefined=booksync_update_pick_link',
+                          '-Wl,--undefined=booksync_position_link'])
 if tag:
     # Artifact copying only. This hook has no release/feed publishing capability.
     import shutil

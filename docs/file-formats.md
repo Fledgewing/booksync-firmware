@@ -2799,3 +2799,36 @@ interrupted attempt; another image leaves the outcome unknown. A failed write
 result is never assumed to mean boot selection failed. No receipt proves that
 an older version can understand current durable state; return requires a separate,
 current compatibility proof bound to the verified previous image digest.
+
+## BookSync position policy (`BPS1`, F19)
+
+New private version 1 records; no existing cache or journal layout changes.
+The externally serialized sync worker owns one F06 current/staging/backup triplet
+per exact server/account + book/edition/source revision. Do not use a path hash
+as authority. An existing file with another binding is a conflict, never replaced.
+
+The 16-byte header contains `BPS1`, little-endian uint32 total length, uint32
+FNV-1a body checksum (basis 2166136261, multiplier 16777619), and four reserved zero
+bytes. Maximum complete record: 16,384 bytes. The body contains server and account
+strings (uint16 length then bytes, each 1–128 bytes), canonical book and edition
+UUID bytes (16 each), source SHA-256 (32), uint64 token, declined timestamp,
+released-reread timestamp and last sent override timestamp. One flags byte stores
+reset-declined, wake-pending, answerable, allow-push, compared and released-reread
+in bits 0–5; other bits
+are rejected.
+
+Three values follow: remote, last sync marker, queued explicit override. Each has
+one flags byte (present, percentage-present, reset, redated in bits 0–3), IEEE-754
+binary64 percentage bits, uint64 timestamp, uint16 locator kind and version, then
+length-prefixed raw locator (0–4096 bytes, binary, never rewritten) and label
+(0–100 bytes, NUL-free). All numbers are little-endian. Absent values have zero
+metadata and empty raw/label fields; an absent percentage differs from zero.
+The release flag distinguishes a reread against a zero/unknown remote timestamp
+from no release. Only a native reader may interpret known locator kinds for an exact source.
+
+The counter advances when remote values change, including metadata, and after a
+confirmed send. Zero is not answerable; exhaustion refuses updates. An answer
+must match the current nonzero token and an answerable decision, and saves its
+marker/decline before it can authorize native movement. Same-remote observation
+is idempotent. Unknown versions, bad checksums and damaged primary files remain
+retained; valid backup selection is read-only if the primary is damaged.

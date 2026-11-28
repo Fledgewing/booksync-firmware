@@ -116,3 +116,9 @@ progress handler and route selector use F15 accounts/F17 ownership against an
 independently persisted fake server, with remote-commit, projection-publication
 and owner-checkpoint cuts. Hardware images force-link the dormant handler for
 size checks. See `docs/booksync/F18e.md` for bounds and maintainer hardware checks.
+
+F19 adds `test/simulator/position_policy.py` before the boot harness exits. Each
+profile runs five isolated durable policy sequences (14 boots), including F12
+same-book late consent after caller timeout with one draw. The complete dormant
+policy/store are a required physical-image budget root. See `docs/booksync/F19.md`
+for shared-case provenance, state lifetime, worker bounds and hardware checks.
