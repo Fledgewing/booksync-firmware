@@ -164,6 +164,14 @@ TEST_F(RemindersTest, BackupRecoveryIgnoresTmpAndPreservesDamage) {
   EXPECT_EQ(service.count(), 1);
   EXPECT_EQ(card.files[paths.current], "corrupt");
   EXPECT_EQ(card.files[paths.staging], "uncommitted");
+  now.wall += 60;
+  ReminderDue due{};
+  ASSERT_TRUE(service.next(now, due));
+  EXPECT_EQ(service.claim(due, 7, now).status, ReminderStatus::StorageError);
+  EXPECT_TRUE(service.next(now, due));
+  EXPECT_EQ(card.files[paths.current], "corrupt");
+  now.wall += 3601;
+  EXPECT_FALSE(service.next(now, due));
 }
 TEST_F(RemindersTest, PublicationPowerCutsSelectOnlyCompleteSchedules) {
   ASSERT_EQ(add().status, ReminderStatus::Saved);
