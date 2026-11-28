@@ -477,6 +477,19 @@ bool inputReminderScene(GfxRenderer& renderer, MappedInputManager& input, Librar
 #else
   const auto tapAction = [](unsigned) {};
 #endif
+  if (state == 9) {
+    const auto originalConfirm = SETTINGS.frontButtonConfirm;
+    SETTINGS.frontButtonConfirm = SETTINGS.frontButtonRight;
+    key(SDL_SCANCODE_RIGHT);
+    key(SDL_SCANCODE_RIGHT);
+    key(SDL_SCANCODE_RIGHT);
+    SETTINGS.frontButtonConfirm = originalConfirm;
+    if (!p.sheet.view().open) {
+      input.setMenuMode(menu);
+      return false;
+    }
+    key(SDL_SCANCODE_RETURN);
+  }
   if (!input.hasTouch() && state >= 1 && state <= 5) {
     key(SDL_SCANCODE_RIGHT);
     if (state != 1) key(SDL_SCANCODE_RIGHT);

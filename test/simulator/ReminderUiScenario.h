@@ -166,19 +166,19 @@ inline bool tick() {
       ++settingsInputs;
     }
     unsigned& inputs = testedInputs;
-    for (unsigned i = 0; i < 9; ++i) {
+    for (unsigned i = 0; i < 10; ++i) {
       if ((i == 6 || i == 7) && !mappedInputManager.hasTouch()) continue;
-      if (i == 5 && mappedInputManager.hasTouch()) continue;
+      if ((i == 5 || i == 9) && mappedInputManager.hasTouch()) continue;
       fixture.response = ReminderStatus::Saved;
       fixture.writes = 0;
       if (!inputReminderScene(renderer, mappedInputManager, fixture, i)) {
         LOG_ERR("BSR", "Reminder input route failed: %u", i);
         std::_Exit(56);
       }
-      const auto expected = i == 1   ? ReminderAction::Snooze10
-                            : i == 2 ? ReminderAction::Sleep
-                            : i == 8 ? ReminderAction::TurnOff
-                                     : ReminderAction::GotIt;
+      const auto expected = i == 1             ? ReminderAction::Snooze10
+                            : i == 2 || i == 9 ? ReminderAction::Sleep
+                            : i == 8           ? ReminderAction::TurnOff
+                                               : ReminderAction::GotIt;
       if (i == 7 ? fixture.writes > 1 || (fixture.writes && fixture.selected != ReminderAction::GotIt)
                  : fixture.writes != 1 || fixture.selected != expected) {
         LOG_ERR("BSR", "Reminder input effect failed: route=%u writes=%u action=%u", i, fixture.writes,
