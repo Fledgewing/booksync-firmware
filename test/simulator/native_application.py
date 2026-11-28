@@ -29,10 +29,12 @@ records_checked = 0
 
 def inspect(sd):
     global records_checked
-    for name in ('native-app.progress-capture', 'native-app.state-capture', 'native-app.state', 'native-app.position'):
+    for name in ('native-app.progress-capture', 'native-app.state-capture', 'native-app.state', 'native-app.position',
+                 'native-app.annotations', 'native-app.reply'):
         path = sd / '.booksync' / name
         if path.exists():
-            recovery.inspect_record(path.read_bytes())
+            with path.open('rb') as stream:
+                recovery.inspect_stream(stream)
             records_checked += 1
 
 
@@ -91,6 +93,21 @@ with tempfile.TemporaryDirectory(prefix='booksync-native-app-', dir=out) as temp
         run(sd, 'apply', f'recover-{cut}')
         run(sd, 'restart', f'replay-{cut}')
         inspect(sd)
+    annotations = directory / 'annotations'
+    shutil.copytree(captured, annotations)
+    log = run(annotations, 'annotation-stage', 'annotation-stage')
+    annotation_checkpoints = int(re.search(r'checkpoints=(\d+)', log).group(1))
+    run(annotations, 'annotation-restart', 'annotation-restart')
+    inspect(annotations)
+    annotation_cuts = sorted({0, 1, annotation_checkpoints // 3, annotation_checkpoints // 2,
+                              annotation_checkpoints - 2, annotation_checkpoints - 1})
+    for cut in annotation_cuts:
+        sd = directory / f'annotation-cut-{cut}'
+        shutil.copytree(captured, sd)
+        run(sd, 'annotation-stage', f'annotation-cut-{cut}', cut)
+        run(sd, 'annotation-stage', f'annotation-recover-{cut}')
+        run(sd, 'annotation-restart', f'annotation-replay-{cut}')
+        inspect(sd)
     for mode in ('wrong-scope', 'account-switch', 'changed-source'):
         sd = directory / mode
         shutil.copytree(captured, sd)
@@ -106,9 +123,10 @@ with tempfile.TemporaryDirectory(prefix='booksync-native-app-', dir=out) as temp
             raise SystemExit('Rejected native application mutated private authority')
         inspect(sd)
 (out / 'native-application.json').write_text(json.dumps({
-    'profile': profile, 'result': 'PASS', 'processes': processes, 'deliberate_cuts': len(cuts),
+    'profile': profile, 'result': 'PASS', 'processes': processes, 'deliberate_cuts': len(cuts) + len(annotation_cuts),
+    'annotation_reply_rows': 600, 'annotation_capture_keys': 1024,
     'recovery_records_checked': records_checked, 'native_reader_bytes': 'unchanged',
     'network': 'none; concrete SD providers receive normalized synthetic replies',
     'memory': 'Native fixtures do not measure ESP32 heap or task high-water'
 }, indent=2) + '\n')
-print(f'BookSync F46b2a {profile}: {processes} processes, {len(cuts)} deliberate cuts PASS')
+print(f'BookSync F46b2a {profile}: {processes} processes, {len(cuts) + len(annotation_cuts)} deliberate cuts PASS')

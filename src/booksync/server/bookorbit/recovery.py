@@ -11,7 +11,7 @@ from pathlib import Path
 import struct
 import sys
 
-MAX_BYTES = 24 * 1024
+MAX_BYTES = 32 * 1024
 
 
 def require(condition):
@@ -24,8 +24,7 @@ def number(data, at, count):
     return int.from_bytes(data[at:at + count], 'little')
 
 
-def checksum(data):
-    value = 2166136261
+def checksum(data, value=2166136261):
     for byte in data:
         value = ((value ^ byte) * 16777619) & 0xffffffff
     return value
@@ -98,11 +97,24 @@ def state(flags, rating, status, modified, review, history):
 def inspect_record(data):
     require(16 <= len(data) <= MAX_BYTES)
     tag = data[:4]
-    require(tag in (b'BPG1', b'BNS1', b'BPS1', b'BPS2') and number(data, 4, 4) == len(data))
+    require(tag in (b'BPG1', b'BNS1', b'BPS1', b'BPS2', b'BAR1') and number(data, 4, 4) == len(data))
     start = 16 if tag in (b'BPS1', b'BPS2') else 12
     require(number(data, 8, 4) == checksum(data[start:]))
     result = {'format': tag.decode('ascii'), 'bytes': len(data), 'valid': True}
-    if tag == b'BPG1':
+    if tag == b'BAR1':
+        require(len(data) >= 80)
+        require(number(data, 12, 8) < 1 << 63 and number(data, 20, 8) < 1 << 63)
+        require(data[34] <= 2 and not data[35] & ~1 and data[76] <= 2)
+        require(not data[77] & ~3 and (not data[77] & 2 or data[77] & 1))
+        require(data[78:80] == bytes(2))
+        cursor = Cursor(data, 80)
+        for index, maximum in enumerate((19, 19, 4000, 4000, 32, 32, 32, 10000, 5000, 500, 500, 32)):
+            length = number(data, 52 + 2 * index, 2)
+            require(length <= maximum)
+            cursor.take(length)  # Raw bytes may contain unknown locator data.
+        cursor.end()
+        result.update(payload_bytes=len(data) - 80)
+    elif tag == b'BPG1':
         require(len(data) <= 8192 and len(data) >= 126)
         flags = number(data, 12, 2)
         require(not flags & ~127 and (not flags & 32 or flags & 1))
@@ -124,6 +136,7 @@ def inspect_record(data):
         require(not flags & 1 or (flags & 2 and flags & 4 and at and raw))
         result.update(capture=True, deliver=bool(flags & 1), raw_bytes=len(raw))
     elif tag == b'BNS1':
+        require(len(data) <= 24 * 1024)
         require(len(data) >= 130 and not number(data, 12, 2) & ~3 and number(data, 14, 2) == 0)
         require(number(data, 16, 8) != 0)
         source = data[40:104]
@@ -174,14 +187,61 @@ def inspect_record(data):
     return result
 
 
+def inspect_stream(stream):
+    """Bounded inspection: at most one BAR1 record, never an entire push-down."""
+    prefix = stream.read(4)
+    if prefix not in (b'BAF1', b'BAP1'):
+        return inspect_record(prefix + stream.read(MAX_BYTES - 3))
+    header = prefix + stream.read(132)
+    require(len(header) == 136)
+    total, wanted = number(header, 4, 4), number(header, 8, 4)
+    flags, kind = number(header, 12, 2), header[14]
+    require(not flags & ~127 and kind <= 1 and header[15] == 0)
+    require(number(header, 16, 8) and number(header, 24, 8))
+    source = header[56:120]
+    identity(source)
+    cursor, next_cursor = number(header, 40, 4), number(header, 44, 4)
+    rows, keys = number(header, 48, 4), number(header, 52, 4)
+    pending = prefix == b'BAP1'
+    require(rows <= (600 if pending else 1024) and keys <= 1024 and (not pending or not keys))
+    require(cursor <= next_cursor <= cursor + 16)
+    value, consumed = checksum(header[12:]), 136
+    def take(size):
+        nonlocal value, consumed
+        data = stream.read(size)
+        require(len(data) == size)
+        consumed += size
+        value = checksum(data, value)
+        return data
+    lengths = [number(header, at, 2) for at in (120, 122, 124, 126)]
+    require(all(0 < n <= cap for n, cap in zip(lengths, (128, 128, 2512, 128))))
+    server, account, payload, document = [take(n) for n in lengths]
+    text(server, 128, True)
+    text(account, 128, True)
+    text(document, 128, True)
+    bound_open(payload, (server, account), source)
+    for _ in range(rows):
+        row_header = take(80)
+        size = number(row_header, 4, 4)
+        require(80 <= size <= MAX_BYTES)
+        inspect_record(row_header + take(size - 80))
+    for _ in range(keys):
+        key = take(51)
+        require(all(c in b'0123456789abcdef' for c in key[:32]))
+        text(key[32:], 19, True)
+    require(consumed == total and value == wanted and not stream.read(1))
+    return {'format': prefix.decode('ascii'), 'bytes': total, 'valid': True,
+            'rows': rows, 'keys': keys, 'pending': pending}
+
+
 def main():
     if len(sys.argv) != 2:
         print('Usage: recovery.py <copied native record>', file=sys.stderr)
         return 2
     try:
         with Path(sys.argv[1]).open('rb') as stream:
-            record = stream.read(MAX_BYTES + 1)
-        print(json.dumps(inspect_record(record), sort_keys=True))
+            result = inspect_stream(stream)
+        print(json.dumps(result, sort_keys=True))
         return 0
     except (OSError, ValueError, struct.error):
         print('Native record unavailable, damaged or unsupported', file=sys.stderr)

@@ -2,6 +2,7 @@
 #include <Memory.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -14,13 +15,23 @@ inline constexpr size_t BOOKMARK_SNIPPET_MAX = 64;
 
 struct Bookmark {
   uint16_t spineIndex;
+  // v6 UUID storage offset/source, NOT the UUID. These two halfwords occupy
+  // existing alignment gaps, retaining the 128 KiB maximum C3 record buffer.
+  uint16_t identityOffsetLow = 0;
   float progress;
   uint32_t timestamp;
   char chapterTitle[BOOKMARK_CHAPTER_TITLE_MAX];
   // Optional 1-based paragraph anchor from the section cache. UINT16_MAX means unavailable.
   uint16_t paragraphIndex = UINT16_MAX;
   char snippet[BOOKMARK_SNIPPET_MAX] = {};
+  uint16_t identityOffsetHigh = 0;
+  uint32_t identityStorage() const { return identityOffsetLow | (uint32_t(identityOffsetHigh) << 16); }
+  void identityStorage(uint32_t value) {
+    identityOffsetLow = static_cast<uint16_t>(value);
+    identityOffsetHigh = static_cast<uint16_t>(value >> 16);
+  }
 };
+static_assert(sizeof(Bookmark) == 128);
 
 // Owned record storage with explicit allocation failure. std::vector::reserve
 // aborts on ESP32 when its allocation fails because exceptions are disabled.
@@ -171,10 +182,15 @@ class BookmarkStore {
   bool dirty = false;
   // Never allow an incomplete/failed load to overwrite the source file.
   bool writable = false;
+  uint64_t nativeGeneration_ = 0;
+  bool identityTracked_ = false;
 
   bool readFromFile();
-  bool readFromFile(const std::string& path, BookmarkRecords& out, bool& needsRewrite) const;
-  bool writeToFile() const;
+  bool readFromFile(const std::string& path, BookmarkRecords& out, bool& needsRewrite, uint8_t identitySource = 0,
+                    uint64_t* generation = nullptr) const;
+  // Rename merges borrow up to four original files until atomic publication.
+  using IdentitySources = std::array<const char*, 4>;
+  bool writeToFile(const IdentitySources* identitySources = nullptr);
 };
 
 #define BOOKMARKS BookmarkStore::getInstance()

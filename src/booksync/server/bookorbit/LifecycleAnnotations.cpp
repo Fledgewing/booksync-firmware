@@ -120,19 +120,26 @@ PhaseOutcome LifecycleAnnotations::run(const SyncWriterToken& token, const Phase
     if (progress.done || !enabled) continue;
     AnnotationBatch batch;
     if (!workspace_.batch(kind, progress.cursor, batch) || batch.count > MaxChanges ||
-        (batch.count && !batch.changes) || batch.keyCount > MaxKeys || (batch.keyCount && !batch.keys) ||
+        (batch.count && !batch.changes && !batch.rowReader) || batch.keyCount > MaxKeys ||
+        (batch.keyCount && !batch.keys && !batch.keyReader) ||
         batch.count > std::numeric_limits<uint32_t>::max() - progress.cursor || (!batch.count && !batch.last))
       return unavailable();
-    for (size_t i = 0; i < batch.count; ++i)
-      if (!row(batch.changes[i], kind)) return unavailable();
+    for (size_t i = 0; i < batch.count; ++i) {
+      const auto* value = batch.rowReader ? batch.rowReader->at(i) : batch.changes + i;
+      if (!value || !row(*value, kind)) return unavailable();
+    }
     // Full keys only accompany the first chunk of a known current closed capture.
     // Subsequent requests preserve keysComplete but do not repeat the key array.
-    if (!complete || progress.cursor != 0) {
+    if (!complete || progress.cursor != 0 || !batch.keysIncluded) {
       batch.keys = nullptr;
+      batch.keyReader = nullptr;
       batch.keyCount = 0;
+      batch.keysIncluded = false;
     }
     for (size_t i = 0; i < batch.keyCount; ++i) {
-      const auto& key = batch.keys[i];
+      const auto* value = batch.keyReader ? batch.keyReader->at(i) : batch.keys + i;
+      if (!value) return unavailable();
+      const auto& key = *value;
       if (key.key.size() != 32 || !date(key.datetime)) return unavailable();
       for (char c : key.key)
         if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return unavailable();

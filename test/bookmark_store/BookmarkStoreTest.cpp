@@ -9,6 +9,7 @@
 #include <new>
 
 #include "BookmarkStore.h"
+#include "activities/reader/NativeReaderObserver.h"
 
 namespace {
 size_t allocationNumber = 0;
@@ -63,6 +64,7 @@ std::string fixture(const std::string& book, uint16_t count, uint8_t version = 5
   string(bytes, title);
   string(bytes, "Author");
   string(bytes, book);
+  if (version >= 6) pod(bytes, uint64_t(5));
   for (uint16_t i = 0; i < count; ++i) {
     Bookmark bookmark{};
     bookmark.spineIndex = first + i;
@@ -77,6 +79,14 @@ std::string fixture(const std::string& book, uint16_t count, uint8_t version = 5
     bytes.append(bookmark.chapterTitle, sizeof(bookmark.chapterTitle));
     if (version >= 4) pod(bytes, bookmark.paragraphIndex);
     if (version >= 5) bytes.append(bookmark.snippet, sizeof(bookmark.snippet));
+    if (version >= 6) {
+      uint8_t id[16]{};
+      id[0] = static_cast<uint8_t>(first + i + 1);
+      id[1] = static_cast<uint8_t>((first + i + 1) >> 8);
+      id[6] = 0x40;
+      id[8] = 0x80;
+      bytes.append(reinterpret_cast<const char*>(id), sizeof(id));
+    }
   }
   return bytes;
 }
@@ -336,8 +346,167 @@ void migrationFailuresPreserveBothBooks() {
     }
   }
 }
+
+std::vector<std::string> identities(const std::string& bytes) {
+  assert(static_cast<uint8_t>(bytes[0]) == 6);
+  uint16_t count;
+  std::memcpy(&count, bytes.data() + 1, sizeof(count));
+  size_t offset = 3;
+  for (int i = 0; i < 3; ++i) {
+    uint32_t size;
+    assert(offset + 4 <= bytes.size());
+    std::memcpy(&size, bytes.data() + offset, sizeof(size));
+    offset += 4 + size;
+    assert(offset <= bytes.size());
+  }
+  offset += 8;  // Native mutation version in v6.
+  assert(offset + count * 140 == bytes.size());
+  std::vector<std::string> out;
+  out.reserve(count);
+  for (size_t i = 0; i < count; ++i) out.push_back(bytes.substr(offset + i * 140 + 124, 16));
+  return out;
+}
+
+uint64_t nativeGeneration(const std::string& bytes) {
+  size_t offset = 3;
+  for (int i = 0; i < 3; ++i) {
+    uint32_t size;
+    std::memcpy(&size, bytes.data() + offset, sizeof(size));
+    offset += 4 + size;
+  }
+  uint64_t value;
+  std::memcpy(&value, bytes.data() + offset, sizeof(value));
+  return value;
+}
+void deletionCannotLookLikeAnOlderMissingOrEmptyNativeStore() {
+  reset();
+  const auto emptyBefore = fixture(BOOK, 0, 6);
+  // A remotely projected row retains the native mutation version. Removing
+  // that final row must advance it even though the visible state is empty.
+  Storage.files[storePath(BOOK)] = fixture(BOOK, 1, 6);
+  assert(load());
+  assert(BOOKMARKS.removeBookmarkAt(0));
+  assert(BOOKMARKS.getBookmarks().empty());
+  assert(Storage.files.contains(storePath(BOOK)));
+  const auto emptyAfter = Storage.files.at(storePath(BOOK));
+  assert(identities(emptyAfter).empty());
+  assert(nativeGeneration(emptyAfter) == nativeGeneration(emptyBefore) + 1);
+  assert(emptyAfter != emptyBefore);
+  assert(!BookmarkStore::hasAnyBookmarks());
+  assert(load() && BOOKMARKS.getBookmarks().empty());
+  assert(BOOKMARKS.addBookmark(90, 0.25f, 10, "Local") == BookmarkStore::AddResult::Added);
+  assert(nativeGeneration(Storage.files.at(storePath(BOOK))) == nativeGeneration(emptyAfter) + 1);
+  assert(BookmarkStore::hasAnyBookmarks());
+}
+void emptyMarkersDoNotConsumeTheActiveBookScanBudget() {
+  reset();
+  for (size_t i = 0; i < 220; ++i) {
+    const auto path = std::string("/empty-") + std::to_string(i) + ".epub";
+    Storage.files[storePath(path)] = fixture(path, 0, 6);
+  }
+  assert(!BookmarkStore::hasAnyBookmarks());
+  Storage.files[BOOK] = "source";
+  Storage.files[storePath(BOOK)] = fixture(BOOK, 1, 6);
+  std::vector<BookmarkedBookEntry> entries;
+  assert(BookmarkStore::getAllBookmarkedBooks(entries));
+  assert(entries.size() == 1 && entries[0].bookPath == BOOK);
+  assert(BookmarkStore::hasAnyBookmarks());
+  assert(openBookmarkReaders == 0);
+}
+void opaqueIdentitiesSurviveNativeEditsAndRename() {
+  static_assert(sizeof(Bookmark) == 128, "Identity retention must not grow the C3 record buffer");
+  static uint32_t serial = 10000;
+  native_reader_observer::identity = [](std::string_view kind, std::string_view book, uint8_t* id, size_t count) {
+    assert(kind == "bookmarks" && book == BOOK && count == 16);
+    std::memset(id, 0, count);
+    const auto next = ++serial;
+    std::memcpy(id, &next, sizeof(next));
+    id[6] = 0x40;
+    id[8] = 0x80;
+    return true;
+  };
+  reset();
+  const auto original = fixture(BOOK, 3, 6);
+  const auto before = identities(original);
+  Storage.files[storePath(BOOK)] = original;
+  assert(load());
+  assert(Storage.files.at(storePath(BOOK)) == original);
+  assert(BOOKMARKS.addBookmark(90, 0.25f, 10, "New") == BookmarkStore::AddResult::Added);
+  auto after = identities(Storage.files.at(storePath(BOOK)));
+  assert(nativeGeneration(Storage.files.at(storePath(BOOK))) == 6);
+  assert(std::equal(before.begin(), before.end(), after.begin()));
+  const auto firstAdded = after.back();
+  assert(firstAdded != std::string(16, '\0'));
+  // Even an identical visible bookmark is a new intent after remove/re-add.
+  assert(BOOKMARKS.removeBookmarkAt(3));
+  assert(BOOKMARKS.addBookmark(90, 0.25f, 10, "New") == BookmarkStore::AddResult::Added);
+  after = identities(Storage.files.at(storePath(BOOK)));
+  assert(after.back() != firstAdded);
+  assert(std::equal(before.begin(), before.end(), after.begin()));
+  // A failed save/retry must not redirect offsets into a different record.
+  failBookmarkSync = true;
+  assert(BOOKMARKS.addBookmark(91, 0.5f, 10, "Retry") == BookmarkStore::AddResult::Added);
+  assert(identities(Storage.files.at(storePath(BOOK))) == after);
+  failBookmarkSync = false;
+  BOOKMARKS.saveToFile();
+  const auto retried = identities(Storage.files.at(storePath(BOOK)));
+  assert(std::equal(after.begin(), after.end(), retried.begin()));
+
+  // Legacy rows remain unbound; a later issuer must never stamp them retroactively.
+  reset();
+  Storage.files[storePath(BOOK)] = fixture(BOOK, 2, 5);
+  const auto legacy = Storage.files.at(storePath(BOOK));
+  assert(load());
+  assert(Storage.files.at(storePath(BOOK)) == legacy);
+  assert(BOOKMARKS.addBookmark(90, 0.25f, 10, "New") == BookmarkStore::AddResult::Added);
+  after = identities(Storage.files.at(storePath(BOOK)));
+  assert(after[0] == std::string(16, '\0') && after[1] == std::string(16, '\0'));
+  assert(after[2] != std::string(16, '\0'));
+  native_reader_observer::identity = nullptr;
+  assert(BOOKMARKS.addBookmark(91, 0.5f, 10, "Local") == BookmarkStore::AddResult::Added);
+  const auto local = identities(Storage.files.at(storePath(BOOK)));
+  assert(local[2] == after[2] && local[3] == std::string(16, '\0'));
+
+  for (int operation : {0, 1, 2}) {
+    reset();
+    Storage.files[storePath(BOOK)] = fixture(BOOK, 2, 6, 0);
+    Storage.files[storePath(BOOK, true)] = fixture(BOOK, 2, 6, 2);
+    Storage.files[storePath(MOVED)] = fixture(MOVED, 2, 6, 4);
+    Storage.files[storePath(MOVED, true)] = fixture(MOVED, 2, 6, 6);
+    const auto originalFiles = Storage.files;
+    std::vector<std::string> expected;
+    for (const auto& entry : originalFiles) {
+      const auto ids = identities(entry.second);
+      expected.insert(expected.end(), ids.begin(), ids.end());
+    }
+    std::sort(expected.begin(), expected.end());
+    if (operation == 0) {
+      assert(BookmarkStore::migrateForFilePath(BOOK, MOVED, "Title", "Author", "epub"));
+    } else {
+      BookmarkStore::RenameMigration migration;
+      assert(BookmarkStore::beginRenameMigration(BOOK, MOVED, "Title", "Author", "epub", migration));
+      if (operation == 2) {
+        assert(BookmarkStore::rollbackRenameMigration(migration));
+        assert(Storage.files == originalFiles);
+        continue;
+      }
+      assert(BookmarkStore::commitRenameMigration(migration));
+    }
+    auto ids = identities(Storage.files.at(storePath(MOVED)));
+    std::sort(ids.begin(), ids.end());
+    assert(ids == expected && openBookmarkReaders == 0);
+  }
+  reset();
+  Storage.files[storePath(BOOK)] = fixture(BOOK, 1024, 6);
+  maxArrayBytes = 128 * 1024;
+  assert(load() && allocationNumber == 1);
+  assert(BOOKMARKS.getBookmarks().size() == 1024);
+}
 }  // namespace
 int main() {
+  deletionCannotLookLikeAnOlderMissingOrEmptyNativeStore();
+  emptyMarkersDoNotConsumeTheActiveBookScanBudget();
+  opaqueIdentitiesSurviveNativeEditsAndRename();
   largeLoadFailureAndRetry();
   versionsAndHeaderValidation();
   legacyMergeFailures();

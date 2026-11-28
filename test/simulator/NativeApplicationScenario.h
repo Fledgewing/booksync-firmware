@@ -8,6 +8,7 @@
 #include <cstring>
 #include <optional>
 
+#include "NativeAnnotationScenario.h"
 #include "activities/reader/ProgressRecord.h"
 #include "booksync/reader/Locator.h"
 #include "booksync/server/bookorbit/NativeProgress.h"
@@ -170,6 +171,7 @@ inline void runNativeApplicationScenario() {
     ok = false;
   }
   ok = entry.acknowledged == 0 && ok;  // Providers never manufacture a phase acknowledgement.
+  ok = nativeAnnotationScenario(mode, account, scope, *source, entry, nativeId) && ok;
   LOG_INF("BSE", "BookSync native application scenario %s; checkpoints=%u; network=none", ok ? "PASS" : "FAIL",
           publicationCheckpoints());
   std::fflush(nullptr);

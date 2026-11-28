@@ -16,7 +16,12 @@ namespace {
 constexpr uint8_t LEGACY_VERSION = 2;
 constexpr uint8_t COUNT_U16_VERSION = 3;
 constexpr uint8_t PARAGRAPH_ANCHOR_VERSION = 4;
-constexpr uint8_t VERSION = 5;
+constexpr uint8_t SNIPPET_VERSION = 5;
+constexpr uint8_t VERSION = 6;
+constexpr uint32_t IDENTITY_OFFSET_MASK = 0x3fffffff;
+constexpr uint32_t NEW_IDENTITY = UINT32_MAX;
+constexpr size_t RECORD_BYTES = 140;
+constexpr size_t IDENTITY_RECORD_OFFSET = 124;
 // Stored count is uint16_t in v3+, but we keep an in-memory safety cap for ESP32-C3 RAM.
 constexpr uint16_t MAX_BOOKMARKS = 1024;
 constexpr char BOOKMARKS_DIR[] = "/.crosspoint/bookmarks";
@@ -59,6 +64,32 @@ std::string bookmarkScanPath(const char* name) {
   return path.ends_with(".bin") ? path : std::string{};
 }
 
+// Reopen at the directory cookie so no directory/data readers overlap.
+bool nextBookmarkName(uint64_t& position, char (&name)[64], bool& done) {
+  done = false;
+  auto directory = Storage.open(BOOKMARKS_DIR);
+  if (!directory || !directory.isDirectory() || (position && !directory.seekSet(position))) {
+    directory.close();
+    LOG_ERR("BKS", "Cannot enumerate bookmark stores");
+    return false;
+  }
+  auto entry = directory.openNextFile();
+  if (!entry) {
+    const bool failed = directory.iterationFailed() || directory.allocationFailed();
+    directory.close();
+    done = !failed;
+    if (failed) LOG_ERR("BKS", "Bookmark directory iteration failed");
+    return !failed;
+  }
+  position = directory.position();
+  const auto length = entry.getName(name, sizeof(name));
+  const bool folder = entry.isDirectory();
+  entry.close();
+  directory.close();
+  if (folder || !length || length >= sizeof(name) - 1) name[0] = 0;
+  return true;
+}
+
 struct BookmarkFileHeader {
   std::string title;
   std::string author;
@@ -85,7 +116,8 @@ bool readBookmarkCount(FsFile& file, const uint8_t version, uint16_t& count) {
     return true;
   }
 
-  if (version == COUNT_U16_VERSION || version == PARAGRAPH_ANCHOR_VERSION || version == VERSION) {
+  if (version == COUNT_U16_VERSION || version == PARAGRAPH_ANCHOR_VERSION || version == SNIPPET_VERSION ||
+      version == VERSION) {
     return serialization::tryReadPod(file, count);
   }
 
@@ -247,7 +279,7 @@ bool readBookmarkFileHeader(const std::string& fullPath, const char* name, Bookm
   uint8_t version;
   serialization::readPod(f, version);
   if (version != LEGACY_VERSION && version != COUNT_U16_VERSION && version != PARAGRAPH_ANCHOR_VERSION &&
-      version != VERSION) {
+      version != SNIPPET_VERSION && version != VERSION) {
     f.close();
     return false;
   }
@@ -292,6 +324,8 @@ bool BookmarkStore::loadForBook(const std::string& filePath, const std::string& 
   bookAuthor = author;
   dirty = false;
   writable = false;
+  nativeGeneration_ = 0;
+  identityTracked_ = false;
   bookmarks.release();
 
   storeFilePath = currentStoreFilePathForBook(filePath, bookType);
@@ -331,7 +365,7 @@ bool BookmarkStore::loadForBook(const std::string& filePath, const std::string& 
   bool currentLoaded = false;
   if (hasCurrentFile) {
     bool currentNeedsRewrite = false;
-    if (readFromFile(storeFilePath, loadedBookmarks, currentNeedsRewrite)) {
+    if (readFromFile(storeFilePath, loadedBookmarks, currentNeedsRewrite, 0, &nativeGeneration_)) {
       loadedAny = true;
       currentLoaded = true;
       needsRewrite = currentNeedsRewrite;
@@ -344,7 +378,7 @@ bool BookmarkStore::loadForBook(const std::string& filePath, const std::string& 
   if (hasLegacyFile) {
     bool legacyNeedsRewrite = false;
     BookmarkRecords legacyBookmarks;
-    if (!readFromFile(legacyStoreFilePath, legacyBookmarks, legacyNeedsRewrite)) {
+    if (!readFromFile(legacyStoreFilePath, legacyBookmarks, legacyNeedsRewrite, 1, &nativeGeneration_)) {
       LOG_ERR("BKS", "Failed to load legacy bookmark file: %s", legacyStoreFilePath.c_str());
       return false;
     }
@@ -359,6 +393,9 @@ bool BookmarkStore::loadForBook(const std::string& filePath, const std::string& 
   if (!loadedAny) return false;
 
   bookmarks = std::move(loadedBookmarks);
+  identityTracked_ = nativeGeneration_ != 0 || std::any_of(bookmarks.begin(), bookmarks.end(), [](const Bookmark& row) {
+                       return row.identityStorage() != 0;
+                     });
   writable = true;
   if (needsRewrite) {
     dirty = true;
@@ -418,6 +455,7 @@ BookmarkStore::AddResult BookmarkStore::addBookmark(uint16_t spineIndex, float p
   bm.spineIndex = spineIndex;
   bm.progress = progress;
   bm.timestamp = 0;  // ESP32-C3 has no battery-backed RTC; reserved for future use
+  bm.identityStorage(NEW_IDENTITY);
   snprintf(bm.chapterTitle, sizeof(bm.chapterTitle), "%s", chapterTitle ? chapterTitle : "");
   bm.paragraphIndex = paragraphIndex;
   snprintf(bm.snippet, sizeof(bm.snippet), "%s", snippet ? snippet : "");
@@ -478,6 +516,16 @@ void BookmarkStore::clearAll() {
     LOG_ERR("BKS", "Cannot clear bookmarks after an unsuccessful load");
     return;
   }
+  if (!storeFilePath.empty() && (identityTracked_ || nativeGeneration_ || native_reader_observer::identity)) {
+    auto previous = std::move(bookmarks);
+    const bool saved = writeToFile();
+    bookmarks = std::move(previous);
+    if (saved) {
+      bookmarks.clear();
+      dirty = false;
+    }
+    return;
+  }
   if (!storeFilePath.empty()) {
     for (const char* suffix : {"", ".bak", ".tmp"}) {
       char target[BOOKMARK_STORE_PATH_BYTES];
@@ -491,10 +539,12 @@ void BookmarkStore::clearAll() {
 
 bool BookmarkStore::readFromFile() {
   bool needsRewrite = false;
-  if (!readFromFile(storeFilePath, bookmarks, needsRewrite)) {
+  if (!readFromFile(storeFilePath, bookmarks, needsRewrite, 0, &nativeGeneration_)) {
     return false;
   }
 
+  identityTracked_ = nativeGeneration_ || std::any_of(bookmarks.begin(), bookmarks.end(),
+                                                      [](const Bookmark& row) { return row.identityStorage() != 0; });
   if (needsRewrite) {
     dirty = true;
     saveToFile();
@@ -503,7 +553,12 @@ bool BookmarkStore::readFromFile() {
   return true;
 }
 
-bool BookmarkStore::readFromFile(const std::string& path, BookmarkRecords& out, bool& needsRewrite) const {
+bool BookmarkStore::readFromFile(const std::string& path, BookmarkRecords& out, bool& needsRewrite,
+                                 uint8_t identitySource, uint64_t* generation) const {
+  if (identitySource > 3) {
+    LOG_ERR("BKS", "Invalid bookmark identity source");
+    return false;
+  }
   needsRewrite = false;
   if (!recoverBookmarkFile(path)) return false;
   FsFile f;
@@ -513,8 +568,9 @@ bool BookmarkStore::readFromFile(const std::string& path, BookmarkRecords& out, 
   }
 
   uint8_t version = 0;
-  if (!serialization::tryReadPod(f, version) || (version != LEGACY_VERSION && version != COUNT_U16_VERSION &&
-                                                 version != PARAGRAPH_ANCHOR_VERSION && version != VERSION)) {
+  if (!serialization::tryReadPod(f, version) ||
+      (version != LEGACY_VERSION && version != COUNT_U16_VERSION && version != PARAGRAPH_ANCHOR_VERSION &&
+       version != SNIPPET_VERSION && version != VERSION)) {
     LOG_ERR("BKS", "Invalid bookmark file version: %s", path.c_str());
     f.close();
     return false;
@@ -526,9 +582,15 @@ bool BookmarkStore::readFromFile(const std::string& path, BookmarkRecords& out, 
     f.close();
     return false;
   }
+  uint64_t storedGeneration = 0;
+  if (version >= VERSION && !serialization::tryReadPod(f, storedGeneration)) {
+    LOG_ERR("BKS", "Truncated bookmark mutation version");
+    f.close();
+    return false;
+  }
   constexpr size_t baseRecordBytes = sizeof(uint16_t) + sizeof(float) + sizeof(uint32_t) + BOOKMARK_CHAPTER_TITLE_MAX;
   const size_t recordBytes = baseRecordBytes + (version >= PARAGRAPH_ANCHOR_VERSION ? sizeof(uint16_t) : 0) +
-                             (version >= VERSION ? BOOKMARK_SNIPPET_MAX : 0);
+                             (version >= SNIPPET_VERSION ? BOOKMARK_SNIPPET_MAX : 0) + (version >= VERSION ? 16 : 0);
   if (static_cast<size_t>(f.available()) < static_cast<size_t>(count) * recordBytes) {
     LOG_ERR("BKS", "Truncated bookmark records: %s", path.c_str());
     f.close();
@@ -547,10 +609,22 @@ bool BookmarkStore::readFromFile(const std::string& path, BookmarkRecords& out, 
         !serialization::tryReadPod(f, bm.timestamp) ||
         f.read(bm.chapterTitle, sizeof(bm.chapterTitle)) != static_cast<int>(sizeof(bm.chapterTitle)) ||
         (version >= PARAGRAPH_ANCHOR_VERSION && !serialization::tryReadPod(f, bm.paragraphIndex)) ||
-        (version >= VERSION && f.read(bm.snippet, sizeof(bm.snippet)) != static_cast<int>(sizeof(bm.snippet)))) {
+        (version >= SNIPPET_VERSION &&
+         f.read(bm.snippet, sizeof(bm.snippet)) != static_cast<int>(sizeof(bm.snippet)))) {
       LOG_ERR("BKS", "Failed to read bookmark record %u: %s", i, path.c_str());
       f.close();
       return false;
+    }
+    if (version >= VERSION) {
+      uint8_t id[16];
+      const auto offset = f.position();
+      if (offset > IDENTITY_OFFSET_MASK || f.read(id, sizeof(id)) != static_cast<int>(sizeof(id))) {
+        LOG_ERR("BKS", "Invalid bookmark identity storage");
+        f.close();
+        return false;
+      }
+      if (std::any_of(std::begin(id), std::end(id), [](uint8_t byte) { return byte != 0; }))
+        bm.identityStorage((uint32_t(identitySource) << 30) | static_cast<uint32_t>(offset));
     }
     bm.chapterTitle[sizeof(bm.chapterTitle) - 1] = '\0';
     bm.snippet[sizeof(bm.snippet) - 1] = '\0';
@@ -563,38 +637,105 @@ bool BookmarkStore::readFromFile(const std::string& path, BookmarkRecords& out, 
 
   f.close();
   out = std::move(loadedBookmarks);
-  needsRewrite = version != VERSION;
+  if (generation) *generation = std::max(*generation, storedGeneration);
+  // A v5 file remains byte-identical until an explicit native mutation. Old
+  // rows acquire zero UUIDs on that write, never retroactive ownership.
+  needsRewrite = version < SNIPPET_VERSION;
   return true;
 }
 
-bool BookmarkStore::writeToFile() const {
+bool BookmarkStore::writeToFile(const IdentitySources* identitySources) {
   Storage.mkdir(BOOKMARKS_DIR);
   if (!recoverBookmarkFile(storeFilePath)) return false;
-  // Two bounded hash paths (192 bytes total) avoid new heap allocations while
-  // the loaded record buffer may already consume most of the C3 heap.
+  // Two bounded native paths (192 bytes) and one 16-byte UUID avoid heap
+  // allocation beside a potentially 128 KiB record buffer. The backup path
+  // buffer doubles as the legacy UUID-source path until its reader closes.
+  // One source reader is reused across rows; no UUID array is allocated.
   char temporary[BOOKMARK_STORE_PATH_BYTES];
   char backup[BOOKMARK_STORE_PATH_BYTES];
-  if (!bookmarkSiblingPath(storeFilePath, ".tmp", temporary) || !bookmarkSiblingPath(storeFilePath, ".bak", backup))
-    return false;
+  auto* legacy = backup;
+  IdentitySources originals{};
+  if (!identitySources) {
+    const auto name = std::string_view(storeFilePath).substr(storeFilePath.find_last_of('/') + 1);
+    const auto separator = name.find('_');
+    if (separator == name.npos || separator > 16) {
+      LOG_ERR("BKS", "Invalid bookmark identity path");
+      return false;
+    }
+    const int size = snprintf(legacy, sizeof(backup), "%s/%.*s_%llu.bin", BOOKMARKS_DIR, static_cast<int>(separator),
+                              name.data(), static_cast<unsigned long long>(std::hash<std::string>{}(bookFilePath)));
+    if (size < 0 || static_cast<size_t>(size) >= sizeof(backup)) {
+      LOG_ERR("BKS", "Bookmark identity path exceeds bound");
+      return false;
+    }
+    originals = {storeFilePath.c_str(), legacy, nullptr, nullptr};
+    identitySources = &originals;
+  }
+  if (!bookmarkSiblingPath(storeFilePath, ".tmp", temporary)) return false;
   FsFile f;
   if (!Storage.openFileForWrite("BKS", temporary, f)) {
     LOG_ERR("BKS", "Failed to open bookmark temporary file for write");
     Storage.remove(temporary);  // HAL may have created/truncated it before wrapper allocation failed.
     return false;
   }
+  const bool tracked = identityTracked_ || nativeGeneration_ || native_reader_observer::identity;
+  const uint64_t generation = tracked && nativeGeneration_ != UINT64_MAX ? nativeGeneration_ + 1 : nativeGeneration_;
   const uint16_t count = static_cast<uint16_t>(bookmarks.size());
   bool ok = serialization::tryWritePod(f, VERSION) && serialization::tryWritePod(f, count) &&
             serialization::tryWriteString(f, bookTitle) && serialization::tryWriteString(f, bookAuthor) &&
-            serialization::tryWriteString(f, bookFilePath);
+            serialization::tryWriteString(f, bookFilePath) && serialization::tryWritePod(f, generation);
+  const auto firstIdentity = f.position() + IDENTITY_RECORD_OFFSET;
+  ok = ok && firstIdentity + bookmarks.size() * RECORD_BYTES < IDENTITY_OFFSET_MASK;
+  FsFile identityFile;
+  const char* currentIdentitySource = nullptr;
+  bool identityOpen = false;
+  uint8_t id[16];
   for (const auto& bm : bookmarks) {
     if (!ok) break;
+    std::fill(std::begin(id), std::end(id), 0);
+    const auto location = bm.identityStorage();
+    if (location == NEW_IDENTITY) {
+      if (native_reader_observer::identity &&
+          !native_reader_observer::identity("bookmarks", bookFilePath, id, sizeof(id))) {
+        std::fill(std::begin(id), std::end(id), 0);
+        LOG_ERR("BKS", "Bookmark identity unavailable; retained locally");
+      }
+    } else if (location) {
+      const auto* source = (*identitySources)[location >> 30];
+      if (!source || !source[0]) {
+        ok = false;
+        break;
+      }
+      if (currentIdentitySource != source) {
+        if (identityOpen) {
+          ok = identityFile.close();
+          identityOpen = false;
+          if (!ok) break;
+        }
+        if (!Storage.openFileForRead("BKS", source, identityFile)) {
+          ok = false;
+          break;
+        }
+        identityOpen = true;
+        currentIdentitySource = source;
+      }
+      if (!identityFile.seekSet(location & IDENTITY_OFFSET_MASK) ||
+          identityFile.read(id, sizeof(id)) != static_cast<int>(sizeof(id))) {
+        ok = false;
+        break;
+      }
+    }
     ok = serialization::tryWritePod(f, bm.spineIndex) && serialization::tryWritePod(f, bm.progress) &&
          serialization::tryWritePod(f, bm.timestamp) &&
          f.write(reinterpret_cast<const uint8_t*>(bm.chapterTitle), sizeof(bm.chapterTitle)) ==
              sizeof(bm.chapterTitle) &&
          serialization::tryWritePod(f, bm.paragraphIndex) &&
-         f.write(reinterpret_cast<const uint8_t*>(bm.snippet), sizeof(bm.snippet)) == sizeof(bm.snippet);
+         f.write(reinterpret_cast<const uint8_t*>(bm.snippet), sizeof(bm.snippet)) == sizeof(bm.snippet) &&
+         f.write(id, sizeof(id)) == sizeof(id);
   }
+  if (identityOpen) ok = identityFile.close() && ok;
+  // The shared path buffer is no longer borrowed by a source reader.
+  ok = bookmarkSiblingPath(storeFilePath, ".bak", backup) && ok;
   const bool synced = ok && f.sync();
   const bool closed = f.close();
   if (!synced || !closed || !atomic_file::publish(BOOKMARK_FILE_OPS, storeFilePath.c_str(), temporary, backup)) {
@@ -602,6 +743,12 @@ bool BookmarkStore::writeToFile() const {
     Storage.remove(temporary);
     return false;
   }
+  // Publication succeeded. All UUID references now point into the new current
+  // file. On failure, original offsets and backups remain valid for retry.
+  for (size_t i = 0; i < bookmarks.size(); ++i)
+    bookmarks[i].identityStorage(static_cast<uint32_t>(firstIdentity + i * RECORD_BYTES));
+  nativeGeneration_ = generation;
+  identityTracked_ = tracked;
   native_reader_observer::published("bookmarks", bookFilePath, storeFilePath.c_str());
   return true;
 }
@@ -647,7 +794,8 @@ bool BookmarkStore::migrateForFilePath(const std::string& oldFilePath, const std
 
   if (hasSrcCurrent) {
     bool currentNeedsRewrite = false;
-    if (!sourceReader.readFromFile(srcCurrentPath, migratedBookmarks, currentNeedsRewrite)) {
+    if (!sourceReader.readFromFile(srcCurrentPath, migratedBookmarks, currentNeedsRewrite, 0,
+                                   &sourceReader.nativeGeneration_)) {
       LOG_ERR("BKS", "Failed to load source bookmark file during path migration: %s", srcCurrentPath.c_str());
       return false;
     }
@@ -658,7 +806,8 @@ bool BookmarkStore::migrateForFilePath(const std::string& oldFilePath, const std
   if (hasSrcLegacy) {
     bool legacyNeedsRewrite = false;
     BookmarkRecords legacyBookmarks;
-    if (!sourceReader.readFromFile(srcLegacyPath, legacyBookmarks, legacyNeedsRewrite)) {
+    if (!sourceReader.readFromFile(srcLegacyPath, legacyBookmarks, legacyNeedsRewrite, 1,
+                                   &sourceReader.nativeGeneration_)) {
       LOG_ERR("BKS", "Failed to load source legacy bookmark file during path migration: %s", srcLegacyPath.c_str());
       return false;
     }
@@ -678,7 +827,8 @@ bool BookmarkStore::migrateForFilePath(const std::string& oldFilePath, const std
   if (hasBookmarkFile(dstCurrentPath)) {
     bool dstNeedsRewrite = false;
     BookmarkRecords existingBookmarks;
-    if (!destReader.readFromFile(dstCurrentPath, existingBookmarks, dstNeedsRewrite)) {
+    if (!destReader.readFromFile(dstCurrentPath, existingBookmarks, dstNeedsRewrite, 2,
+                                 &destReader.nativeGeneration_)) {
       LOG_ERR("BKS", "Failed to load destination bookmark file during path migration: %s", dstCurrentPath.c_str());
       return false;
     }
@@ -690,7 +840,8 @@ bool BookmarkStore::migrateForFilePath(const std::string& oldFilePath, const std
   if (dstLegacyPath != dstCurrentPath && hasBookmarkFile(dstLegacyPath)) {
     bool dstLegacyNeedsRewrite = false;
     BookmarkRecords existingLegacyBookmarks;
-    if (!destReader.readFromFile(dstLegacyPath, existingLegacyBookmarks, dstLegacyNeedsRewrite)) {
+    if (!destReader.readFromFile(dstLegacyPath, existingLegacyBookmarks, dstLegacyNeedsRewrite, 3,
+                                 &destReader.nativeGeneration_)) {
       LOG_ERR("BKS", "Failed to load destination legacy bookmark file during path migration: %s",
               dstLegacyPath.c_str());
       return false;
@@ -706,9 +857,15 @@ bool BookmarkStore::migrateForFilePath(const std::string& oldFilePath, const std
   writer.bookAuthor = author;
   writer.storeFilePath = dstCurrentPath;
   writer.bookmarks = std::move(migratedBookmarks);
+  writer.nativeGeneration_ = std::max(sourceReader.nativeGeneration_, destReader.nativeGeneration_);
+  writer.identityTracked_ =
+      writer.nativeGeneration_ || std::any_of(writer.bookmarks.begin(), writer.bookmarks.end(),
+                                              [](const Bookmark& row) { return row.identityStorage() != 0; });
 
-  if (!writer.bookmarks.empty()) {
-    if (!writer.writeToFile()) {
+  if (!writer.bookmarks.empty() || writer.identityTracked_) {
+    const IdentitySources originals{srcCurrentPath.c_str(), srcLegacyPath.c_str(), dstCurrentPath.c_str(),
+                                    dstLegacyPath.c_str()};
+    if (!writer.writeToFile(&originals)) {
       LOG_ERR("BKS", "Failed to write migrated bookmark file: %s", dstCurrentPath.c_str());
       return false;
     }
@@ -789,7 +946,8 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
   BookmarkRecords migratedBookmarks;
   if (hasSrcCurrent) {
     bool needsRewrite = false;
-    if (!sourceReader.readFromFile(migration.sourceCurrentPath, migratedBookmarks, needsRewrite)) {
+    if (!sourceReader.readFromFile(migration.sourceCurrentPath, migratedBookmarks, needsRewrite, 0,
+                                   &sourceReader.nativeGeneration_)) {
       LOG_ERR("BKS", "Failed to load source bookmarks for rename: %s", migration.sourceCurrentPath.c_str());
       return false;
     }
@@ -797,7 +955,8 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
   if (hasSrcLegacy) {
     bool needsRewrite = false;
     BookmarkRecords legacyBookmarks;
-    if (!sourceReader.readFromFile(migration.sourceLegacyPath, legacyBookmarks, needsRewrite)) {
+    if (!sourceReader.readFromFile(migration.sourceLegacyPath, legacyBookmarks, needsRewrite, 1,
+                                   &sourceReader.nativeGeneration_)) {
       LOG_ERR("BKS", "Failed to load source legacy bookmarks for rename: %s", migration.sourceLegacyPath.c_str());
       return false;
     }
@@ -809,7 +968,8 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
   if (hasBookmarkFile(migration.destinationCurrentPath)) {
     bool needsRewrite = false;
     BookmarkRecords destinationBookmarks;
-    if (!destinationReader.readFromFile(migration.destinationCurrentPath, destinationBookmarks, needsRewrite)) {
+    if (!destinationReader.readFromFile(migration.destinationCurrentPath, destinationBookmarks, needsRewrite, 2,
+                                        &destinationReader.nativeGeneration_)) {
       LOG_ERR("BKS", "Failed to load destination bookmarks for rename: %s", migration.destinationCurrentPath.c_str());
       return false;
     }
@@ -820,7 +980,8 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
       hasBookmarkFile(migration.destinationLegacyPath)) {
     bool needsRewrite = false;
     BookmarkRecords destinationLegacyBookmarks;
-    if (!destinationReader.readFromFile(migration.destinationLegacyPath, destinationLegacyBookmarks, needsRewrite)) {
+    if (!destinationReader.readFromFile(migration.destinationLegacyPath, destinationLegacyBookmarks, needsRewrite, 3,
+                                        &destinationReader.nativeGeneration_)) {
       LOG_ERR("BKS", "Failed to load destination legacy bookmarks for rename: %s",
               migration.destinationLegacyPath.c_str());
       return false;
@@ -859,7 +1020,14 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
   writer.bookAuthor = author;
   writer.storeFilePath = migration.destinationCurrentPath;
   writer.bookmarks = std::move(migratedBookmarks);
-  if (!writer.bookmarks.empty() && !writer.writeToFile()) {
+  writer.nativeGeneration_ = std::max(sourceReader.nativeGeneration_, destinationReader.nativeGeneration_);
+  writer.identityTracked_ =
+      writer.nativeGeneration_ || std::any_of(writer.bookmarks.begin(), writer.bookmarks.end(),
+                                              [](const Bookmark& row) { return row.identityStorage() != 0; });
+  const IdentitySources originals{migration.sourceCurrentPath.c_str(), migration.sourceLegacyPath.c_str(),
+                                  migration.destinationCurrentBackupPath.c_str(),
+                                  migration.destinationLegacyBackupPath.c_str()};
+  if ((!writer.bookmarks.empty() || writer.identityTracked_) && !writer.writeToFile(&originals)) {
     LOG_ERR("BKS", "Failed to write transactional bookmark rename: %s", migration.destinationCurrentPath.c_str());
     rollbackRenameMigration(migration);
     return false;
@@ -906,20 +1074,43 @@ bool BookmarkStore::rollbackRenameMigration(RenameMigration& migration) {
 
 bool BookmarkStore::hasAnyBookmarks() {
   if (!Storage.exists(BOOKMARKS_DIR)) return false;
-  // Cheap Home-menu hint; the full header scan filters incomplete temporary files.
-  return !Storage.listFiles(BOOKMARKS_DIR, 1).empty();
+  uint64_t position = 0;
+  for (;;) {
+    char name[64]{};
+    bool done = false;
+    if (!nextBookmarkName(position, name, done)) return true;  // Preserve the conservative menu hint on I/O failure.
+    if (done) return false;
+    const auto path = bookmarkScanPath(name);
+    if (path.empty()) return true;
+    FsFile file;
+    if (!Storage.openFileForRead("BKS", path, file)) return true;
+    uint8_t version = 0;
+    uint16_t count = 0;
+    uint64_t generation = 0;
+    const bool emptyMarker = serialization::tryReadPod(file, version) && version == VERSION &&
+                             serialization::tryReadPod(file, count) && count == 0 && consumeStoredString(file) &&
+                             consumeStoredString(file) && consumeStoredString(file) &&
+                             serialization::tryReadPod(file, generation) && file.available() == 0;
+    file.close();
+    if (!emptyMarker) return true;
+  }
 }
 
 bool BookmarkStore::getAllBookmarkedBooks(std::vector<BookmarkedBookEntry>& out) {
   if (!Storage.exists(BOOKMARKS_DIR)) return true;
 
-  const auto files = Storage.listFiles(BOOKMARKS_DIR);
-  for (const auto& name : files) {
-    const std::string fullPath = bookmarkScanPath(name.c_str());
+  uint64_t position = 0;
+  size_t activeFiles = 0;
+  while (activeFiles < 200) {
+    char name[64]{};
+    bool done = false;
+    if (!nextBookmarkName(position, name, done)) return false;
+    if (done) break;
+    const std::string fullPath = bookmarkScanPath(name);
     if (fullPath.empty()) continue;
 
     BookmarkFileHeader header;
-    if (!readBookmarkFileHeader(fullPath, name.c_str(), header)) continue;
+    if (!readBookmarkFileHeader(fullPath, name, header)) continue;
     auto& title = header.title;
     auto& author = header.author;
     auto& path = header.path;
@@ -927,6 +1118,7 @@ bool BookmarkStore::getAllBookmarkedBooks(std::vector<BookmarkedBookEntry>& out)
     const uint16_t count = header.count;
 
     if (path.empty() || count == 0) continue;
+    ++activeFiles;
     if (!Storage.exists(path.c_str())) {
       if (bookType != "epub") continue;
 

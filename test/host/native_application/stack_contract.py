@@ -8,7 +8,7 @@ import tempfile
 root = Path(__file__).resolve().parents[3]
 sources = [root / 'src/booksync/storage/SourceFile.cpp'] + [
     root / 'src/booksync/server/bookorbit' / (name + '.cpp') for name in
-    ('ProgressCapture', 'NativeCaptureGate', 'NativeProgress', 'NativeStateStore', 'NativeState')]
+    ('ProgressCapture', 'NativeCaptureGate', 'NativeProgress', 'NativeStateStore', 'NativeState', 'AnnotationRecord', 'AnnotationSpool')]
 (root / 'build').mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='booksync-native-frames-', dir=root / 'build') as temporary:
     directory = Path(temporary)

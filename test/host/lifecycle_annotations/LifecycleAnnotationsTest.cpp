@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cstdio>
 #include <cstring>
 
 #include "booksync/server/bookorbit/Auth.h"
@@ -29,8 +30,10 @@ class Workspace final : public AnnotationWorkspace {
   AnnotationRow rows[17]{};
   AnnotationChange remoteRows[3]{};
   AnnotationKey key{hash, "2026-11-27 10:00:00"};
-  size_t count = 1;
-  bool last = true, fail = false, known = false;
+  size_t count = 1, keyCount = 1;
+  AnnotationRowReader* outgoingRows = nullptr;
+  AnnotationKeyReader* outgoingKeys = nullptr;
+  bool last = true, fail = false, known = false, includeKeys = true;
   bool failStage = false, failApply = false, failFinish = false, failKnown = false;
   unsigned applications = 0, stages = 0;
   AnnotationReceipt receipts[3]{};
@@ -61,7 +64,10 @@ class Workspace final : public AnnotationWorkspace {
     return !fail;
   }
   bool batch(AnnotationKind, uint32_t, AnnotationBatch& out) override {
-    out = {rows, count, &key, 1, last};
+    out = {outgoingRows ? nullptr : rows, count, outgoingKeys ? nullptr : &key, keyCount, last};
+    out.rowReader = outgoingRows;
+    out.keyReader = outgoingKeys;
+    out.keysIncluded = includeKeys;
     return !fail;
   }
   bool stage(AnnotationKind kind, const AnnotationReply& r, AnnotationProgress next) override {
@@ -157,7 +163,17 @@ class Remote final : public AnnotationTransport {
     reconciles += reconcile;
     EXPECT_EQ(h, hash);
     EXPECT_EQ(complete, expectKeys);
-    EXPECT_EQ(batch.keyCount, complete && work.progress[unsigned(k)].cursor == 0 ? 1 : 0);
+    EXPECT_EQ(batch.keyCount,
+              complete && work.progress[unsigned(k)].cursor == 0 && work.includeKeys ? work.keyCount : 0);
+    if (batch.rowReader)
+      for (size_t i = 0; i < batch.count; ++i) {
+        const auto* row = batch.rowReader->at(i);
+        EXPECT_NE(row, nullptr);
+        if (row) EXPECT_EQ(row->text.size(), 10000);
+      }
+    if (batch.keyReader)
+      for (size_t i = 0; i < batch.keyCount; ++i) EXPECT_NE(batch.keyReader->at(i), nullptr);
+    if (!batch.keyCount) EXPECT_EQ(batch.keyReader, nullptr);
     if (before && k == cutKind) {
       if (cut) throw PowerCut{};
       return {MatchResult::Uncertain};
@@ -622,5 +638,88 @@ TEST_F(AnnotationsTest, PreservesCompletedStatsEnvelopeAcrossAnnotationRestart) 
   EXPECT_EQ(step(), SyncResult::Advanced);
   EXPECT_EQ(adapter.remote.commits, 2);
   EXPECT_EQ(read().checkpoint, checkpoint);
+  EXPECT_EQ(read().acknowledged, 7);
+}
+
+namespace {
+class OutgoingRows final : public AnnotationRowReader {
+ public:
+  AnnotationRow row;
+  std::string text = std::string(10000, 'p');
+  size_t failAt = SIZE_MAX;
+  unsigned rewinds = 0;
+  const AnnotationRow* at(size_t index) override {
+    if (!index) ++rewinds;
+    if (index == failAt) return nullptr;
+    row.text = text;
+    return &row;
+  }
+};
+class OutgoingKeys final : public AnnotationKeyReader {
+ public:
+  AnnotationKey key;
+  std::array<char, 33> value{};
+  size_t failAt = SIZE_MAX;
+  unsigned rewinds = 0;
+  const AnnotationKey* at(size_t index) override {
+    if (!index) ++rewinds;
+    if (index == failAt) return nullptr;
+    std::snprintf(value.data(), value.size(), "%032zx", index);
+    key = {{value.data(), 32}, "2026-11-27 10:00:00"};
+    return &key;
+  }
+};
+}  // namespace
+TEST_F(AnnotationsTest, StreamsSixteenFullRowsAndAll1024KeysWithReusableRecords) {
+  auto& w = adapter.workspace;
+  w.capture.native = w.capture.syncKnown = true;
+  w.count = 16;
+  w.keyCount = 1024;
+  OutgoingRows rows;
+  rows.row = w.rows[0];
+  OutgoingKeys keys;
+  w.outgoingRows = &rows;
+  w.outgoingKeys = &keys;
+  adapter.remote.expectKeys = true;
+  EXPECT_EQ(step(), SyncResult::Advanced);
+  EXPECT_EQ(adapter.remote.calls, 2);
+  EXPECT_EQ(rows.rewinds, 4);  // Validation and transport rewind each kind.
+  EXPECT_EQ(keys.rewinds, 4);
+  EXPECT_EQ(read().acknowledged, 7);
+}
+TEST_F(AnnotationsTest, OutgoingStreamFailureCannotSendOrAcknowledge) {
+  auto& w = adapter.workspace;
+  w.capture.native = w.capture.syncKnown = true;
+  w.count = 16;
+  w.keyCount = 1024;
+  OutgoingRows rows;
+  rows.row = w.rows[0];
+  OutgoingKeys keys;
+  w.outgoingRows = &rows;
+  w.outgoingKeys = &keys;
+  rows.failAt = 15;
+  EXPECT_NE(step(), SyncResult::Advanced);
+  EXPECT_EQ(adapter.remote.calls, 0);
+  EXPECT_EQ(read().acknowledged, 3);
+  rows.failAt = SIZE_MAX;
+  keys.failAt = 1023;
+  EXPECT_NE(step(), SyncResult::Advanced);
+  EXPECT_EQ(adapter.remote.calls, 0);
+  EXPECT_EQ(read().acknowledged, 3);
+}
+
+TEST_F(AnnotationsTest, LaterEmptyCaptureRoundOmitsKeysWithoutReadingTheStream) {
+  auto& w = adapter.workspace;
+  w.capture.native = w.capture.syncKnown = true;
+  w.count = 0;
+  w.keyCount = 1024;
+  w.includeKeys = false;  // A retained round can advance with cursor still zero.
+  OutgoingKeys keys;
+  keys.failAt = 0;
+  w.outgoingKeys = &keys;
+  adapter.remote.expectKeys = true;
+  EXPECT_EQ(step(), SyncResult::Advanced);
+  EXPECT_EQ(adapter.remote.calls, 2);
+  EXPECT_EQ(keys.rewinds, 0);
   EXPECT_EQ(read().acknowledged, 7);
 }

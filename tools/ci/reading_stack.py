@@ -60,7 +60,8 @@ def bounded_native_application_frame(node_env, node):
 
 
 for source in ("SourceFile.cpp", "ProgressCapture.cpp", "NativeCaptureGate.cpp",
-               "NativeProgress.cpp", "NativeStateStore.cpp", "NativeState.cpp"):
+               "NativeProgress.cpp", "NativeStateStore.cpp", "NativeState.cpp",
+               "AnnotationRecord.cpp", "AnnotationSpool.cpp"):
     env.AddBuildMiddleware(bounded_native_application_frame, "*/" + source)
 env.AddBuildMiddleware(bounded_reminder_frame, "*/ReminderPresenter.cpp")
 env.AddBuildMiddleware(bounded_reminder_frame, "*/DueSheet.cpp")
@@ -75,3 +76,8 @@ env.AddBuildMiddleware(bounded_reminder_frame, "*/ui/reminders/Settings.cpp")
 
 env.AddBuildMiddleware(bounded_reminder_frame, "*/ReminderText.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/ChapterCapture.cpp")
+
+# Native stores retain historical frame budgets; collect the changed methods
+# without imposing the new-provider gate on unrelated legacy migrations.
+env.AddBuildMiddleware(finish_frames, "*/BookmarkStore.cpp")
+env.AddBuildMiddleware(finish_frames, "*/ClippingStore.cpp")
