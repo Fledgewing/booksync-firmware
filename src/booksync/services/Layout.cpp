@@ -531,7 +531,8 @@ bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePa
         if (!text(field(tile, "widget"), text_) || !number(field(tile, "version"), 1, 2147483647, n)) return false;
         const auto widgetId = std::string_view(text_, textLength_);
         WidgetKind kind{};
-        const bool installed = n == 1 && !g.hidden && installedKind(widgetId, output.textOnly, kind);
+        bool installed = n == 1 && !g.hidden && installedKind(widgetId, output.textOnly, kind);
+        if (isTimeWidget(kind) && (g.w != 1 || g.h != 1)) installed = false;
         if (installed) {
           if (output.count == HomeWidgets) {
             LOG_ERR("BSL", "Visible widget budget exceeded");
@@ -600,6 +601,10 @@ bool Layout::installedKind(std::string_view id, bool textOnly, WidgetKind& kind)
     kind = WidgetKind::Shelf;
   else if (id == "library")
     kind = WidgetKind::Browse;
+  else if (!textOnly && id == "clock")
+    kind = WidgetKind::Clock;
+  else if (!textOnly && id == "moon")
+    kind = WidgetKind::Moon;
   else if (!textOnly && id == "this-week")
     kind = WidgetKind::Week;
   else if (!textOnly && id == "reading-streak")

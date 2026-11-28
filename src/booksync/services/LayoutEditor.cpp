@@ -8,6 +8,7 @@
 
 #include "LayoutGeometry.h"
 namespace booksync {
+
 bool LayoutEditor::patch(uint32_t begin, uint32_t end, const char* text) {
   const size_t n = std::strlen(text);
   if (count_ == 68 || used_ + n > sizeof(inserted_) || end < begin || end > input_.bytes) return false;
@@ -358,19 +359,16 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
                            : edit.widget == WidgetKind::When     ? "when-you-read"
                            : edit.widget == WidgetKind::Records  ? "reading-records"
                            : edit.widget == WidgetKind::Monthly  ? "monthly-reading"
-                                                                 : nullptr;
-      if (!widget) return LayoutEditStatus::Invalid;
-      if (!std::strcmp(device, "x3") && isStatsWidget(edit.widget)) return LayoutEditStatus::Invalid;
-      const uint8_t h = edit.widget == WidgetKind::Browse || isStatsWidget(edit.widget) ? 1 : 2;
-      const uint8_t w = isStatsWidget(edit.widget) && edit.widget != WidgetKind::Year &&
-                                edit.widget != WidgetKind::Monthly && edit.widget != WidgetKind::Records
-                            ? 1
-                            : 2;
+                                                                 : edit.widget == WidgetKind::Clock ? "clock" : edit.widget == WidgetKind::Moon ? "moon" : nullptr;
+      const bool timeWidget = isTimeWidget(edit.widget) || isStatsWidget(edit.widget);
+      if (!widget || (!std::strcmp(device, "x3") && timeWidget)) return LayoutEditStatus::Invalid;
+      const uint8_t h = edit.widget == WidgetKind::Browse || timeWidget ? 1 : 2;
+      const uint8_t width = timeWidget && edit.widget != WidgetKind::Year && edit.widget != WidgetKind::Monthly && edit.widget != WidgetKind::Records ? 1 : 2;
       uint8_t xs[3]{}, ys[3]{};
       static constexpr const char* classes[] = {"android-tablet", "x4", "x3"};
       for (unsigned i = 0; i < 3; ++i) {
-        if (i == 2 && isStatsWidget(edit.widget)) continue;  // New X4 cards stay hidden on X3.
-        if (!freeCell(root, pg, classes[i], i == 0 && edit.widget == WidgetKind::Continue ? 4 : w, h, xs[i], ys[i]))
+        if (timeWidget && i == 2) continue;  // An explicit hidden X3 override is written below.
+        if (!freeCell(root, pg, classes[i], i == 0 && edit.widget == WidgetKind::Continue ? 4 : width, h, xs[i], ys[i]))
           return LayoutEditStatus::NoSpace;
       }
       auto overrides = p.field(root, "overrides");
@@ -408,7 +406,7 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
       std::snprintf(
           text, sizeof(scratch_),
           "%s{\"instance\":\"%s\",\"widget\":\"%s\",\"version\":1,\"x\":%u,\"y\":%u,\"w\":%u,\"h\":%u,\"settings\":{}}",
-          p.at(pos) == ']' ? "" : ",", id, widget, xs[0], ys[0], edit.widget == WidgetKind::Continue ? 4 : w, h);
+          p.at(pos) == ']' ? "" : ",", id, widget, xs[0], ys[0], edit.widget == WidgetKind::Continue ? 4 : width, h);
       if (!patch(tiles.end - 1, tiles.end - 1, text)) return LayoutEditStatus::Invalid;
       // UI supplies the localized first-widget title. Only untouched Page N
       // names are automatic; manual and already-derived names remain stable.
@@ -425,13 +423,13 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
       auto* missing = missing_;
       missing[0] = 0;
       for (unsigned i = 1; i < 3; ++i) {
+        const char* hidden = timeWidget && i == 2 ? ",\"hidden\":true" : "";
         auto group = p.field(overrides, classes[i]);
         if (group.type) {
           pos = group.begin + 1;
           p.space(pos);
           std::snprintf(text, sizeof(scratch_), "%s\"%s\":{\"x\":%u,\"y\":%u,\"w\":%u,\"h\":%u%s}",
-                        p.at(pos) == '}' ? "" : ",", id, xs[i], ys[i], w, h,
-                        i == 2 && isStatsWidget(edit.widget) ? ",\"hidden\":true" : "");
+                        p.at(pos) == '}' ? "" : ",", id, xs[i], ys[i], width, h, hidden);
           if (!patch(group.end - 1, group.end - 1, text)) return LayoutEditStatus::Invalid;
         } else {
           pos = overrides.begin + 1;
@@ -439,8 +437,7 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
           const auto used = std::strlen(missing);
           std::snprintf(missing + used, sizeof(missing_) - used,
                         "%s\"%s\":{\"%s\":{\"x\":%u,\"y\":%u,\"w\":%u,\"h\":%u%s}}",
-                        used || p.at(pos) != '}' ? "," : "", classes[i], id, xs[i], ys[i], w, h,
-                        i == 2 && isStatsWidget(edit.widget) ? ",\"hidden\":true" : "");
+                        used || p.at(pos) != '}' ? "," : "", classes[i], id, xs[i], ys[i], width, h, hidden);
         }
       }
       if (missing[0] && !patch(overrides.end - 1, overrides.end - 1, missing)) return LayoutEditStatus::Invalid;

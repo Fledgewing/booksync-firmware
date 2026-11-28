@@ -21,6 +21,8 @@ class ServerAdapter;
 void enterLocalLibrary(ServerAdapter* savedStatsSource = nullptr);
 void leaveLocalLibrary();
 void workLocalLibrary();
+// Pure main-loop values; safe while a network lease owns storage. Never paint.
+void workTimeWidgets(bool twelveHour = false);
 void invalidateLocalCapture();
 bool takeIndexedOpenRequest(std::string& path);
 }  // namespace booksync

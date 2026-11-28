@@ -18,6 +18,8 @@ enum class WidgetKind : uint8_t {
   Records,
   Goal,
   Forecast,
+  Clock,
+  Moon,
   Count
 };
 constexpr bool isStatsWidget(WidgetKind kind) {
@@ -38,6 +40,7 @@ constexpr StatsWidget statsWidgetKind(WidgetKind kind) {
          : kind == WidgetKind::Goal    ? StatsWidget::Goal
                                        : StatsWidget::Forecast;
 }
+inline bool isTimeWidget(WidgetKind kind) { return kind == WidgetKind::Clock || kind == WidgetKind::Moon; }
 struct WidgetPlacement {
   WidgetKind kind = WidgetKind::Continue;
   WindowSource source = WindowSource::Recent;

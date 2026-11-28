@@ -23,11 +23,12 @@ with tempfile.TemporaryDirectory(prefix='booksync-records-widgets-') as director
     for scene in ('known', 'empty', 'not-saved', 'off', 'unsupported', 'stale', 'oversize', 'error', 'known-zero', 'stale-empty', 'account-only', 'add-list-final'):
         assert (out / f'{scene}.pgm').stat().st_size > 1000
 if profile != 'simulator-X3':
-    # Approved eight-pixel record gutters keep complete labels apart.
+    # The bezel-safe compact card is 448 px wide at x=16. Check the
+    # centres of its eight-pixel gutters after reserving the Home footer once.
     for scene in ('known', 'stale'):
         header, dimensions, maximum, pixels = (out / f'{scene}.pgm').read_bytes().split(b'\n', 3)
         assert header == b'P5' and dimensions == b'480 800' and maximum == b'255'
-        for left in (106, 195, 284, 373):
-            assert all(pixels[y*480+x] == 255 for y in range(240, 254)
+        for left in (107, 194, 281, 368):
+            assert all(pixels[y*480+x] == 255 for y in range(248, 260)
                        for x in range(left, left+4)), 'Reading record labels invade a column gutter'
 print(f'BookSync F40w {profile}: twelve states PASS')

@@ -18,6 +18,12 @@ std::string bytes(LayoutInput in) {
   return out;
 }
 std::string original() { return bytes(Layout::defaults()); }
+// Frozen pre-compact custom layout: these compatibility cases require a seventh
+// row and must not derive that requirement from the current starter defaults.
+std::string sevenRowCustom() {
+  return R"({"schemaVersion":1,"revision":1,"grids":{"android-tablet":{"cols":4,"rows":8},"x4":{"cols":2,"rows":7},"x3":{"cols":2,"rows":7}},"pages":[{"id":"home","tab":"Home","placements":[{"instance":"resume","widget":"continue-reading","version":1,"x":0,"y":0,"w":4,"h":3,"settings":{}},{"instance":"recent","widget":"booklist","version":1,"x":0,"y":3,"w":2,"h":2,"settings":{"src":"recent","style":0,"sort":0,"cap":1}},{"instance":"library","widget":"library","version":1,"x":2,"y":3,"w":2,"h":1,"settings":{}}]}],"overrides":{"x4":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}},"x3":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}}}})";
+}
+
 LayoutEdit request(LayoutEditKind kind, uint32_t revision = 1) {
   LayoutEdit edit;
   edit.kind = kind;
@@ -327,10 +333,7 @@ TEST(LayoutEditor, RemovesFirstMiddleLastAndAllWithoutChangingOtherBytes) {
             LayoutEditStatus::Saved);
 }
 TEST(LayoutEditor, MissingOverrideGroupsAndGeneratedIdCollision) {
-  auto raw = original();
-  // This fixture intentionally exercises an existing seven-row custom layout.
-  const std::string grid = R"("x4":{"cols":2,"rows":6})";
-  raw.replace(raw.find(grid), grid.size(), R"("x4":{"cols":2,"rows":7})");
+  auto raw = sevenRowCustom();
   const auto start = raw.find("\"overrides\":");
   raw.replace(start, raw.size() - start, "\"overrides\":{}} ");
   // Without class reflow the 4-column hero does not fit, so use a common 2-column base.
@@ -361,10 +364,7 @@ TEST(LayoutEditor, BrokenSourceReadAndRevisionExhaustionCannotPublish) {
   EXPECT_EQ(editor.output().bytes, 0u);
 }
 TEST(LayoutEditor, UnknownInstancesReserveCellsAndSurviveKnownRemoval) {
-  auto raw = original();
-  // This fixture intentionally exercises an existing seven-row custom layout.
-  const std::string grid = R"("x4":{"cols":2,"rows":6})";
-  raw.replace(raw.find(grid), grid.size(), R"("x4":{"cols":2,"rows":7})");
+  auto raw = sevenRowCustom();
   const std::string unknown =
       R"({"instance":"future","widget":"future-widget","version":99,"x":2,"y":6,"w":2,"h":1,"settings":{"opaque":[null,{"keep":"exact"}]}})";
   raw.insert(raw.find("\"placements\":[") + 14, unknown + ",");

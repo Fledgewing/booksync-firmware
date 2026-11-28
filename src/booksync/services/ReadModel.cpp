@@ -5,6 +5,7 @@
 
 #include "booksync/interface/PersonalWidgets.h"
 #include "booksync/interface/StatsWidgets.h"
+#include "booksync/interface/TimeWidgets.h"
 namespace booksync {
 bool ReadModel::accepts(const WindowBatchRequest& batch) {
   constexpr uint32_t Metadata = sizeof(LibraryWindow) - sizeof(BookRow) * LibraryRows;
@@ -15,6 +16,8 @@ bool ReadModel::accepts(const WindowBatchRequest& batch) {
   constexpr uint16_t StatsMask = (1u << StatsWidgetCount) - 1;
   if (batch.statsWidgets & ~StatsMask) return false;
   const uint32_t statsBytes = batch.statsWidgets ? sizeof(StatsWidgetBatch) : 0;
+  const uint32_t timeBytes = batch.timeWidgets ? sizeof(TimeWidgetBatch) : 0;
+  if (batch.timeWidgets > 3 || batch.bytes < Metadata + timeBytes) return false;
   uint32_t rows = personalWidgetRows(batch.personalWidgets);
   for (unsigned i = 0; i < batch.count; ++i) {
     const auto request = batch.windows[i];
@@ -24,7 +27,7 @@ bool ReadModel::accepts(const WindowBatchRequest& batch) {
     rows += request.limit;
   }
   return rows <= batch.rows && Metadata + (rows - personalWidgetRows(batch.personalWidgets)) * sizeof(BookRow) +
-                                       statsBytes + personalWidgetBytes(batch.personalWidgets) <=
+                                       statsBytes + timeBytes + personalWidgetBytes(batch.personalWidgets) <=
                                    batch.bytes;
 }
 bool ReadModel::materialize(WindowRequest request) {
@@ -45,7 +48,7 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
   window_.count = 0;
   window_.windowCount = batch.count;
   window_.request = batch.windows[0];
-  window_.bytes = Metadata + personalWidgetBytes(batch.personalWidgets);
+  window_.bytes = Metadata + (batch.timeWidgets ? sizeof(TimeWidgetBatch) : 0) + personalWidgetBytes(batch.personalWidgets);
   window_.provenance = index_.provenance();
   window_.total = index_.count();
   window_.stale = false;
