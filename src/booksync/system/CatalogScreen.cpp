@@ -76,6 +76,7 @@ const char* errorTitle(DownloadError error) {
 }
 class CatalogActivity final : public Activity {
   Library& library_;
+  CatalogRoute entry_{};
   std::unique_ptr<CatalogSurface> catalog_;
   // S3-only optional decoded thumbnails: <=24.1 KiB, once per foreground
   // activity, too large for the task stack. X3 never allocates this workspace.
@@ -299,9 +300,11 @@ class CatalogActivity final : public Activity {
     if (catalog_->catalogState() == CatalogSurface::State::Ready ||
         catalog_->catalogState() == CatalogSurface::State::Empty || catalog_->catalogVisibleRows()) {
       if (catalog_->catalogPanel() == CatalogSurface::Panel::Sources)
-        std::snprintf(
-            label, sizeof(label), "%u %s", unsigned(catalog_->catalogTotal()),
-            catalog_->catalogRoot() == CatalogRoot::Lists ? tr(STR_HOME_LISTS) : rootTitle(catalog_->catalogRoot()));
+        std::snprintf(label, sizeof(label), "%u %s", unsigned(catalog_->catalogTotal()),
+                      catalog_->catalogRoot() == CatalogRoot::Lists
+                          ? tr(STR_HOME_LISTS)
+                          : (catalog_->catalogEntryTitle()[0] ? catalog_->catalogEntryTitle()
+                                                              : rootTitle(catalog_->catalogRoot())));
       else if (!catalog_->catalogResult().membershipComplete)
         std::snprintf(label, sizeof(label), "%s", tr(STR_CATALOG_INCOMPLETE));
       else
@@ -478,8 +481,8 @@ class CatalogActivity final : public Activity {
   }
 
  public:
-  CatalogActivity(GfxRenderer& renderer, MappedInputManager& input, Library& library)
-      : Activity("Library", renderer, input), library_(library) {}
+  CatalogActivity(GfxRenderer& renderer, MappedInputManager& input, Library& library, CatalogRoute entry)
+      : Activity("Library", renderer, input), library_(library), entry_(entry) {}
   void onEnter() override {
     Activity::onEnter();
     ownsLocal_ = !localLibraryActive();
@@ -504,7 +507,7 @@ class CatalogActivity final : public Activity {
     }
     LOG_INF("BSC", "Catalog bounded allocation: controller=%u thumbnails=%u", unsigned(sizeof(CatalogSurface)),
             unsigned(bitmaps_ ? 8 * sizeof(CoverBitmap) : 0));
-    catalog_->enterCatalog(textOnly_);
+    catalog_->enterCatalog(textOnly_, entry_);
 #ifdef SIMULATOR
     sceneController = catalog_.get();
 #endif
@@ -628,8 +631,9 @@ class CatalogActivity final : public Activity {
     text(Rect{s.x + 12, s.y + 8, 76, 44}, tr(STR_BACK));
     text(Rect{s.x + 92, s.y + 8, s.width - 104, 44},
          catalog_->catalogPanel() == CatalogSurface::Panel::Dashboard ? tr(STR_CATALOG_TITLE)
-         : catalog_->catalogPanel() == CatalogSurface::Panel::Browse  ? tr(STR_CATALOG_BROWSE_TITLE)
-                                                                      : rootTitle(catalog_->catalogRoot()),
+         : catalog_->catalogPanel() == CatalogSurface::Panel::Browse
+             ? tr(STR_CATALOG_BROWSE_TITLE)
+             : (catalog_->catalogEntryTitle()[0] ? catalog_->catalogEntryTitle() : rootTitle(catalog_->catalogRoot())),
          UI_12_FONT_ID);
     renderer.drawLine(s.x, headerBottom(), s.x + s.width, headerBottom());
     if (catalog_->catalogPanel() == CatalogSurface::Panel::Dashboard)
@@ -643,8 +647,9 @@ class CatalogActivity final : public Activity {
   }
 };
 }  // namespace
-std::unique_ptr<Activity> createCatalogScreen(GfxRenderer& renderer, MappedInputManager& input, Library& library) {
-  auto screen = makeUniqueNoThrow<CatalogActivity>(renderer, input, library);
+std::unique_ptr<Activity> createCatalogScreen(GfxRenderer& renderer, MappedInputManager& input, Library& library,
+                                              CatalogRoute entry) {
+  auto screen = makeUniqueNoThrow<CatalogActivity>(renderer, input, library, entry);
   if (!screen) LOG_ERR("BSC", "Cannot allocate catalog activity");
   return screen;
 }

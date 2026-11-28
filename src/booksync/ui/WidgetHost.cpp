@@ -107,7 +107,8 @@ WidgetView boundedWidget(const LibraryWindow& batchValue, const WindowSpan& span
           span.count,
           batchValue.stale || span.stale,
           span.ageDays,
-          span.ageKnown};
+          span.ageKnown,
+          span.count ? &batchValue.fileAvailability[span.first] : nullptr};
 }
 WidgetView WidgetHost::view(uint8_t widget) const {
   if (widget >= page_.count) return {WidgetState::Error};
@@ -216,7 +217,8 @@ CommandStatus WidgetHost::dispatchWidget(uint8_t widget, uint8_t itemIndex) {
   const auto viewValue = view(widget);
   const auto kind = page_.widgets[widget].kind;
   const bool saved = viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty;
-  if (kind == WidgetKind::Browse && saved) return page_.textOnly ? library_.submit(Intent::BrowseOnDevice) : library_.browseSource(WindowSource::OnDevice);
+  if (kind == WidgetKind::Browse && saved)
+    return page_.textOnly ? library_.submit(Intent::BrowseOnDevice) : library_.browseSource(WindowSource::OnDevice);
   if (kind == WidgetKind::Shelf && !page_.textOnly && saved) {
     if (!itemIndex) return library_.browseSource(page_.widgets[widget].source);
     --itemIndex;

@@ -1037,3 +1037,9 @@ TEST(LayoutGeometry, ContinueOffersOnlyApprovedSizeAndCanNormalizeLegacySize) {
   EXPECT_EQ(resized.page.widgets[0].w, 2);
   EXPECT_EQ(resized.page.widgets[0].h, 2);
 }
+
+TEST(LayoutGeometry, BookListOffersOnlyItsApprovedTwoByTwoSize) {
+  EXPECT_TRUE(supportedGeometry(WidgetKind::Shelf, 2, 2));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Shelf, 1, 2));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Shelf, 2, 3));
+}

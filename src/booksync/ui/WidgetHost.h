@@ -11,6 +11,7 @@ struct WidgetView {
   bool stale = false;
   uint32_t ageDays = 0;
   bool ageKnown = false;
+  const FileAvailability* files = nullptr;
 };
 struct WidgetBox {
   int width = 0, height = 0, line = 0;

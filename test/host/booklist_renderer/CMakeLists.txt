@@ -1,5 +1,4 @@
-add_executable(BookSyncBookListRendererTest BookListRendererTest.cpp SourceListTest.cpp ArtworkCacheTest.cpp BookListHostTest.cpp
-  ${REPO_ROOT}/src/booksync/ui/catalog/SourceList.cpp
+add_executable(BookSyncBookListRendererTest BookListRendererTest.cpp ArtworkCacheTest.cpp BookListHostTest.cpp
   ${REPO_ROOT}/src/booksync/ui/WidgetHost.cpp
   ${REPO_ROOT}/src/booksync/ui/widgets/Continue.cpp
   ${REPO_ROOT}/src/booksync/ui/widgets/Browse.cpp

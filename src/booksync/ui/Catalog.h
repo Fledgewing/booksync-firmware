@@ -9,7 +9,7 @@ class CatalogSurface {
   enum class Dialog : uint8_t { None, Offline, Choices, TransferInfo, Login };
   enum class State : uint8_t { Loading, Ready, Empty, NotSaved, Unsupported, Error };
   explicit CatalogSurface(Library& library) : library_(library) {}
-  auto enterCatalog(bool textOnly = false) -> void;
+  auto enterCatalog(bool textOnly = false, CatalogRoute entry = {}) -> void;
   auto retireCatalog() -> void;
   auto pollCatalog() -> bool;
   auto browseCatalog(CatalogRoot root) -> void;
@@ -43,6 +43,7 @@ class CatalogSurface {
   CatalogCount catalogRootCount(CatalogRoot root) const;
   CatalogRoot catalogBrowseRootAt(uint8_t index) const;
   uint8_t catalogBrowseCount() const;
+  const char* catalogEntryTitle() const { return entry_.caption.data(); }
   CatalogRoot catalogRoot() const { return current_.root; }
   uint32_t catalogOffset() const { return current_.offset; }
   const CatalogSummary& catalogSummaryValue() const { return summary_; }
@@ -80,6 +81,10 @@ class CatalogSurface {
   uint32_t retainedTotal_ = 0;
   uint8_t retainedCount_ = 0;
   bool retainedComplete_ = false;
+  CatalogRoute entry_{};
+  std::array<uint32_t, 16> sourceCursors_{};
+  uint8_t sourceCursorCount_ = 0;
+  bool sourceOpenPending_ = false;
   Library& library_;
   CatalogSummary summary_{};
   QueryRequest request_{};  // Reused, never a multi-KiB task-stack temporary.

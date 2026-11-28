@@ -106,7 +106,11 @@ TEST(BookListGeometry, EveryPresetAndStateStaysInsideEachNativeProfileTileWithou
                                     WidgetState::Off,     WidgetState::Unsupported, WidgetState::Error,
                                     WidgetState::Oversize};
   std::array<BookRow, 4> books{};
-  for(auto& book:books){book.readingKnown=true;book.page=36;book.pages=100;}
+  for (auto& book : books) {
+    book.readingKnown = true;
+    book.page = 36;
+    book.pages = 100;
+  }
   for (auto profile : {WidgetBox{456, 224, 26, false, true}, WidgetBox{450, 223, 26, false, false}})
     for (auto source : sources)
       for (auto state : states)
@@ -119,4 +123,23 @@ TEST(BookListGeometry, EveryPresetAndStateStaysInsideEachNativeProfileTileWithou
                                 source, count == 3 ? 1 : 0, profile, 0);
           booksync::test::expectTextGeometry(commands, profile.width, profile.height);
         }
+}
+
+TEST(BookListRenderer, OnCardBadgeRequiresIndependentPublishedFileEvidence) {
+  using namespace booksync::widgets;
+  BookRow books[4];
+  FileAvailability files[] = {FileAvailability::OnCard, FileAvailability::Unknown, FileAvailability::ServerOnly,
+                              FileAvailability::OnCard};
+  WidgetView view{WidgetState::Known, books, 37, 4};
+  view.files = files;
+  Canvas commands;
+  Shelf{}.paint(commands, view, WindowSource::Recent, 0, {456, 224, 26, false, true}, 255);
+  unsigned badges = 0;
+  for (uint8_t i = 0; i < commands.count; ++i)
+    if (commands.commands[i].kind == Drawing::OnCardMark) ++badges;
+  EXPECT_EQ(badges, 2u);
+  commands.clear();
+  view.files = nullptr;
+  Shelf{}.paint(commands, view, WindowSource::Recent, 0, {456, 224, 26, false, true}, 255);
+  for (uint8_t i = 0; i < commands.count; ++i) EXPECT_NE(commands.commands[i].kind, Drawing::OnCardMark);
 }

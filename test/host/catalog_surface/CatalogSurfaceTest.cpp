@@ -606,3 +606,86 @@ TEST(CatalogStateMachine, IncompleteZeroRowsDoNotClaimCompleteEmptyMembership) {
   EXPECT_EQ(ui.catalogVisibleRows(), 0);
   EXPECT_EQ(ui.catalogState(), CatalogSurface::State::Ready);
 }
+
+TEST(CatalogWidgetEntry, SavedSourceUsesApprovedFiveRowBooksAndPreservesItsOrder) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  CatalogRoute route;
+  route.destination = CatalogDestination::BookList;
+  route.source = WindowSource::WantToRead;
+  ui.enterCatalog(false, route);
+  ASSERT_TRUE(ui.pollCatalog());
+  EXPECT_EQ(ui.catalogPanel(), CatalogSurface::Panel::Books);
+  EXPECT_EQ(ui.catalogPageRows(), 5);
+  EXPECT_EQ(library.queries, 0u);
+  EXPECT_EQ(ui.catalogTotal(), 24u);
+  ASSERT_EQ(ui.catalogVisibleRows(), 4);
+  EXPECT_EQ(ui.catalogResult().entries[0].book.key, library.window.rows[0].key);
+  ASSERT_TRUE(ui.pageCatalog(1));
+  ASSERT_TRUE(ui.pollCatalog());
+  EXPECT_EQ(library.window.windows[0].request.offset, 4u);
+  EXPECT_EQ(library.window.windows[0].request.source, WindowSource::WantToRead);
+  EXPECT_EQ(ui.catalogOffset(), 4u);
+}
+TEST(CatalogWidgetEntry, SourceMismatchAndOversizeCannotLeakUnrelatedRows) {
+  for (bool oversize : {false, true}) {
+    catalogFixture::SceneLibrary library;
+    CatalogSurface ui(library);
+    CatalogRoute route;
+    route.destination = CatalogDestination::BookList;
+    route.source = WindowSource::Recent;
+    ui.enterCatalog(false, route);
+    if (oversize)
+      library.window.bytes = LibraryBytes + 1;
+    else
+      library.window.windows[0].request.source = WindowSource::WantToRead;
+    ASSERT_TRUE(ui.pollCatalog());
+    EXPECT_EQ(ui.catalogState(), CatalogSurface::State::Error);
+    EXPECT_EQ(ui.catalogVisibleRows(), 0);
+  }
+}
+TEST(CatalogWidgetEntry, RetiredAccountClosesSavedSourceBeforeOpen) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  CatalogRoute route;
+  route.destination = CatalogDestination::BookList;
+  route.source = WindowSource::OnDevice;
+  ui.enterCatalog(false, route);
+  ASSERT_TRUE(ui.pollCatalog());
+  ++library.owner.accountEpoch;
+  ASSERT_TRUE(ui.pollCatalog());
+  EXPECT_FALSE(ui.catalogLive());
+  EXPECT_EQ(ui.activateCatalogRow(0), CommandStatus::Unavailable);
+  EXPECT_EQ(library.opens, 0u);
+}
+
+TEST(CatalogWidgetEntry, BackRetiresPendingSavedSourceOpen) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  CatalogRoute route;
+  route.destination = CatalogDestination::BookList;
+  route.source = WindowSource::OnDevice;
+  ui.enterCatalog(false, route);
+  ASSERT_TRUE(ui.pollCatalog());
+  EXPECT_EQ(ui.activateCatalogRow(0), CommandStatus::Accepted);
+  EXPECT_EQ(library.opens, 1u);
+  ASSERT_TRUE(ui.backCatalog());
+  EXPECT_EQ(library.retiredOpenCalls, 1u);
+  EXPECT_FALSE(ui.catalogLive());
+}
+TEST(CatalogWidgetEntry, PreviousRestoresExactPartialPageCursor) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  CatalogRoute route;
+  route.destination = CatalogDestination::BookList;
+  route.source = WindowSource::Recent;
+  ui.enterCatalog(false, route);
+  ASSERT_TRUE(ui.pollCatalog());
+  ASSERT_TRUE(ui.pageCatalog(1));
+  ASSERT_TRUE(ui.pollCatalog());
+  ASSERT_EQ(ui.catalogOffset(), 4u);
+  ASSERT_TRUE(ui.pageCatalog(-1));
+  ASSERT_TRUE(ui.pollCatalog());
+  EXPECT_EQ(ui.catalogOffset(), 0u);
+  EXPECT_EQ(library.window.windows[0].request.offset, 0u);
+}
