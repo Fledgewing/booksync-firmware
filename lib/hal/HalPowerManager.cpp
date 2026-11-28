@@ -302,6 +302,12 @@ uint16_t HalPowerManager::getPiccoBatteryPercentage() const {
 }
 #endif
 
+HalPowerManager::ChargerStatus HalPowerManager::batteryStatus() const {
+  // Resolve the active profile only after HAL startup, as the retained reader does.
+  static const BatteryMonitor battery;
+  return battery.readStatus();
+}
+
 uint16_t HalPowerManager::getBatteryPercentage() const {
 #if FREEINK_DEVICE_PICCO
   return getPiccoBatteryPercentage();

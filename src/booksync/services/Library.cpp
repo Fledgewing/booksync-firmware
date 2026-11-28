@@ -2,6 +2,7 @@
 #include <Logging.h>
 #include <Memory.h>
 
+#include "DeviceBridge.h"
 #include "LayoutGeometry.h"
 #include "LocalLibrary.h"
 #include "NativeHistory.h"
@@ -55,6 +56,8 @@ static_assert(sizeof(LocalState) <= 28 * 1024);
 // buffers out of the reader lifetime. HAL owns its bounded directory-handle allocations.
 std::unique_ptr<LocalState> local;
 SleepView currentSleep{};
+DeviceBridge* devices = nullptr;
+bool deviceWanted = false;
 RemindersFacade* reminders = nullptr;
 void (*reminderConnectHook)() = nullptr;
 void (*reminderActivityHook)(ReminderActivity) = nullptr;
@@ -267,6 +270,15 @@ class OfflineLibrary final : public Library {
   LibraryWindow window() const override { return local ? local->model.window() : LibraryWindow{}; }
   Subscription subscribe() const override { return local ? local->model.subscribe() : Subscription{}; }
   bool changed(Subscription value) const override { return local && local->model.changed(value); }
+  bool requestDeviceStatus() override {
+    deviceWanted = devices != nullptr;
+    return deviceWanted;
+  }
+  DeviceSnapshot deviceStatus() const override { return devices ? devices->snapshot() : DeviceSnapshot{}; }
+  DeviceResult deviceResult() const override { return devices ? devices->result() : DeviceResult{}; }
+  CommandStatus deviceCommand(DeviceCommand command) override {
+    return devices ? devices->submit(command) : CommandStatus::Unavailable;
+  }
   CommandStatus submit(Intent intent) override {
     if (intent == Intent::OpenAccount) {
       catalogAccountRequested = true;
@@ -384,6 +396,14 @@ void enterLocalLibrary(ServerAdapter* savedStatsSource) {
   // after sixteen entries and stop before any reader/storage handoff.
   if (!local->index.ready() && local->source.start() && !local->worker.start(local->source.source(), {1, 1, 0, 0}))
     local->source.close();
+}
+void bindDeviceBridge(DeviceBridge* bridge) {
+  devices = bridge;
+  deviceWanted = false;
+}
+bool deviceStatusWanted() { return deviceWanted; }
+void notifyDevicePublication() {
+  if (local) local->model.notifyQueryPublication();
 }
 void leaveLocalLibrary() {
   if (!local) return;

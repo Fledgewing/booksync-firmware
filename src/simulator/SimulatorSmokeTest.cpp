@@ -51,6 +51,7 @@
 #include "../../test/simulator/AccountSurfaceScenario.h"
 #include "../../test/simulator/UpgradeNoticeScenario.h"
 #include "../../test/simulator/NativePersonalScenario.h"
+#include "../../test/simulator/DeviceBridgeScenario.h"
 
 #include <Epub.h>
 #include <Epub/WordSpacing.h>
@@ -12244,6 +12245,7 @@ void prepareSimulatorSmokeState() {
   runLayoutScenario();
   runUpdateInstallScenario();
   runClockProvenanceScenario();
+  runDeviceBridgeScenario();
   runRemindersScenario();
   runVersionScenario();
   runUpdateScenario();

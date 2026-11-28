@@ -8,6 +8,7 @@
 #include "booksync/interface/CatalogView.h"
 #include "booksync/interface/Clock.h"
 #include "booksync/interface/Covers.h"
+#include "booksync/interface/Device.h"
 #include "booksync/interface/Downloads.h"
 #include "booksync/interface/HomeLayout.h"
 #include "booksync/interface/LayoutEdit.h"
@@ -46,6 +47,10 @@ class Library {
   virtual SleepView sleepView() const { return {}; }
   virtual void readPersonalWidgets(PersonalWidgetBatch& out) const { out.clear(); }
   virtual ClockStatus clockStatus() const { return {}; }
+  virtual bool requestDeviceStatus() { return false; }
+  virtual DeviceSnapshot deviceStatus() const { return {}; }
+  virtual DeviceResult deviceResult() const { return {}; }
+  virtual CommandStatus deviceCommand(DeviceCommand) { return CommandStatus::Unavailable; }
   virtual AccountView accountView() const { return {}; }
   virtual CommandStatus accountAction(AccountFormRequest) { return CommandStatus::Unavailable; }
   virtual void readAccountForm(AccountFormView& out) const { out = {}; }

@@ -5,6 +5,10 @@ namespace booksync {
 class RemindersFacade;
 struct ReminderActivity;
 void bindReminderActivity(void (*)(ReminderActivity));
+class DeviceBridge;
+void bindDeviceBridge(DeviceBridge*);
+bool deviceStatusWanted();
+void notifyDevicePublication();
 void bindReminders(RemindersFacade&);
 void bindReminderConnect(void (*)());
 // Composition root publishes small cached values and a private checkpoint port.
