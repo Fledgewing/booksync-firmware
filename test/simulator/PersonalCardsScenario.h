@@ -261,6 +261,15 @@ inline bool tick() {
       if (fixture.discover.books[0].key == initial) std::_Exit(127);
       save(fixture, output, "another-changed");
     }
+    if (!touch && cycle < 8) {
+      // The approval sheet focuses each isolated Classic card. Capture the
+      // sibling through real Down events after the existing action/Back checks.
+      const unsigned steps = cycle == 0 || cycle == 7 ? 6 : 1;
+      for (unsigned n = 0; n < steps; ++n)
+        if (frame == 64 + n * 2)
+          mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Down));
+      if (frame == 78) save(fixture, output, name + "-recommended-focused");
+    }
     if (!touch && cycle == 9) {
       for (unsigned n = 0; n < 6; ++n)
         if (frame == 30 + n * 2)

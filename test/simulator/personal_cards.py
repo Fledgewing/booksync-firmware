@@ -11,5 +11,5 @@ with tempfile.TemporaryDirectory(prefix='booksync-personal-cards-') as directory
  log=result.stdout+result.stderr;(out/'cards.log').write_text(log)
  assert result.returncode==0 and 'BookSync personal cards PASS:' in log,f'Personal cards {profile} failed: {out}/cards.log'
  assert not any('Font ' in line and 'not found' in line for line in log.splitlines())
- assert len(list(out.glob('*.pgm')))==(1 if profile=='simulator-X3' else 17)
+ assert len(list(out.glob('*.pgm')))==(1 if profile=='simulator-X3' else 25 if profile=='x4-classic-simulator' else 17)
 print(f'BookSync personal cards {profile}: states/Another/All/Back/X3 PASS')
