@@ -13339,6 +13339,7 @@
         "../../test/simulator/RemindersScenario.h",
         "../../test/simulator/SeriesPlanScenario.h",
         "../../test/simulator/SeriesQueueScenario.h",
+        "../../test/simulator/SeriesSurfaceScenario.h",
         "../../test/simulator/SleepScenario.h",
         "../../test/simulator/SyncOwnerScenario.h",
         "../../test/simulator/UpdateInstallScenario.h",
@@ -15836,6 +15837,34 @@
     "src/booksync/storage/SeriesQueueStore.cpp": {
       "role": "storage",
       "rationale": "F36c little-endian scoped checksummed queue publications and exact-ID backup recovery; one file handle, bounded codec scratch."
+    },
+    "src/booksync/interface/SeriesFlow.h": {
+      "role": "interface",
+      "rationale": "F36c immutable scoped download flow and bounded opaque choices; descriptors and acquisition locators remain worker-private."
+    },
+    "src/booksync/ui/Series.h": {
+      "role": "ui",
+      "rationale": "F36c approved foreground Series controller and cached presentation values; only Library requests, no scans, filesystem or transport."
+    },
+    "src/booksync/ui/Series.cpp": {
+      "role": "ui",
+      "rationale": "F36c Android-parity Back/count/preview/choice/queue intents with epoch/session/stale-response retirement; no private worker edges."
+    },
+    "src/booksync/system/SeriesScreen.h": {
+      "role": "system",
+      "rationale": "F36c explicit existing caller push/pop seam and shared top-right All header; native reader context remains owned by caller."
+    },
+    "src/booksync/system/SeriesScreen.cpp": {
+      "role": "system",
+      "rationale": "F36c approved compact Pro touch, Classic buttons and X3 text rendering/input; cached F25 cover preparation after first paint, no Library work in render."
+    },
+    "src/booksync/services/SeriesFlow.h": {
+      "role": "services",
+      "rationale": "F36c single-worker scoped flow: bounded file options and frozen review, plan/selection revalidation, explicit connectivity and queue intents; no UI/private adapter dependency or new task."
+    },
+    "src/booksync/services/SeriesFlow.cpp": {
+      "role": "services",
+      "rationale": "F36c single-worker scoped flow: bounded file options and frozen review, plan/selection revalidation, explicit connectivity and queue intents; no UI/private adapter dependency or new task."
     }
   },
   "generators": {

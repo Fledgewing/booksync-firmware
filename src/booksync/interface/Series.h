@@ -40,7 +40,7 @@ struct SeriesPlanView {
   uint8_t count = 0, requested = 3;
   Availability availability = Availability::NotSaved;
   bool pending = false, earlierKnown = false, membershipIncomplete = false;
-  bool deviceKnown = false, remainingSaved = false;
+  bool deviceKnown = false, remainingSaved = false, countsKnown = false, offline = false;
   void clear() {
     for (uint8_t i = 0; i < SeriesNextMax; ++i) next[i].clear();
     earlier.clear();
@@ -52,7 +52,7 @@ struct SeriesPlanView {
     count = 0;
     requested = 3;
     availability = Availability::NotSaved;
-    pending = earlierKnown = membershipIncomplete = deviceKnown = remainingSaved = false;
+    pending = earlierKnown = membershipIncomplete = deviceKnown = remainingSaved = countsKnown = offline = false;
   }
 };
 static_assert(sizeof(SeriesPlanView) <= LibraryBytes);

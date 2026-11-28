@@ -36,3 +36,6 @@ env.AddBuildMiddleware(bounded_reading_frame, "*/SeriesPlan.cpp")
 
 env.AddBuildMiddleware(bounded_reading_frame, "*/SeriesQueue.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/SeriesQueueStore.cpp")
+
+env.AddBuildMiddleware(bounded_reading_frame, "*/SeriesFlow.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/Series.cpp")

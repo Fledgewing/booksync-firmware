@@ -227,6 +227,7 @@ bool SeriesPlan::tick(uint16_t allowance) {
       } else {
         view_.token = hash_ ? hash_ : 1;
         view_.remainingSaved = sawRemaining_ && allRemainingSaved_;
+        view_.countsKnown = true;
         finish(Availability::Ready);
       }
       continue;
