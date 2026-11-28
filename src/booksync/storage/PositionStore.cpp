@@ -29,7 +29,7 @@ bool validValue(const PositionValue& v) {
          std::isfinite(v.percentage) && v.percentage >= 0 && v.percentage <= 1 &&
          (v.percentagePresent || v.percentage == 0) &&
          (v.present || (!v.percentagePresent && !v.at && !v.kind && !v.version && v.raw.empty() && v.label.empty() &&
-                        !v.reset && !v.redated)) &&
+                        !v.reset && !v.redated && !v.browser)) &&
          (!v.reset || (v.percentagePresent && v.percentage == 0));
 }
 bool validRecord(const PositionRecord& r) {
@@ -58,7 +58,7 @@ struct Encoder {
     bytes(v.data(), v.size());
   }
   void value(const PositionValue& v) {
-    number(v.present | v.percentagePresent << 1 | v.reset << 2 | v.redated << 3, 1);
+    number(v.present | v.percentagePresent << 1 | v.reset << 2 | v.redated << 3 | v.browser << 4, 1);
     uint64_t bits;
     static_assert(sizeof(bits) == sizeof(v.percentage) && std::numeric_limits<double>::is_iec559);
     std::memcpy(&bits, &v.percentage, 8);
@@ -110,11 +110,12 @@ struct Decoder {
   }
   void value(PositionValue& v) {
     const auto flags = number(1);
-    if (flags & ~15U) ok = false;
+    if (flags & ~(bytes.size() >= 4 && bytes[3] == '2' ? 31U : 15U)) ok = false;
     v.present = flags & 1;
     v.percentagePresent = flags & 2;
     v.reset = flags & 4;
     v.redated = flags & 8;
+    v.browser = flags & 16;
     const uint64_t bits = number(8);
     std::memcpy(&v.percentage, &bits, 8);
     v.at = number(8);
@@ -156,6 +157,7 @@ struct WireValidator {
   FsFile& file;
   size_t remaining;
   bool ok = true;
+  uint8_t formatVersion = 1;
   uint64_t number(unsigned n) {
     char bytes[8];
     if (n > remaining || file.read(bytes, n) != static_cast<int>(n)) {
@@ -190,8 +192,8 @@ struct WireValidator {
     std::memcpy(&percentage, &bits, 8);
     const bool raw = string(PositionStore::MaxRaw, true), label = string(PositionStore::MaxLabel);
     const bool present = flags & 1, fraction = flags & 2, reset = flags & 4;
-    ok = ok && !(flags & ~15U) && std::isfinite(percentage) && percentage >= 0 && percentage <= 1 &&
-         (fraction || percentage == 0) && (!reset || (fraction && percentage == 0)) &&
+    ok = ok && !(flags & ~(formatVersion == 2 ? 31U : 15U)) && std::isfinite(percentage) && percentage >= 0 &&
+         percentage <= 1 && (fraction || percentage == 0) && (!reset || (fraction && percentage == 0)) &&
          (present || (!(flags & ~1U) && !at && !kind && !version && !raw && !label));
     return present;
   }
@@ -232,7 +234,9 @@ bool sameBinding(FsFile& f, ScopeView scope, const SourceIdentity& source) {
 }  // namespace
 bool PositionStore::validateFile(FsFile& file, void*) {
   char header[Header];
-  if (file.read(header, Header) != Header || std::memcmp(header, "BPS1", 4) || get(header + 12, 4)) return false;
+  if (file.read(header, Header) != Header || (std::memcmp(header, "BPS1", 4) && std::memcmp(header, "BPS2", 4)) ||
+      get(header + 12, 4))
+    return false;
   const auto size = get(header + 4, 4);
 #if SIZE_MAX < UINT64_MAX
   const auto actual = file.fileSize64();
@@ -249,7 +253,7 @@ bool PositionStore::validateFile(FsFile& file, void*) {
     at += n;
   }
   if (checksum != get(header + 8, 4) || !file.seekSet(Header)) return false;
-  WireValidator validator{file, static_cast<size_t>(size - Header)};
+  WireValidator validator{file, static_cast<size_t>(size - Header), true, static_cast<uint8_t>(header[3] - '0')};
   return validator.record();
 }
 PositionLoad PositionStore::load(ScopeView scope, const SourceIdentity& source, PositionRecord& out, char* scratch,
@@ -320,7 +324,7 @@ bool PositionStore::save(const PositionRecord& r) {
   measure.record(r);
   if (measure.size + Header > MaxBytes) return false;
   char header[Header]{};
-  std::memcpy(header, "BPS1", 4);
+  std::memcpy(header, "BPS2", 4);
   put(header + 4, measure.size + Header, 4);
   put(header + 8, measure.checksum, 4);
   FilePublish writer(paths_, validateFile);

@@ -62,6 +62,24 @@ TEST_F(PositionStateTest, RawUnknownLocatorsAndAccountEditionIsolation) {
             PositionLoad::Conflict);
   EXPECT_EQ(sync.observe({"adapter:toy", "account:one"}, other, remote()), PositionResult::Conflict);
 }
+TEST_F(PositionStateTest, BrowserProvenanceUsesV2WhileV1RemainsReadable) {
+  record.remote = remote();
+  ASSERT_TRUE(store.save(record));
+  const auto v2 = card.files.at("/place");
+  EXPECT_EQ(v2.substr(0, 4), "BPS2");
+  card.files["/place"][3] = '1';
+  EXPECT_EQ(store.load(record.scope, source, record, scratch, sizeof(scratch)), PositionLoad::Ready);
+  EXPECT_FALSE(record.remote.browser);
+  record.remote.browser = true;
+  ASSERT_TRUE(store.save(record));
+  ASSERT_EQ(store.load(record.scope, source, record, scratch, sizeof(scratch)), PositionLoad::Ready);
+  EXPECT_TRUE(record.remote.browser);
+  card.files["/place"][3] = '1';
+  const auto invalidOld = card.files.at("/place");
+  card.files.erase("/place.bak");
+  EXPECT_EQ(store.load(record.scope, source, record, scratch, sizeof(scratch)), PositionLoad::Unreadable);
+  EXPECT_EQ(card.files.at("/place"), invalidOld);
+}
 TEST_F(PositionStateTest, StaleAndDuplicateAnswerNeverMoveAndNoPersistsAcrossRestart) {
   PositionSync sync(store, record);
   ASSERT_EQ(sync.observe(record.scope, source, remote()), PositionResult::Saved);

@@ -49,3 +49,16 @@ env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Monthly.cpp")
 
 env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Today.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Pages.cpp")
+
+
+def bounded_native_application_frame(node_env, node):
+    # Borrowed metadata and one small codec header/publication control block;
+    # raw captures/reviews and digest buffers remain in reusable worker storage.
+    return node_env.Object(node, CCFLAGS=node_env["CCFLAGS"] + [
+        "-fstack-usage", "-Wstack-usage=512", "-Werror=stack-usage=512",
+    ])
+
+
+for source in ("SourceFile.cpp", "ProgressCapture.cpp", "NativeCaptureGate.cpp",
+               "NativeProgress.cpp", "NativeStateStore.cpp", "NativeState.cpp"):
+    env.AddBuildMiddleware(bounded_native_application_frame, "*/" + source)

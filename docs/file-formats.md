@@ -2800,14 +2800,16 @@ result is never assumed to mean boot selection failed. No receipt proves that
 an older version can understand current durable state; return requires a separate,
 current compatibility proof bound to the verified previous image digest.
 
-## BookSync position policy (`BPS1`, F19)
+## BookSync position policy (`BPS1`/`BPS2`, F19/F46b2a)
 
-New private version 1 records; no existing cache or journal layout changes.
+F19 introduced private BPS1. F46b2a writes BPS2 and reads both versions; BPS2
+adds browser-origin provenance in value flag bit 4. Native reader cache and
+lifecycle journal layouts are unchanged.
 The externally serialized sync worker owns one F06 current/staging/backup triplet
 per exact server/account + book/edition/source revision. Do not use a path hash
 as authority. An existing file with another binding is a conflict, never replaced.
 
-The 16-byte header contains `BPS1`, little-endian uint32 total length, uint32
+The 16-byte header contains `BPS1` or `BPS2`, little-endian uint32 total length, uint32
 FNV-1a body checksum (basis 2166136261, multiplier 16777619), and four reserved zero
 bytes. Maximum complete record: 16,384 bytes. The body contains server and account
 strings (uint16 length then bytes, each 1–128 bytes), canonical book and edition
@@ -2818,7 +2820,8 @@ in bits 0–5; other bits
 are rejected.
 
 Three values follow: remote, last sync marker, queued explicit override. Each has
-one flags byte (present, percentage-present, reset, redated in bits 0–3), IEEE-754
+one flags byte (present, percentage-present, reset, redated in bits 0–3 and
+browser origin in BPS2 bit 4), IEEE-754
 binary64 percentage bits, uint64 timestamp, uint16 locator kind and version, then
 length-prefixed raw locator (0–4096 bytes, binary, never rewritten) and label
 (0–100 bytes, NUL-free). All numbers are little-endian. Absent values have zero
@@ -2894,3 +2897,83 @@ including unknown/corrupt records, block reissuance; fallback cannot roll an
 identity backward. Initial publication uses create-only FilePublish. A staging
 file is never authority. Callers must validate source revision on their worker
 and provide independent entropy, never a path/backend/account-derived UUID.
+
+## BookSync frozen progress capture (`BPG1`, F46b2a)
+
+A new private create-only record freezes an explicit progress intent before any
+lifecycle attempt. It is distinct from mutable F19 policy. Current-only validation
+and exact entry/document/native-open/source/scope checks prevent recapture or
+backup rollback. Maximum record/workspace: 8192 bytes. All numbers are little endian.
+
+| Offset | Bytes | Value |
+| --- | --- | --- |
+| 0 | 4 | `BPG1` |
+| 4 | 4 | Complete byte length |
+| 8 | 4 | FNV-1a of bytes 12 through end |
+| 12 | 2 | Bits 0–6: deliver, value-present, percentage-present, reset, redated, original override, browser origin; other bits rejected |
+| 14 | 2 | Preserved locator kind |
+| 16 | 2 | Locator version |
+| 18 | 10 | Five uint16 lengths: server scope, account scope, BSO2 payload, raw locator, label |
+| 28 | 8 | Delivery journal entry ID, nonzero |
+| 36 | 8 | Original native open ID, nonzero |
+| 44 | 8 | Capture time; zero remains unknown |
+| 52 | 8 | IEEE-754 binary64 fraction, 0–1 |
+| 60 | 64 | Independent book UUID, edition UUID and full source SHA-256 |
+| 124 | 2 | Journal document token byte length, 1–128 |
+| 126 | variable | Server, account, BSO2 payload, raw locator, label, document token |
+
+Scopes are 1–128 NUL-free bytes. The complete bound-open payload is at most 2512
+bytes and its scope/source must match the outer record. Raw locator is at most
+4096 binary bytes; label is at most 100 NUL-free bytes. An absent value has zero
+metadata/flags and empty raw/label. An absent fraction is zero. Reset requires
+known zero fraction. Deliver requires present value, known fraction, nonzero time
+and nonempty raw; original-override requires deliver. A later provider separately
+refuses unsupported or lossy outgoing mappings. Unknown native bytes remain stored.
+
+## BookSync native state and frozen state (`BNS1`, F46b2a)
+
+This new private account/source store does not migrate native legacy queues.
+Mutable current state and immutable pre-attempt captures share the versioned codec
+but use distinct caller-owned paths. Maximum complete record/workspace: 24,576 bytes.
+Current state requires zero entry/open and empty payload/document; captures require
+all of them and a matching BSO2 binding. Freeze is create-only/current-only.
+Current publication uses F06 and refuses another binding or native token rollback.
+
+| Offset | Bytes | Value |
+| --- | --- | --- |
+| 0 | 4 | `BNS1` |
+| 4 | 4 | Complete byte length |
+| 8 | 4 | FNV-1a of bytes 12 through end |
+| 12 | 2 | Bit 0 manual-status pending, bit 1 immutable capture; others rejected |
+| 14 | 2 | Reserved zero |
+| 16 | 8 | Nonzero native user-status token |
+| 24 | 8 | Delivery entry ID, or zero for current state |
+| 32 | 8 | Original native open ID, or zero for current state |
+| 40 | 64 | Book UUID, edition UUID, full source SHA-256 |
+| 104 | 20 | Ten uint16 lengths in the order below, excluding final document |
+| 124 | 1 | Native flags: status-known, rating-known, review-known, review-present in bits 0–3 |
+| 125 | 1 | Native rating, 0–5 |
+| 126 | 1 | Remote-known history flags, same bits |
+| 127 | 1 | Historical rating, 0–5 |
+| 128 | 2 | Document token byte length |
+| 130 | variable | Strings listed below |
+
+Strings follow in this order: server scope, account scope, BSO2 payload, native
+status, native status date, native review, native review modification, historical
+status, historical status date, historical review, document token. Scopes are
+1–128 bytes; payload is at most 2512; statuses at most 32; native date/modification
+at most 64; historical date at most 10; each review at most 10,000; document at
+most 128. Text is NUL-free; the BSO2 payload retains opaque proof bytes. Capture
+document is nonempty and compared in full; a path hash never supplies authority.
+
+Known status requires a nonempty value. A present review requires known-review;
+a non-present review has empty bytes. Present empty and absent remain distinct.
+Unknown flags and their bounded raw status/rating values survive independently
+from native values. Only explicit local intent advances the native user token;
+background publication preserves it and pending manual intent.
+
+Both new codecs and BPS1/BPS2 have an owned read-only inspector at
+`src/booksync/server/bookorbit/recovery.py`. It bounds reads, validates complete
+integrity/structure and emits only format/size metadata. Original records are
+never rewritten or repaired. The existing F18 checkpoint capacity is unchanged;
+unpersistable phase replies remain pending without truncation or acknowledgement.

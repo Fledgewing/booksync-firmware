@@ -22,6 +22,7 @@
 #include "../../test/simulator/CatalogJobsScenario.h"
 #include "../../test/simulator/LiveAdapterScenario.h"
 #include "../../test/simulator/NativeEvidenceScenario.h"
+#include "../../test/simulator/NativeApplicationScenario.h"
 
 #include "../../test/simulator/ActivationScenario.h"
 
@@ -12210,6 +12211,7 @@ void runSimulatorUpgradeBootScenario() { runActivationScenario(); }
 
 void prepareSimulatorSmokeState() {
   runNativeEvidenceScenario();
+  runNativeApplicationScenario();
   runLiveAdapterScenario();
   runFilePublishScenario();
   runLifecycleMatchScenario();

@@ -24,9 +24,12 @@ void publicationCheckpoint() {
 #ifdef SIMULATOR
   // Test-only hard power loss, with no destructors/cleanup. Every publication
   // operation still uses the real simulator HAL and parent-directory barrier.
-  if (std::getenv("BOOKSYNC_ACTIVATION_SCENARIO") || std::getenv("BOOKSYNC_COPY_JOBS_SCENARIO")) {
+  if (std::getenv("BOOKSYNC_ACTIVATION_SCENARIO") || std::getenv("BOOKSYNC_COPY_JOBS_SCENARIO") ||
+      std::getenv("BOOKSYNC_NATIVE_APPLICATION_SCENARIO")) {
     const char* cut =
-        std::getenv(std::getenv("BOOKSYNC_COPY_JOBS_SCENARIO") ? "BOOKSYNC_COPY_CUT" : "BOOKSYNC_ACTIVATION_CUT");
+        std::getenv(std::getenv("BOOKSYNC_NATIVE_APPLICATION_SCENARIO") ? "BOOKSYNC_NATIVE_APPLICATION_CUT"
+                    : std::getenv("BOOKSYNC_COPY_JOBS_SCENARIO")        ? "BOOKSYNC_COPY_CUT"
+                                                                        : "BOOKSYNC_ACTIVATION_CUT");
     if (cut && std::strtoul(cut, nullptr, 10) == checkpointCount) {
       std::fflush(nullptr);
       std::_Exit(86);

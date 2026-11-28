@@ -13334,6 +13334,7 @@
         "../../test/simulator/LifecycleStatsScenario.h",
         "../../test/simulator/LiveAdapterScenario.h",
         "../../test/simulator/LocatorScenario.h",
+        "../../test/simulator/NativeApplicationScenario.h",
         "../../test/simulator/NativeEvidenceScenario.h",
         "../../test/simulator/PersonalReadingScenario.h",
         "../../test/simulator/PositionPolicyScenario.h",
@@ -14953,6 +14954,14 @@
       "role": "storage",
       "rationale": "F46b1 create-only source identity authority with independent entropy-issued UUIDs, exact revision and scope; current-only validation forbids rollback/reissue on corruption."
     },
+    "src/booksync/storage/SourceFile.h": {
+      "role": "storage",
+      "rationale": "F46b2a worker-only exact full-source revision and closed-file proof. Independently issued binding stays separate from SHA-256; bounded reused digest/read storage, no UI or network."
+    },
+    "src/booksync/storage/SourceFile.cpp": {
+      "role": "storage",
+      "rationale": "F46b2a worker-only exact full-source revision and closed-file proof. Independently issued binding stays separate from SHA-256; bounded reused digest/read storage, no UI or network."
+    },
     "src/booksync/reader/Locator.h": {
       "role": "reader",
       "rationale": "F08 worker-only identity evidence and raw native locator inspection; allocation-free, no UI or transport. Locator delegates EPUB decoding to the retained pure ProgressRecord codec."
@@ -15414,6 +15423,50 @@
     "src/booksync/server/bookorbit/NativeEvidence.cpp": {
       "role": "server",
       "rationale": "F46b1 private native match/stats providers read immutable captured source/account proof and frozen page windows; no current-path rebinding, legacy import, UI, network or writer activation."
+    },
+    "src/booksync/server/bookorbit/NativeCaptureGate.h": {
+      "role": "server",
+      "rationale": "F46b2a private immutable account/source captures and closed native state/F19 progress application. Full raw values, pinned epoch, status/override guards and idempotent publication; no UI, legacy-reading import or automatic network scheduling."
+    },
+    "src/booksync/server/bookorbit/NativeCaptureGate.cpp": {
+      "role": "server",
+      "rationale": "F46b2a private immutable account/source captures and closed native state/F19 progress application. Full raw values, pinned epoch, status/override guards and idempotent publication; no UI, legacy-reading import or automatic network scheduling."
+    },
+    "src/booksync/server/bookorbit/NativeProgress.h": {
+      "role": "server",
+      "rationale": "F46b2a private immutable account/source captures and closed native state/F19 progress application. Full raw values, pinned epoch, status/override guards and idempotent publication; no UI, legacy-reading import or automatic network scheduling."
+    },
+    "src/booksync/server/bookorbit/NativeProgress.cpp": {
+      "role": "server",
+      "rationale": "F46b2a private immutable account/source captures and closed native state/F19 progress application. Full raw values, pinned epoch, status/override guards and idempotent publication; no UI, legacy-reading import or automatic network scheduling."
+    },
+    "src/booksync/server/bookorbit/NativeStateStore.h": {
+      "role": "server",
+      "rationale": "F46b2a private immutable account/source captures and closed native state/F19 progress application. Full raw values, pinned epoch, status/override guards and idempotent publication; no UI, legacy-reading import or automatic network scheduling."
+    },
+    "src/booksync/server/bookorbit/NativeStateStore.cpp": {
+      "role": "server",
+      "rationale": "F46b2a private immutable account/source captures and closed native state/F19 progress application. Full raw values, pinned epoch, status/override guards and idempotent publication; no UI, legacy-reading import or automatic network scheduling."
+    },
+    "src/booksync/server/bookorbit/NativeState.h": {
+      "role": "server",
+      "rationale": "F46b2a private immutable account/source captures and closed native state/F19 progress application. Full raw values, pinned epoch, status/override guards and idempotent publication; no UI, legacy-reading import or automatic network scheduling."
+    },
+    "src/booksync/server/bookorbit/NativeState.cpp": {
+      "role": "server",
+      "rationale": "F46b2a private immutable account/source captures and closed native state/F19 progress application. Full raw values, pinned epoch, status/override guards and idempotent publication; no UI, legacy-reading import or automatic network scheduling."
+    },
+    "src/booksync/server/bookorbit/ProgressCapture.h": {
+      "role": "server",
+      "rationale": "F46b2a private immutable account/source captures and closed native state/F19 progress application. Full raw values, pinned epoch, status/override guards and idempotent publication; no UI, legacy-reading import or automatic network scheduling."
+    },
+    "src/booksync/server/bookorbit/ProgressCapture.cpp": {
+      "role": "server",
+      "rationale": "F46b2a private immutable account/source captures and closed native state/F19 progress application. Full raw values, pinned epoch, status/override guards and idempotent publication; no UI, legacy-reading import or automatic network scheduling."
+    },
+    "src/booksync/server/bookorbit/NativeApplicationLink.cpp": {
+      "role": "server",
+      "rationale": "F46b2a linker-only dormant native provider construction/application budget root. No startup caller; retains concrete vtables and fallible workspace paths for physical size evidence."
     },
     "src/booksync/interface/LayoutEdit.h": {
       "role": "interface",
@@ -16009,6 +16062,10 @@
     "src/booksync/ui/widgets/StatsSummary.h": {
       "role": "ui",
       "rationale": "F40w bounded geometry values shared by compact read-only daily summaries."
+    },
+    "src/booksync/server/bookorbit/recovery.py": {
+      "role": "server",
+      "rationale": "F46b2a bounded read-only recovery inspector for private BPG1/BNS1 and F19 BPS1/BPS2 copied records. Validates complete framing/integrity/semantics, prints size/format metadata only, and never repairs, acknowledges, mutates or uses network."
     }
   },
   "generators": {
