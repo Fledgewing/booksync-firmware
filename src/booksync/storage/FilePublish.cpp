@@ -20,7 +20,7 @@ uint32_t checkpointCount = 0;
 uint32_t publicationCheckpoints() { return checkpointCount; }
 #endif
 namespace {
-void checkpoint() {
+void publicationCheckpoint() {
 #ifdef SIMULATOR
   // Test-only hard power loss, with no destructors/cleanup. Every publication
   // operation still uses the real simulator HAL and parent-directory barrier.
@@ -69,18 +69,18 @@ bool validPaths(PublishPaths paths) {
   return suffixOf(paths.current, paths.staging, ".tmp") && suffixOf(paths.current, paths.backup, ".bak");
 }
 bool validate(const char* path, FileValidator validator, void* context) {
-  checkpoint();
+  publicationCheckpoint();
   FsFile file = Storage.open(path, O_RDONLY);
-  checkpoint();
+  publicationCheckpoint();
   if (!file) {
     LOG_ERR("BSP", "Publication candidate open failed");
     return false;
   }
-  checkpoint();
+  publicationCheckpoint();
   const bool valid = validator(file, context);
-  checkpoint();
+  publicationCheckpoint();
   const bool closed = file.close();
-  checkpoint();
+  publicationCheckpoint();
   if (!valid || !closed) LOG_ERR("BSP", "Publication candidate validation/close failed");
   return valid && closed;
 }
@@ -94,6 +94,7 @@ FilePublish::~FilePublish() {
 bool FilePublish::fail(const char* step) {
   LOG_ERR("BSP", "Publication failed: %s", step);
   failed_ = true;
+  active_ = false;
   if (file_ && !file_.close()) LOG_ERR("BSP", "Publication failure close failed");
   return false;
 }
@@ -115,22 +116,56 @@ bool FilePublish::begin(size_t expectedBytes) {
   }
   if (!validPaths(paths_) || !validator_) return fail("paths/validator");
   if (select(paths_, validator_, context_) == PublishedFile::Unreadable) return fail("unreadable source retained");
-  checkpoint();
+  publicationCheckpoint();
   file_ = Storage.open(paths_.staging, O_WRONLY | O_CREAT | O_TRUNC);
-  checkpoint();
+  publicationCheckpoint();
   if (!file_) return fail("staging open");
   remaining_ = expectedBytes;
   failed_ = false;
   active_ = true;
   return true;
 }
+bool FilePublish::resume(size_t expectedBytes, size_t received) {
+  if (active_ || received > expectedBytes || !validPaths(paths_) || !validator_) return fail("resume bounds");
+  // One handle at a time, including on the constrained SD transport.
+  file_ = Storage.open(paths_.staging, O_RDONLY);
+  if (!file_) return fail("resume open");
+  const bool exact = file_.fileSize() == received;
+  const bool closed = file_.close();
+  if (!exact || !closed) return fail("resume length");
+  file_ = Storage.open(paths_.staging, O_WRONLY);
+  if (!file_ || !file_.seekSet(received)) return fail("resume seek");
+  remaining_ = expectedBytes - received;
+  failed_ = false;
+  active_ = true;
+  return true;
+}
+bool FilePublish::flush() {
+  if (!active_ || failed_) return fail("inactive flush");
+  if (!file_.sync() || !syncDirectory(paths_.current)) return fail("partial flush");
+  return true;
+}
+bool FilePublish::checkpoint() {
+  if (!active_ || failed_) return fail("inactive checkpoint");
+  active_ = false;
+  if (!file_.sync()) return fail("checkpoint sync");
+  if (!file_.close()) return fail("checkpoint close");
+  return syncDirectory(paths_.current) ? true : fail("checkpoint directory sync");
+}
 bool FilePublish::write(const void* bytes, size_t count) {
   if (!active_ || failed_) return fail("inactive write");
   if (count > remaining_ || (!bytes && count)) return fail("write bounds");
-  checkpoint();
+  publicationCheckpoint();
   if (count && file_.write(bytes, count) != count) return fail("short write");
-  checkpoint();
+  publicationCheckpoint();
   remaining_ -= count;
+  return true;
+}
+bool FilePublish::confirm() {
+  if (active_) return fail("active confirmation");
+  if (select(paths_, validator_, context_) != PublishedFile::Current) return fail("current confirmation");
+  if (!syncDirectory(paths_.current)) return fail("confirmation directory sync");
+  failed_ = false;
   return true;
 }
 bool FilePublish::validateCurrent(PublishPaths paths, FileValidator validator, void* context) {
@@ -141,15 +176,15 @@ bool FilePublish::finishNew() { return finishImpl(false); }
 bool FilePublish::finishImpl(bool replace) {
   if (!active_ || failed_ || remaining_) return fail("incomplete transaction");
   active_ = false;
-  checkpoint();
+  publicationCheckpoint();
   if (!file_.sync()) return fail("file sync");
-  checkpoint();
+  publicationCheckpoint();
   if (!file_.close()) return fail("file close");
-  checkpoint();
+  publicationCheckpoint();
   if (!syncDirectory(paths_.current)) return fail("staging directory sync");
-  checkpoint();
+  publicationCheckpoint();
   if (!validate(paths_.staging, validator_, context_)) return fail("staging validation");
-  checkpoint();
+  publicationCheckpoint();
 
   const auto source = select(paths_, validator_, context_);
   if (source == PublishedFile::Unreadable) return fail("source validation");
@@ -158,29 +193,29 @@ bool FilePublish::finishImpl(bool replace) {
     // Current remains valid while retiring the older backup. Never erase the
     // only valid source to make room for a rename.
     if (Storage.exists(paths_.backup)) {
-      checkpoint();
+      publicationCheckpoint();
       if (!Storage.remove(paths_.backup)) return fail("retire backup");
-      checkpoint();
+      publicationCheckpoint();
       if (!syncDirectory(paths_.current)) return fail("retire backup directory sync");
-      checkpoint();
+      publicationCheckpoint();
     }
-    checkpoint();
+    publicationCheckpoint();
     if (!Storage.rename(paths_.current, paths_.backup)) return fail("retain current");
-    checkpoint();
+    publicationCheckpoint();
     if (!syncDirectory(paths_.current)) return fail("retain current directory sync");
-    checkpoint();
+    publicationCheckpoint();
   } else if (source == PublishedFile::Backup && Storage.exists(paths_.current)) {
-    checkpoint();
+    publicationCheckpoint();
     if (!Storage.remove(paths_.current)) return fail("retire invalid current");
-    checkpoint();
+    publicationCheckpoint();
     if (!syncDirectory(paths_.current)) return fail("retire invalid directory sync");
-    checkpoint();
+    publicationCheckpoint();
   }
-  checkpoint();
+  publicationCheckpoint();
   if (!Storage.rename(paths_.staging, paths_.current)) return fail("publish rename");
-  checkpoint();
+  publicationCheckpoint();
   if (!syncDirectory(paths_.current)) return fail("publish directory sync");
-  checkpoint();
+  publicationCheckpoint();
   // Keep the backup. Read-only recovery needs no rename, cleanup or repair.
   return true;
 }

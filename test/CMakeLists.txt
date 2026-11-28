@@ -288,3 +288,5 @@ add_subdirectory(host/lifecycle_stats)
 add_subdirectory(host/layout_editor)
 add_subdirectory(host/lifecycle_state)
 add_subdirectory(host/activation)
+
+add_subdirectory(host/download_jobs)

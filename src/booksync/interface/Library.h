@@ -3,6 +3,7 @@
 #include "Capabilities.h"
 #include "Commands.h"
 #include "Models.h"
+#include "booksync/interface/Downloads.h"
 #include "booksync/interface/HomeLayout.h"
 #include "booksync/interface/LayoutEdit.h"
 
@@ -17,6 +18,13 @@ class Library {
   // Called outside paint; one pending visible window, repeated requests coalesce.
   virtual bool requestWindow(WindowRequest) { return false; }
   virtual bool requestBatch(WindowBatchRequest) { return false; }
+  // Selection is a saved book key and manifest ordinal; path/identity/transport
+  // resolution remains private. UI may poll cached values outside paint and
+  // retire its F12 delivery when leaving the originating view.
+  virtual CommandStatus download(BookKey, uint8_t) { return CommandStatus::Unavailable; }
+  virtual DownloadStatus downloadStatus(uint64_t) const { return {}; }
+  virtual CommandStatus resumeDownload(uint64_t) { return CommandStatus::Unavailable; }
+  virtual CommandStatus cancelDownload(uint64_t) { return CommandStatus::Unavailable; }
   virtual CommandStatus open(BookKey) { return CommandStatus::Unavailable; }
   virtual LibraryWindow window() const { return {}; }
   virtual void readWindow(LibraryWindow& out) const { out = window(); }

@@ -13,7 +13,7 @@ struct PowerCut {};
 struct FakeCard {
   std::map<std::string, std::string> files, disk;
   std::vector<std::string> events;
-  int stop = -1, fail = -1;
+  int stop = -1, fail = -1, readOnlyAt = -1;
   int cutWrite = -1, prefix = 0, writes = 0;
   bool readOnly = false, full = false, eager = false, dead = false;
   int handles = 0, maxHandles = 0;
@@ -21,6 +21,7 @@ struct FakeCard {
   bool event(const std::string& name) {
     events.push_back(name);
     const int n = static_cast<int>(events.size()) - 1;
+    if (n == readOnlyAt) readOnly = true;
     if (n == stop) {
       dead = true;
       throw PowerCut{};
@@ -32,7 +33,7 @@ struct FakeCard {
   }
   void restart() {
     files = disk;
-    stop = fail = cutWrite = -1;
+    stop = fail = cutWrite = readOnlyAt = -1;
     dead = false;
     handles = 0;
     events.clear();
@@ -72,6 +73,7 @@ class HalFile {
     return n;
   }
   bool sync() {
+    if (card.dead) return false;
     if (!card.event("file-sync:before") || card.readOnly || card.full) return false;
     card.disk[path] = card.files[path];
     return card.event("file-sync:after");
@@ -107,12 +109,18 @@ using FsFile = HalFile;
 class HalStorage {
  public:
   bool mkdir(const char*) { return true; }
+  bool ensureDirectoryExists(const char* path) {
+    return card.event(std::string("mkdir:") + path) && !card.readOnly && !card.full;
+  }
   bool exists(const char* path) { return card.files.count(path); }
   FsFile open(const char* path, int flags = O_RDONLY) {
     if (!card.event("open")) return {};
     if (flags & O_WRONLY) {
       if (card.readOnly || card.full) return {};
-      card.files[path].clear();
+      if (flags & O_TRUNC)
+        card.files[path].clear();
+      else if (!exists(path) && !(flags & O_CREAT))
+        return {};
       card.metadata();
     } else if (!exists(path))
       return {};
@@ -132,6 +140,7 @@ class HalStorage {
     return card.event("rename:after");
   }
   bool syncFilesystem() {
+    if (card.dead) return false;
     if (!card.event("fs-sync:before") || card.readOnly) return false;
     card.disk = card.files;
     return card.event("fs-sync:after");

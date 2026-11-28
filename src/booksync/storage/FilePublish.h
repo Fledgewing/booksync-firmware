@@ -32,6 +32,11 @@ class FilePublish {
   FilePublish(const FilePublish&) = delete;
   FilePublish& operator=(const FilePublish&) = delete;
   bool begin(size_t expectedBytes);
+  // Explicit resume only: caller has authenticated the exact selection/validator.
+  // Staging length must equal received; no implicit truncation or publication.
+  bool resume(size_t expectedBytes, size_t received);
+  bool flush();       // Durable partial bytes while retaining the reusable handle.
+  bool checkpoint();  // Close and durably retain partial staging; never publish it.
   bool write(const void* bytes, size_t count);
   // False may mean the new complete file is visible but its final directory sync
   // failed: reconcile with select(), rather than assuming a failed remote intent.
@@ -40,6 +45,10 @@ class FilePublish {
   bool finishNew();
   // Positive current-only validation: missing/read errors never select backup.
   static bool validateCurrent(PublishPaths paths, FileValidator validator, void* context = nullptr);
+  // Reconcile a visible current file after a failed final barrier or restart.
+  // Still requires the serialized writer and full validator; true confirms both
+  // current bytes and directory durability, without renaming/deleting anything.
+  bool confirm();
   static PublishedFile select(PublishPaths paths, FileValidator validator, void* context = nullptr);
 
  private:
