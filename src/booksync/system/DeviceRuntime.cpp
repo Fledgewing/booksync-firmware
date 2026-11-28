@@ -55,6 +55,19 @@ bool apply(void*, DeviceCommand command) {
 }
 void sample() {
   DeviceSnapshot value{};
+  value.battery = sampleNativeBattery();
+  value.light = {Frontlight.brightness(), Frontlight.present(), Frontlight.present(), Frontlight.isOn()};
+  value.controls.known = true;
+  value.controls.orientation = SETTINGS.orientation;
+  value.controls.night = SETTINGS.screenInverted != 0;
+  value.controls.networkBusy = !networkAdmission().storageIdle();
+#ifndef SIMULATOR
+  value.controls.wifi = WiFi.getMode() != WIFI_MODE_NULL;
+#endif
+  bridge.publish(value);
+}
+}  // namespace
+DeviceBattery sampleNativeBattery() {
   const uint32_t now = millis();
   if (!sampled || now - lastSample >= 30000u) {
     sampled = true;
@@ -70,18 +83,8 @@ void sample() {
     batteryValue = {};
 #endif
   }
-  value.battery = batteryValue;
-  value.light = {Frontlight.brightness(), Frontlight.present(), Frontlight.present(), Frontlight.isOn()};
-  value.controls.known = true;
-  value.controls.orientation = SETTINGS.orientation;
-  value.controls.night = SETTINGS.screenInverted != 0;
-  value.controls.networkBusy = !networkAdmission().storageIdle();
-#ifndef SIMULATOR
-  value.controls.wifi = WiFi.getMode() != WIFI_MODE_NULL;
-#endif
-  bridge.publish(value);
+  return batteryValue;
 }
-}  // namespace
 DeviceBridge& deviceRuntime() { return bridge; }
 bool workDeviceRuntime(DevicePorts navigation) {
   const auto before = bridge.snapshot().revision;
