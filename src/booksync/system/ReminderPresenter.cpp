@@ -117,8 +117,7 @@ uint8_t hit(GfxRenderer& renderer, const ReminderSheetView& value, int x, int y,
 void paragraph(GfxRenderer& renderer, int x, int& y, int width, const char* text) {
   paintReminderParagraph(renderer, text, x, y, width);
 }
-
-void paint(GfxRenderer& renderer, const ReminderSheetView& value) {
+void paintReminderSheet(GfxRenderer& renderer, const ReminderSheetView& value) {
   const auto r = geometry(renderer, value);
   renderer.fillRect(r.x, r.y, r.width, r.height, false);
   renderer.drawRect(r.x, r.y, r.width, r.height, 2, true);
@@ -230,7 +229,7 @@ void inputs(Presenter& p, GfxRenderer& renderer, MappedInputManager& input) {
       activityManager.requestUpdate();
     } else if (p.revision != p.sheet.revision()) {
       RenderLock lock;
-      paint(renderer, p.sheet.view());  // Only fresh, explicit input/error redraws.
+      paintReminderSheet(renderer, p.sheet.view());  // Only fresh, explicit input/error redraws.
       p.revision = p.sheet.revision();
     }
     return true;
@@ -268,7 +267,7 @@ void inputs(Presenter& p, GfxRenderer& renderer, MappedInputManager& input) {
     }
     p.frame = true;
     p.changes = library.remindersEvents().changed;
-    paint(renderer, p.sheet.view());
+    paintReminderSheet(renderer, p.sheet.view());
     p.revision = p.sheet.revision();
     return true;
   }
@@ -415,7 +414,7 @@ void paintReminderScene(GfxRenderer& renderer, Library& library, unsigned state)
     sheet.sheetInput(ReminderSheetInput::SelectUp);
     sheet.pollSheet();
   }
-  paint(renderer, sheet.view());  // Scene caller holds RenderLock across capture.
+  paintReminderSheet(renderer, sheet.view());  // Scene caller holds RenderLock across capture.
 }
 bool inputReminderScene(GfxRenderer& renderer, MappedInputManager& input, Library& library, unsigned state) {
   using B = MappedInputManager::Button;

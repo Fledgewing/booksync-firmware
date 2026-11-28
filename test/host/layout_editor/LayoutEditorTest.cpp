@@ -18,6 +18,13 @@ std::string bytes(LayoutInput in) {
   return out;
 }
 std::string original() { return bytes(Layout::defaults()); }
+std::string legacySevenRows() {
+  auto raw = original();
+  const std::string key = "\"x4\":{\"cols\":2,\"rows\":";
+  const auto row = raw.find(key) + key.size();
+  raw.replace(row, raw.find('}', row) - row, "7");
+  return raw;
+}
 LayoutEdit request(LayoutEditKind kind, uint32_t revision = 1) {
   LayoutEdit edit;
   edit.kind = kind;
@@ -382,6 +389,7 @@ TEST(LayoutEditor, UnknownInstancesReserveCellsAndSurviveKnownRemoval) {
   ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
   ASSERT_EQ(page.count, 4);
   EXPECT_EQ(page.widgets[3].y, 6);  // The unknown tile reserved row 5.
+  EXPECT_EQ(page.rows, 7);          // Editing retains the stored class grid.
   auto edit = request(LayoutEditKind::Remove, 2);
   ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
   EXPECT_NE(bytes(editor.output()).find(unknown), std::string::npos);
@@ -429,8 +437,8 @@ TEST(LayoutGeometry, BandSwapResizeAndCancelValues) {
   EXPECT_EQ(moved.page.widgets[1].y, 0);
   EXPECT_EQ(page.widgets[0].y, before.widgets[0].y);
   auto resized = previewGeometry(page, 0, LayoutStep::Size);
-  ASSERT_EQ(resized.status, LayoutEditStatus::Saved);
-  EXPECT_EQ(resized.page.widgets[0].w, 1);
+  EXPECT_EQ(resized.status, LayoutEditStatus::NoSpace);
+  EXPECT_EQ(resized.page.widgets[0].w, 2);
   EXPECT_EQ(resized.page.widgets[0].h, 2);
   EXPECT_EQ(previewGeometry(page, 0, LayoutStep::Up).status, LayoutEditStatus::NoSpace);
   EXPECT_EQ(previewGeometry(page, 99, LayoutStep::Size).status, LayoutEditStatus::Invalid);
@@ -1013,4 +1021,19 @@ TEST(EditorAddRemove, EveryInstalledAddEntryHasAVisibleFocusedViewport) {
   }
   ui.activateEditor();
   EXPECT_EQ(lib.captured.widget, WidgetKind(uint8_t(WidgetKind::Count) - 1));
+}
+
+TEST(LayoutGeometry, ContinueOffersOnlyApprovedSizeAndCanNormalizeLegacySize) {
+  EXPECT_TRUE(supportedGeometry(WidgetKind::Continue, 2, 2));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Continue, 1, 2));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Continue, 2, 3));
+  HomePage page;
+  page.cols = 2;
+  page.rows = 6;
+  page.count = 1;
+  page.widgets[0] = {WidgetKind::Continue, WindowSource::Continue, 0, 0, 1, 2};
+  const auto resized = previewGeometry(page, 0, LayoutStep::Size);
+  EXPECT_EQ(resized.status, LayoutEditStatus::Saved);
+  EXPECT_EQ(resized.page.widgets[0].w, 2);
+  EXPECT_EQ(resized.page.widgets[0].h, 2);
 }

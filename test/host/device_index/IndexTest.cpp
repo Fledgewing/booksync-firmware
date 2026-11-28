@@ -6,6 +6,7 @@
 #include "booksync/services/DeviceIndex.h"
 #include "booksync/services/LocalLibrary.h"
 #include "booksync/services/OfflineLibrary.h"
+#include "booksync/services/PersonalReading.h"
 #include "booksync/services/ReadModel.h"
 using namespace booksync;
 using namespace booksync::storage;
@@ -260,7 +261,18 @@ TEST_F(IndexTest, AccountInvalidationErasesRowsAndOldLifetimeStaysRetired) {
   ReadModel old{index};
   ASSERT_TRUE(old.materialize({0, 2, 16384}));
   auto subscription = old.subscribe();
+  BookRow current;
+  current.title[0] = 'A';
+  PersonalCard resolved;
+  resolved.progress = {0, true};
+  resolved.timeLeft = {3600, true};
+  old.setContinue(current, true, &resolved);
+  EXPECT_TRUE(old.window().resume.timeLeftKnown);
   old.invalidate(Invalidation::Account);
+  EXPECT_FALSE(old.window().resume.supplied);
+  EXPECT_FALSE(old.window().resume.progressKnown);
+  EXPECT_FALSE(old.window().resume.timeLeftKnown);
+  EXPECT_EQ(old.window().resume.timeLeftAmount, 0u);
   EXPECT_EQ(old.window().count, 0);
   EXPECT_EQ(old.window().rows[0].title[0], 0);
   ReadModel next{index};
@@ -616,4 +628,16 @@ TEST(ReadModel, CombinedStatsAndPersonalChargeBothConcretePayloads) {
   ++batch.bytes;
   batch.rows = 1;
   EXPECT_FALSE(ReadModel::accepts(batch));
+}
+
+TEST(ContinueBudget, SummaryAndContextAreChargedToCaller) {
+  booksync::WindowBatchRequest request;
+  request.count = 1;
+  auto& window = request.windows[0];
+  window.source = booksync::WindowSource::Continue;
+  window.limit = 1;
+  window.bytes = sizeof(booksync::WindowSpan) + sizeof(booksync::BookRow);
+  EXPECT_FALSE(booksync::ReadModel::accepts(request));
+  window.bytes += sizeof(booksync::ContinueValues);
+  EXPECT_TRUE(booksync::ReadModel::accepts(request));
 }
