@@ -28,6 +28,7 @@
 #include "FilenameFontSystem.h"
 #include "FontSelectionActivity.h"
 #include "HyphenationManagerActivity.h"
+#include "booksync/system/Bootstrap.h"
 #include "util/PluginEvents.h"
 #if CROSSINK_SCALABLE_FONTS
 #include "TtfRenderOptionsActivity.h"
@@ -1511,6 +1512,11 @@ void SettingsActivity::toggleCurrentSetting() {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
 
     switch (setting.action) {
+      case SettingAction::HomeWidgets: {
+        auto editor = booksync::createHomeEditor(renderer, mappedInput);
+        if (editor) startActivityForResult(std::move(editor), [](const ActivityResult&) {});
+        break;
+      }
       case SettingAction::ScreenCalibration: {
         auto activity = makeUniqueNoThrow<ScreenCalibrationActivity>(renderer, mappedInput);
         if (!activity) {

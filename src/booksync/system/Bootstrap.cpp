@@ -6,6 +6,7 @@
 #include <Memory.h>
 #include <ScalableBuiltins.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
@@ -18,6 +19,7 @@
 #include <esp_mac.h>
 #endif
 #include "NetworkPhase.h"
+#include "ReadingGate.h"
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
 #include "booksync/services/LocalLibrary.h"
@@ -64,6 +66,8 @@ bool noticePending = false, recoveryRequired = false, priorReaderState = false;
 class ShellActivity final : public Activity {
   Library& library;
   Home home;
+  UpgradeNotice notice;
+  bool editorOnly = false, editorStarted = false;
 #if CROSSINK_APP_CAP_HOME_EDITOR
   EditorAddRemove editor;
 #endif
@@ -133,7 +137,7 @@ class ShellActivity final : public Activity {
         return tr(STR_HOME_WIDGET_ERROR);
     }
   }
-  void paintFittedText(int font, int x, int y, const char* text, int width) const {
+  void paintFittedText(int font, int x, int y, const char* text, int width, bool black = true) const {
     char caption[96]{};
     size_t bytes = 0;
     while (bytes + 1 < sizeof(caption) && text[bytes]) {
@@ -148,7 +152,7 @@ class ShellActivity final : public Activity {
         break;
       }
     }
-    renderer.drawText(font, x, y, caption);
+    renderer.drawText(font, x, y, caption, black);
   }
   void paintWidget(uint8_t index) const {
     const auto r = tileRect(index);
@@ -254,20 +258,185 @@ class ShellActivity final : public Activity {
     }
     renderer.endTextClip();
   }
+  // Bounded UTF-8 wrapping shared by the static notice and text editor.
+  int paragraph(const char* text, int x, int y, int width, int maxLines, bool bold = false,
+                int font = UI_10_FONT_ID) const {
+    char line[128]{};
+    unsigned offset = 0;
+    const int height = renderer.getLineHeight(font);
+    for (int row = 0; row < maxLines && text[offset]; ++row) {
+      unsigned n = 0, word = 0;
+      while (text[offset + n] && n + 1 < sizeof(line)) {
+        line[n] = text[offset + n];
+        line[++n] = 0;
+        if (line[n - 1] == ' ') word = n;
+        if ((static_cast<unsigned char>(text[offset + n]) & 0xc0) == 0x80) continue;
+        if (renderer.getTextWidth(font, line) > width) {
+          if (word)
+            n = word;
+          else
+            do {
+              --n;
+            } while (n && (static_cast<unsigned char>(line[n]) & 0xc0) == 0x80);
+          break;
+        }
+      }
+      if (!n) break;
+      line[n] = 0;
+      renderer.drawText(font, x, y, line, true, bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+      y += height;
+      offset += n;
+      while (text[offset] == ' ') ++offset;
+    }
+    return y;
+  }
+  Rect noticeAction(uint8_t row) const {
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const int height = renderer.getLineHeight(UI_10_FONT_ID) + 22;
+    return Rect{safe.x + 24, safe.y + safe.height - 42 - (2 - row) * (height + 8), safe.width - 48, height};
+  }
+  void paintNotice() const {
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const int x = safe.x + 24, width = safe.width - 48;
+    int y = safe.y + 12;
+    paintFittedText(UI_10_FONT_ID, x, y, tr(STR_BACK), 68);
+    y = paragraph(tr(STR_BOOKSYNC_NAME), x + 88, y, width - 88, 1, true);
+    y = paragraph(tr(STR_UPGRADE_FROM), x + 88, y, width - 88, 1) + 18;
+    y = paragraph(tr(STR_UPGRADE_TITLE), x, y, width, 2, true, BITTER_14_FONT_ID) + 18;
+    y = paragraph(tr(STR_UPGRADE_CARRIED), x, y, width, 1, true) + 4;
+    y = paragraph(tr(STR_UPGRADE_RETAINED), x, y, width, 5) + 16;
+    y = paragraph(tr(STR_UPGRADE_FRESH), x, y, width, 1, true) + 4;
+    y = paragraph(tr(STR_UPGRADE_DEFAULTS), x, y, width, 2) + 16;
+    y = paragraph(tr(STR_UPGRADE_RESTORE), x, y, width, 1, true) + 4;
+    char text[192]{};
+    std::snprintf(text, sizeof(text), tr(STR_UPGRADE_RESTORE_FORMAT), notice.serviceName());
+    paragraph(text, x, y, width, 4);
+    for (uint8_t i = 0; i < 2; ++i) {
+      const auto r = noticeAction(i);
+      const bool selected = notice.focus() == i;
+      if (selected)
+        renderer.fillRect(r.x, r.y, r.width, r.height, true);
+      else
+        renderer.drawRect(r.x, r.y, r.width, r.height, 1, true);
+      if (!i) std::snprintf(text, sizeof(text), tr(STR_UPGRADE_SYNC_FORMAT), notice.serviceName());
+      paintFittedText(UI_10_FONT_ID, r.x + 12, r.y + 8, i ? tr(STR_LATER) : text, r.width - 24, !selected);
+    }
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_HOME_PREV), tr(STR_HOME_NEXT));
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  }
+  bool noticeInput() {
+    if (!notice.visible()) return false;
+    int x = 0, y = 0;
+    if (mappedInput.wasReleased(MappedInputManager::Button::Back))
+      notice.back();
+    else if (mappedInput.wasReleased(MappedInputManager::Button::Confirm))
+      notice.choose(notice.focus());
+    else if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Down)))
+      notice.stepNotice(1);
+    else if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Up)))
+      notice.stepNotice(-1);
+    else if (mappedInput.wasScreenTapped(x, y)) {
+      for (uint8_t i = 0; i < 2; ++i) {
+        const auto r = noticeAction(i);
+        if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) notice.choose(i);
+      }
+      const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+      if (y >= safe.y && y < safe.y + 2 * renderer.getLineHeight(UI_10_FONT_ID) && x >= safe.x && x < safe.x + 100)
+        notice.back();
+    } else
+      return true;
+    requestUpdate();
+    return true;
+  }
+#if CROSSINK_APP_CAP_HOME_EDITOR
+  Rect textEditorRow(uint8_t row) const {
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const int line = renderer.getLineHeight(UI_10_FONT_ID);
+    const int top = header.y + header.height + (editor.panel() == EditorAddRemove::Panel::Select ? 12 : 6 * line);
+    const int height = line + 18;
+    const int capacity = std::max(1, (safe.y + safe.height - 48 - top) / height);
+    const int first = editor.focus() >= capacity ? editor.focus() - capacity + 1 : 0;
+    return Rect{safe.x + 24, top + (row - first) * height, safe.width - 48, height};
+  }
+  void paintTextEditor() const {
+    using Panel = EditorAddRemove::Panel;
+    const auto panel = editor.panel();
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const char* title = nullptr;
+    const char* body = nullptr;
+    char selectedTitle[96]{};
+    if (panel == Panel::Selected) {
+      const auto kind = widgets->page().widgets[editor.selected()].kind;
+      std::snprintf(selectedTitle, sizeof(selectedTitle), tr(STR_HOME_REMOVE_CONFIRM_FORMAT),
+                    kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)
+                    : kind == WidgetKind::Shelf  ? tr(STR_HOME_SHELF)
+                                                 : tr(STR_HOME_BROWSE));
+      title = selectedTitle;
+      body = tr(STR_HOME_REMOVE_EXPLAIN);
+    } else if (panel == Panel::Add) {
+      title = tr(STR_HOME_ADD_WIDGET);
+      body = tr(STR_HOME_ADD_EXPLAIN);
+    } else if (panel == Panel::Reset) {
+      title = tr(STR_HOME_RESET_TITLE);
+      body = tr(STR_HOME_RESET_EXPLAIN);
+    } else if (panel == Panel::Error) {
+      const bool noSpace = editor.editorFailure() == LayoutEditStatus::NoSpace;
+      title = noSpace ? tr(STR_HOME_ADD_FAILED) : tr(STR_HOME_LAYOUT_NOT_SAVED);
+      body = noSpace ? tr(STR_HOME_NO_SPACE_EXPLAIN) : tr(STR_HOME_NOT_SAVED_EXPLAIN);
+    } else if (panel == Panel::Waiting)
+      title = tr(STR_HOME_EDIT_SAVING);
+    int y = header.y + header.height + 12;
+    if (title) y = paragraph(title, safe.x + 24, y, safe.width - 48, 2, true);
+    if (body) paragraph(body, safe.x + 24, y + 8, safe.width - 48, 3);
+    if (panel == Panel::Waiting) return;
+    const int minY = panel == Panel::Select ? header.y + header.height + 12
+                                            : header.y + header.height + 6 * renderer.getLineHeight(UI_10_FONT_ID);
+    for (uint8_t i = 0; i < editor.rows(); ++i) {
+      const auto r = textEditorRow(i);
+      if (r.y < minY || r.y + r.height > safe.y + safe.height - 48) continue;
+      const bool selected = i == editor.focus();
+      if (selected)
+        renderer.fillRect(r.x, r.y, r.width, r.height, true);
+      else
+        renderer.drawRect(r.x, r.y, r.width, r.height, 1, true);
+      char label[96]{};
+      const char* text = editorLabel(i);
+      if (panel == Panel::Select && i < widgets->page().count && widgets->page().widgets[i].kind == WidgetKind::Shelf) {
+        std::snprintf(label, sizeof(label), tr(STR_HOME_SHELF_SOURCE_FORMAT),
+                      widgets->page().widgets[i].source == WindowSource::Recent
+                          ? tr(STR_HOME_EDITOR_RECENT)
+                          : shelfTitle(widgets->page().widgets[i].source));
+        text = label;
+      }
+      paintFittedText(UI_10_FONT_ID, r.x + 12, r.y + 8, text, r.width - 24, !selected);
+    }
+  }
+
+#endif
   HalDisplay::RefreshMode initialRefresh;
 
 #if CROSSINK_APP_CAP_HOME_EDITOR
-  bool canEdit() const { return widgets && widgets->page().revision && !widgets->page().textOnly; }
+  bool canEdit() const { return widgets && widgets->page().revision; }
   const char* editorLabel(uint8_t row) const {
     using Panel = EditorAddRemove::Panel;
     const auto panel = editor.panel();
-    if (panel == Panel::Selected || panel == Panel::Options)
+    if (panel == Panel::Selected || panel == Panel::Options) {
+      if (widgets->page().textOnly) return row == 0 ? tr(STR_HOME_KEEP_WIDGET) : tr(STR_HOME_REMOVE_WIDGET);
       return row == 0 ? tr(STR_HOME_REMOVE_WIDGET) : tr(STR_DONE);
+    }
     if (panel == Panel::Reset) return row == 0 ? tr(STR_HOME_KEEP_LAYOUT) : tr(STR_HOME_RESET_LAYOUT);
     if (panel == Panel::Error) return tr(STR_BACK);
     if (panel == Panel::Add)
       return row == 0 ? tr(STR_CONTINUE_READING) : row == 1 ? tr(STR_HOME_SHELF) : tr(STR_HOME_BROWSE);
     const auto count = widgets->page().count;
+    if (row < count) {
+      const auto kind = widgets->page().widgets[row].kind;
+      return kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)
+             : kind == WidgetKind::Shelf  ? tr(STR_HOME_SHELF)
+                                          : tr(STR_HOME_BROWSE);
+    }
     return row == count ? tr(STR_HOME_ADD_WIDGET) : row == count + 1 ? tr(STR_HOME_RESET_LAYOUT) : tr(STR_DONE);
   }
   Rect editorHeaderButton(uint8_t index) const {
@@ -322,7 +491,7 @@ class ShellActivity final : public Activity {
   void paintEditor() const {
     using Panel = EditorAddRemove::Panel;
     const auto panel = editor.panel();
-    if (panel == Panel::Select || panel == Panel::Selected) {
+    if (!widgets->page().textOnly && (panel == Panel::Select || panel == Panel::Selected)) {
       // Reuse the Home tiles and snapped grid; no second framebuffer.
       for (uint8_t i = 0; i < widgets->page().count; ++i) paintWidget(i);
       for (uint8_t i = 0; i < (panel == Panel::Selected ? 2 : 3); ++i) {
@@ -345,6 +514,10 @@ class ShellActivity final : public Activity {
         renderer.drawRect(tagX, box.y + box.height - 28, tagWidth, 26, 1, true);
         paintFittedText(UI_10_FONT_ID, tagX + 6, box.y + box.height - 26, tag, tagWidth - 12);
       }
+      return;
+    }
+    if (widgets->page().textOnly) {
+      paintTextEditor();
       return;
     }
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
@@ -401,7 +574,10 @@ class ShellActivity final : public Activity {
       const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
       if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Right)) ||
           (tapped && x >= header.x + header.width - 80 && y >= header.y && y < header.y + header.height)) {
-        editor.enter();
+        if (widgets->page().textOnly)
+          activityManager.goToSettings();
+        else
+          editor.enter();
         requestUpdate();
         return true;
       }
@@ -471,16 +647,18 @@ class ShellActivity final : public Activity {
 #endif
  public:
   ShellActivity(GfxRenderer& renderer, MappedInputManager& input, HalDisplay::RefreshMode refresh,
-                Library& library = offlineLibrary())
+                Library& library = offlineLibrary(), bool editorOnly = false)
       : Activity("Home", renderer, input),
         library(library),
         home(library),
+        notice(library),
+        editorOnly(editorOnly),
 #if CROSSINK_APP_CAP_HOME_EDITOR
         editor(library),
 #endif
         initialRefresh(refresh) {
   }
-  bool isHomeActivity() const override { return true; }
+  bool isHomeActivity() const override { return !editorOnly; }
   void onEnter() override {
     Activity::onEnter();
 #if CROSSINK_SCALABLE_FONTS
@@ -490,7 +668,7 @@ class ShellActivity final : public Activity {
     ensureScalableBuiltinFamily(renderer, 1);
 #endif
     enterLocalLibrary();
-    setNetworkReading(!installNetworkMemory());
+    setNetworkReading(editorOnly || !installNetworkMemory());
     bookPath = APP_STATE.openEpubPath;
     if (bookPath.empty()) {
       const auto& books = RECENT_BOOKS.getBooks();
@@ -521,10 +699,14 @@ class ShellActivity final : public Activity {
   }
   void loop() override {
     if (!networkDisplayReady()) return;
+    bool localWorked = false;
     // Keep the local index's SD work outside the admitted network worker phase.
     if (!networkAdmission().busy()) {
       RenderLock lock(RenderLock::Mode::Try);
-      if (lock.ownsLock()) workLocalLibrary();
+      if (lock.ownsLock()) {
+        workLocalLibrary();
+        localWorked = true;
+      }
     }
     {
       RenderLock lock;
@@ -547,6 +729,28 @@ class ShellActivity final : public Activity {
         requestUpdate();
       }
 #endif
+#if CROSSINK_APP_CAP_HOME_EDITOR
+      if (editorOnly && !editorStarted && !canEdit() && localWorked) {
+        LOG_ERR("BSH", "Home editor unavailable; returning to Settings");
+        finish();
+        return;
+      }
+      if (editorOnly && !editorStarted && canEdit()) {
+        editor.enter();
+        editorStarted = true;
+        requestUpdate();
+      }
+      if (editorOnly && editorStarted && editor.panel() == EditorAddRemove::Panel::Closed) {
+        // A failed render-lock try must not discard an accepted edit on exit.
+        if (!localWorked) return;
+        finish();
+        return;
+      }
+#endif
+      if (!editorOnly && notice.pollNotice(ReadingGate::mayShow(
+                             Presentation::Message, {false, activityManager.isCurrentActivity(this), false})))
+        requestUpdate();
+      if (noticeInput()) return;
       if (editorInput()) return;
       if (widgets && widgets->page().count) {
         const auto count = widgets->page().count;
@@ -608,10 +812,20 @@ class ShellActivity final : public Activity {
     if (takeHomeOpenRequest()) activityManager.goToReader(bookPath);
   }
   void render(RenderLock&&) override {
+    // Keep Settings visible until its child has a complete editor projection.
+#if CROSSINK_APP_CAP_HOME_EDITOR
+    if (editorOnly && (!editorStarted || editor.panel() == EditorAddRemove::Panel::Closed)) return;
+#endif
 #ifdef SIMULATOR
     ++scenePaints;
 #endif
     renderer.clearScreen();
+    if (notice.visible()) {
+      paintNotice();
+      renderer.displayBuffer(initialRefresh);
+      initialRefresh = HalDisplay::FAST_REFRESH;
+      return;
+    }
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
 #if CROSSINK_APP_CAP_HOME_EDITOR
@@ -619,7 +833,7 @@ class ShellActivity final : public Activity {
 #else
     constexpr bool editing = false;
 #endif
-    const char* title = editing                               ? tr(STR_HOME_EDIT)
+    const char* title = editing ? (widgets->page().textOnly ? tr(STR_HOME_WIDGETS) : tr(STR_HOME_EDIT))
                         : widgets && widgets->page().title[0] ? widgets->page().title.data()
                                                               : tr(STR_HOME);
 #if CROSSINK_APP_CAP_HOME_EDITOR
@@ -663,7 +877,8 @@ class ShellActivity final : public Activity {
     }
 #if CROSSINK_APP_CAP_HOME_EDITOR
     if (canEdit() && !editing) {
-      paintFittedText(UI_10_FONT_ID, header.x + header.width - 72, header.y + 4, tr(STR_EDIT), 68);
+      paintFittedText(UI_10_FONT_ID, header.x + header.width - 72, header.y + 4,
+                      widgets->page().textOnly ? tr(STR_SETTINGS_TITLE) : tr(STR_EDIT), 68);
     } else if (editing && editor.panel() != EditorAddRemove::Panel::Select &&
                editor.panel() != EditorAddRemove::Panel::Selected) {
       paintFittedText(UI_10_FONT_ID, header.x + header.width - 72, header.y + 4, tr(STR_BACK), 68);
@@ -754,6 +969,15 @@ bool dismissUpgradeNotice() {
   return committed;
 }
 Library& homeLibrary() { return offlineLibrary(); }
+std::unique_ptr<Activity> createHomeEditor(GfxRenderer& renderer, MappedInputManager& input) {
+#if CROSSINK_APP_CAP_HOME_EDITOR
+  auto shell = makeUniqueNoThrow<ShellActivity>(renderer, input, HalDisplay::FULL_REFRESH, offlineLibrary(), true);
+  if (!shell) LOG_ERR("BSH", "Cannot allocate Home editor");
+  return shell;
+#else
+  return nullptr;
+#endif
+}
 void showHome(GfxRenderer& renderer, MappedInputManager& input, HalDisplay::RefreshMode refresh) {
   // Activity lifetime must outlive this call and is owned by ActivityManager.
   auto shell = makeUniqueNoThrow<ShellActivity>(renderer, input, refresh);
@@ -765,8 +989,8 @@ void showHome(GfxRenderer& renderer, MappedInputManager& input, HalDisplay::Refr
 }
 #ifdef SIMULATOR
 uint32_t homeScenePaints() { return scenePaints; }
-void showHomeScene(GfxRenderer& renderer, MappedInputManager& input, Library& library) {
-  auto shell = makeUniqueNoThrow<ShellActivity>(renderer, input, HalDisplay::FULL_REFRESH, library);
+void showHomeScene(GfxRenderer& renderer, MappedInputManager& input, Library& library, bool edit) {
+  auto shell = makeUniqueNoThrow<ShellActivity>(renderer, input, HalDisplay::FULL_REFRESH, library, edit);
   if (!shell) {
     LOG_ERR("BSH", "Cannot allocate Home scene");
     return;

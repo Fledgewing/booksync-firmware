@@ -1080,7 +1080,7 @@ inline std::vector<SettingInfo> buildControlsSideButtonSettingsList(const std::v
 
 inline std::vector<SettingInfo> buildGroupedDisplaySettingsList(const std::vector<SettingInfo>& allSettings) {
   std::vector<SettingInfo> displaySettings;
-  displaySettings.reserve(10);
+  displaySettings.reserve(11);
 
   auto addDisplaySetting = [&](StrId nameId) {
     const auto it = std::find_if(allSettings.begin(), allSettings.end(),
@@ -1090,6 +1090,8 @@ inline std::vector<SettingInfo> buildGroupedDisplaySettingsList(const std::vecto
     }
   };
 
+  if (gpio.deviceIsX3())
+    displaySettings.push_back(SettingInfo::Action(StrId::STR_HOME_WIDGETS, SettingAction::HomeWidgets));
   displaySettings.push_back(SettingInfo::Submenu(StrId::STR_SLEEP_SCREEN, SettingAction::DisplaySleepScreen));
   if (Frontlight.present()) {
     displaySettings.push_back(SettingInfo::Submenu(StrId::STR_FRONTLIGHT, SettingAction::DisplayFrontlight));

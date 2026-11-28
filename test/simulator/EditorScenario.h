@@ -25,6 +25,7 @@ class Fixture final : public Library {
   LayoutEdit request{};
   LayoutEditResult reply{};
   bool queued = false;
+  LayoutEditStatus forced = LayoutEditStatus::Idle;
   mutable unsigned paints = 0;
   unsigned writes = 0, batches = 0;
   Capabilities capabilities() const override { return {}; }
@@ -52,7 +53,8 @@ class Fixture final : public Library {
     if (!queued) return;
     queued = false;
     ++writes;
-    reply.status = store.edit(worker, request);
+    reply.status = forced == LayoutEditStatus::Idle ? store.edit(worker, request) : forced;
+    forced = LayoutEditStatus::Idle;
     if (!store.project(0, page)) std::_Exit(11);
     reply.revision = page.revision;
   }
@@ -87,7 +89,7 @@ inline bool geometryTick() {
   if (f == 0) {
     fixture.store.load();
     if (!fixture.store.project(0, fixture.page)) std::_Exit(30);
-    showHomeScene(renderer, mappedInputManager, fixture);
+    showHomeScene(renderer, mappedInputManager, fixture, fixture.page.textOnly);
   }
   {
     RenderLock lock;
@@ -106,7 +108,9 @@ inline bool geometryTick() {
 #endif
   if (fixture.page.textOnly) {
     if (f == 10) key(mappedInputManager.menuButton(MappedInputManager::Button::Right));
-    if (f == 20) capture(directory, "editor-disabled");
+    if (f == 8) key(MappedInputManager::Button::Confirm);
+    if (f == 20) capture(directory, "x3-no-spatial-controls");
+    if (f == 22) key(MappedInputManager::Button::Back);
     if (f == 24) {
       auto draft = fixture.page;
       draft.textOnly = false;  // Service parity only; no X3 presentation.
@@ -163,8 +167,29 @@ inline bool geometryTick() {
       std::_Exit(35);
     LOG_INF("BSE",
             "BookSync F35b PASS: band/resize/cancel/drop/focus/stale/restart; workspace=%u; payload-allocations=0; X3 "
-            "editor disabled",
+            "spatial editor disabled",
             unsigned(sizeof(LayoutEditor)));
+    std::fflush(nullptr);
+    std::_Exit(0);
+  }
+  return true;
+}
+inline bool settingsTick(const char* directory) {
+  static unsigned frame = 0;
+  const auto f = frame++;
+  mappedInputManager.simulatorClearInputFrame();
+  if (f == 0) activityManager.goToSettings();
+  if (f == 8)
+    mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Down));
+  if (f == 10) mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
+  if (f == 30) {
+    if (!activityManager.isCurrentActivityNamed("Home")) std::_Exit(24);
+    capture(directory, "x3-settings-entry");
+  }
+  if (f == 32) mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Back);
+  if (f == 45) {
+    if (!activityManager.isCurrentActivityNamed("Settings")) std::_Exit(25);
+    LOG_INF("BSE", "BookSync X3 Settings entry/back PASS");
     std::fflush(nullptr);
     std::_Exit(0);
   }
@@ -174,6 +199,7 @@ inline bool tick() {
   if (geometryTick()) return true;
   const char* directory = std::getenv("BOOKSYNC_EDITOR_CAPTURES");
   if (!directory) return false;
+  if (std::getenv("BOOKSYNC_EDITOR_SETTINGS")) return settingsTick(directory);
   mappedInputManager.simulatorClearInputFrame();
   static Fixture fixture;
   static unsigned frame = 0, idlePaints = 0;
@@ -181,7 +207,7 @@ inline bool tick() {
   if (f == 0) {
     fixture.store.load();
     if (!fixture.store.project(0, fixture.page)) std::_Exit(14);
-    showHomeScene(renderer, mappedInputManager, fixture);
+    showHomeScene(renderer, mappedInputManager, fixture, fixture.page.textOnly);
   }
   {
     RenderLock lock;
@@ -190,17 +216,24 @@ inline bool tick() {
   auto key = [](MappedInputManager::Button button) { mappedInputManager.simulatorInjectRelease(button); };
   auto down = [&] { key(mappedInputManager.menuButton(MappedInputManager::Button::Down)); };
   if (fixture.page.textOnly) {
-    // The unapproved Settings-list UI cannot be entered. Shared service parity
-    // still uses real HAL files and restart, without a spatial editor on C3.
-    if (f == 10) key(mappedInputManager.menuButton(MappedInputManager::Button::Right));
-    if (f == 20) capture(directory, "x3-home-editor-disabled");
-    if (f == 24 || f == 54 || f == 96) {
-      LayoutEdit edit;
-      edit.revision = fixture.page.revision;
-      edit.kind = f == 24 ? LayoutEditKind::Add : f == 54 ? LayoutEditKind::Remove : LayoutEditKind::Reset;
-      edit.widget = WidgetKind::Browse;
-      if (fixture.editLayout(edit) != CommandStatus::Accepted) std::_Exit(15);
-    }
+    if (f == 20) capture(directory, "x3-list");
+    if (f == 24 || f == 26 || f == 28 || f == 34 || f == 36 || f == 62 || f == 76 || f == 78 || f == 80 || f == 82 ||
+        f == 96 || f == 98 || f == 100 || f == 102 || f == 106 || f == 134 || f == 136 || f == 138 || f == 154 ||
+        f == 156 || f == 158)
+      down();
+    if (f == 30 || f == 38 || f == 54 || f == 58 || f == 60 || f == 64 || f == 84 || f == 92 || f == 104 || f == 108 ||
+        f == 140 || f == 144 || f == 152 || f == 160 || f == 164)
+      key(MappedInputManager::Button::Confirm);
+    if (f == 32) capture(directory, "x3-add");
+    if (f == 56) capture(directory, "x3-remove-keep");
+    if (f == 90) capture(directory, "x3-reset-keep");
+    if (f == 94 && fixture.page.revision != 3) std::_Exit(16);
+    if (f == 142) fixture.forced = LayoutEditStatus::NoSpace;
+    if (f == 162) fixture.forced = LayoutEditStatus::StorageError;
+    if (f == 150) capture(directory, "x3-no-space");
+    if (f == 170) capture(directory, "x3-save-failed");
+    if (f == 172 || f == 180) key(MappedInputManager::Button::Back);
+    if (f == 174) capture(directory, "x3-recovered-list");
   } else {
 #if CROSSINK_APP_CAP_TOUCH
     if (mappedInputManager.hasTouch()) {
@@ -262,12 +295,12 @@ inline bool tick() {
               fixture.page.count, unsigned(fixture.reply.status));
       std::_Exit(17);
     }
-    if (!fixture.page.textOnly) capture(directory, f == 50 ? "added" : f == 72 ? "removed" : "reset");
+    capture(directory, f == 50 ? "added" : f == 72 ? "removed" : "reset");
   }
-  if (f == 130) {
+  if (f == (fixture.page.textOnly ? 190u : 130u)) {
     fixture.store.load();
-    if (!fixture.store.project(0, fixture.page) || fixture.page.revision != 4 || fixture.writes != 3 ||
-        fixture.batches != 4)
+    if (!fixture.store.project(0, fixture.page) || fixture.page.revision != 4 ||
+        fixture.writes != (fixture.page.textOnly ? 5u : 3u) || fixture.batches != 4)
       std::_Exit(18);
     LayoutEdit stale;
     stale.kind = LayoutEditKind::Remove;
@@ -275,8 +308,7 @@ inline bool tick() {
     if (fixture.store.edit(fixture.worker, stale) != LayoutEditStatus::Stale) std::_Exit(19);
     LOG_INF("BSE",
             "BookSync F35a PASS: add/remove/reset/restart/stale/keep/idle/one-batch; class=%s editor=%u "
-            "payload-allocations=0; X3 UI "
-            "NEEDS APPROVAL",
+            "payload-allocations=0; approved X3 Settings list",
             Layout::deviceClass(), unsigned(sizeof(LayoutEditor)));
     std::fflush(nullptr);
     std::_Exit(0);

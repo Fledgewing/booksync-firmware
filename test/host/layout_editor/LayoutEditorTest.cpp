@@ -7,6 +7,7 @@
 #include "booksync/services/LayoutGeometry.h"
 #include "booksync/storage/LayoutStore.h"
 #include "booksync/ui/EditorAddRemove.h"
+#include "booksync/ui/Home.h"
 using namespace booksync;
 namespace {
 constexpr storage::PublishPaths paths{"/layout", "/layout.tmp", "/layout.bak"};
@@ -188,6 +189,7 @@ class EditorFixture final : public Library {
   LayoutEdit captured{};
   LayoutEditResult result{};
   unsigned writes = 0;
+  mutable unsigned previews = 0;
   Capabilities capabilities() const override { return {}; }
   Snapshot snapshot() const override { return {}; }
   HomePage homePage() const override { return page; }
@@ -199,6 +201,7 @@ class EditorFixture final : public Library {
     return CommandStatus::Accepted;
   }
   LayoutPreview previewLayout(HomePage draft, uint8_t index, LayoutStep step) const override {
+    ++previews;
     if (draft.revision != page.revision) return {draft, LayoutEditStatus::Stale};
     return previewGeometry(draft, index, step);
   }
@@ -265,14 +268,23 @@ TEST(EditorAddRemove, AddRemoveCompletionFocusAndStaleSelection) {
   EXPECT_EQ(lib.captured.revision, 4u);
   EXPECT_EQ(lib.writes, 3u);
 }
-TEST(EditorAddRemove, X3PresentationIsNotEnabledWithoutApproval) {
+TEST(EditorAddRemove, X3KeepWidgetIsFocusedBeforeRemove) {
   EditorFixture lib;
   lib.page.revision = 1;
   lib.page.textOnly = true;
   EditorAddRemove ui(lib);
   ui.enter();
-  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Closed);
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Select);
+  lib.page.count = 3;
+  ui.chooseEditor(1);
+  EXPECT_EQ(ui.focus(), 0);
+  ui.activateEditor();
   EXPECT_EQ(lib.writes, 0u);
+  ui.chooseEditor(1);
+  ui.chooseEditor(1);
+  EXPECT_EQ(lib.writes, 1u);
+  EXPECT_EQ(lib.captured.kind, LayoutEditKind::Remove);
+  EXPECT_EQ(lib.captured.index, 1);
 }
 TEST(LayoutEditor, RemovesFirstMiddleLastAndAllWithoutChangingOtherBytes) {
   for (uint8_t index : {0, 1, 2}) {
@@ -585,4 +597,139 @@ TEST(EditorAddRemove, ConcurrentRevisionAndRemovalKeepFocusOnAVisibleStop) {
   EXPECT_EQ(ui.focus(), 0);  // Empty page: Add remains reachable.
   EXPECT_LT(ui.focus(), ui.rows());
   EXPECT_EQ(lib.writes, 0u);
+}
+
+TEST(EditorAddRemove, X3ListNeverStartsGeometryOrOptions) {
+  EditorFixture lib;
+  lib.page.revision = 1;
+  lib.page.count = 3;
+  lib.page.textOnly = true;
+  EditorAddRemove ui(lib);
+  ui.enter();
+  ui.moreEditor();
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Select);
+  ui.chooseEditor(1);
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Selected);
+  EXPECT_EQ(ui.draftPage(), nullptr);
+  ui.moreEditor();
+  ui.geometryStep(LayoutStep::Down);
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Selected);
+  ui.stepEditor(1);
+  EXPECT_EQ(ui.focus(), 1);
+  EXPECT_EQ(lib.previews, 0u);
+  EXPECT_EQ(lib.writes, 0u);
+  ui.back();
+  EXPECT_EQ(lib.writes, 0u);
+}
+TEST(EditorAddRemove, StaleActionFocusesTheOnlyRecoveryRow) {
+  EditorFixture lib;
+  lib.page.revision = 1;
+  lib.page.count = 3;
+  lib.page.textOnly = true;
+  EditorAddRemove ui(lib);
+  ui.enter();
+  lib.page.revision = 2;
+  ui.chooseEditor(3);
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Error);
+  EXPECT_EQ(ui.focus(), 0);
+  EXPECT_EQ(ui.rows(), 1);
+  EXPECT_EQ(lib.writes, 0u);
+}
+TEST(EditorAddRemove, X3ErrorsReturnToListWithoutRetry) {
+  EditorFixture lib;
+  lib.page.revision = 1;
+  lib.page.count = 3;
+  lib.page.textOnly = true;
+  EditorAddRemove ui(lib);
+  for (auto error : {LayoutEditStatus::NoSpace, LayoutEditStatus::StorageError}) {
+    ui.enter();
+    ui.chooseEditor(3);
+    ui.chooseEditor(2);
+    lib.result.status = error;
+    EXPECT_TRUE(ui.pollEditor());
+    EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Error);
+    EXPECT_EQ(ui.editorFailure(), error);
+    const auto writes = lib.writes;
+    ui.activateEditor();
+    EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Select);
+    EXPECT_LT(ui.focus(), ui.rows());
+    EXPECT_EQ(lib.writes, writes);
+  }
+}
+namespace {
+class NoticeFixture final : public Library {
+ public:
+  Snapshot value{};
+  AccountView account{};
+  AccountView accountView() const override { return account; }
+  CommandStatus syncResult = CommandStatus::Accepted;
+  unsigned syncs = 0, dismissals = 0;
+  Capabilities capabilities() const override { return {}; }
+  Snapshot snapshot() const override { return value; }
+  CommandStatus submit(Intent intent) override {
+    if (intent == Intent::Sync) {
+      ++syncs;
+      return syncResult;
+    }
+    if (intent == Intent::DismissUpgradeNotice) {
+      ++dismissals;
+      return CommandStatus::Accepted;
+    }
+    return CommandStatus::Unavailable;
+  }
+};
+}  // namespace
+TEST(UpgradeNotice, QuietUntilEligibleAndPending) {
+  NoticeFixture lib;
+  UpgradeNotice ui(lib);
+  EXPECT_FALSE(ui.pollNotice(true));
+  lib.value.upgradeNoticePending = true;
+  EXPECT_FALSE(ui.pollNotice(false));
+  EXPECT_FALSE(ui.visible());
+  EXPECT_TRUE(ui.pollNotice(true));
+  EXPECT_TRUE(ui.visible());
+  EXPECT_EQ(ui.focus(), 0);
+  EXPECT_EQ(lib.syncs + lib.dismissals, 0u);
+}
+TEST(UpgradeNotice, NowDispatchesNeutralSyncExactlyOnceEvenWhenUnavailable) {
+  for (auto result : {CommandStatus::Accepted, CommandStatus::Unavailable}) {
+    NoticeFixture lib;
+    lib.value.upgradeNoticePending = true;
+    lib.syncResult = result;
+    UpgradeNotice ui(lib);
+    ASSERT_TRUE(ui.pollNotice(true));
+    ui.choose(0);
+    EXPECT_FALSE(ui.visible());
+    EXPECT_EQ(lib.syncs, 1u);
+    EXPECT_EQ(lib.dismissals, 1u);
+    EXPECT_FALSE(ui.pollNotice(true));  // Pending checkpoint cannot reopen in this lifetime.
+    ui.choose(0);
+    EXPECT_EQ(lib.syncs, 1u);
+  }
+}
+TEST(UpgradeNotice, LaterAndBackOnlyDismiss) {
+  for (bool back : {false, true}) {
+    NoticeFixture lib;
+    lib.value.upgradeNoticePending = true;
+    UpgradeNotice ui(lib);
+    ui.pollNotice(true);
+    if (back)
+      ui.back();
+    else {
+      ui.stepNotice(1);
+      ui.choose(ui.focus());
+    }
+    EXPECT_FALSE(ui.visible());
+    EXPECT_EQ(lib.syncs, 0u);
+    EXPECT_EQ(lib.dismissals, 1u);
+  }
+}
+
+TEST(UpgradeNotice, UsesCachedNeutralAccountServiceLabel) {
+  NoticeFixture lib;
+  lib.value.upgradeNoticePending = true;
+  lib.account.serviceLabel = {"Example service"};
+  UpgradeNotice ui(lib);
+  ASSERT_TRUE(ui.pollNotice(true));
+  EXPECT_STREQ(ui.serviceName(), "Example service");
 }

@@ -2,7 +2,7 @@
 #pragma once
 #include "booksync/interface/Library.h"
 namespace booksync {
-// Approved X4 editor operations. X3 Settings-list presentation awaits approval.
+// Approved X4 spatial and X3 Settings-list add/remove/reset operations.
 class EditorAddRemove {
  public:
   enum class Panel : uint8_t { Closed, Select, Selected, Options, Add, Reset, Waiting, Error };
@@ -15,7 +15,7 @@ class EditorAddRemove {
   auto pollEditor() -> bool;
   auto geometryStep(LayoutStep movement) -> void;
   auto moreEditor() -> void;
-  const HomePage* draftPage() const { return panel_ == Panel::Selected ? &draft_ : nullptr; }
+  const HomePage* draftPage() const { return panel_ == Panel::Selected && !draft_.textOnly ? &draft_ : nullptr; }
   bool blocked() const { return blocked_; }
   uint8_t nextWidth() const { return nextW_; }
   uint8_t nextHeight() const { return nextH_; }

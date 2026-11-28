@@ -1,6 +1,7 @@
 #include <cassert>
 #include <type_traits>
 
+#include "booksync/services/LocalLibrary.h"
 #include "booksync/services/OfflineLibrary.h"
 #include "booksync/services/ServerAdapter.h"
 #include "booksync/ui/Home.h"
@@ -9,6 +10,12 @@
 bool paintOffline(const booksync::Library& library);
 
 namespace {
+unsigned noticeCheckpoints = 0;
+bool failNoticeCheckpoint() {
+  ++noticeCheckpoints;
+  booksync::publishUpgradeState(true, false, failNoticeCheckpoint);
+  return false;
+}
 class FakeLibrary final : public booksync::Library {
  public:
   mutable unsigned paints = 0;
@@ -76,7 +83,17 @@ int main() {
   for (int boot = 0; boot < 2; ++boot) {
     assert(paintOffline(library));
     assert(library.submit(Intent::Refresh) == CommandStatus::Unavailable);
+    assert(library.submit(Intent::Sync) == CommandStatus::Unavailable);
     assert(library.snapshot().generation == 0);
     assert(!defaultServerAdapter().capabilities().delivery);
   }
+  publishUpgradeState(true, false, failNoticeCheckpoint);
+  UpgradeNotice firstNotice(library);
+  assert(firstNotice.pollNotice(true));
+  firstNotice.back();
+  assert(!library.snapshot().upgradeNoticePending);
+  workLocalLibrary();  // A failed checkpoint republishes durable pending state.
+  assert(noticeCheckpoints == 1);
+  UpgradeNotice laterHome(library);
+  assert(!laterHome.pollNotice(true));
 }
