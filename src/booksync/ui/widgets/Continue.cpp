@@ -59,7 +59,7 @@ void Continue::paint(Canvas& canvas, WidgetView viewValue, const ContinueValues&
       : book.pages ? static_cast<uint32_t>(uint64_t(book.page < book.pages ? book.page : book.pages) * 100 / book.pages)
                    : 0;
   if (positionKnown) {
-    canvas.text({box.width - 64, progressY - 2, 52, box.line}, Label::Progress, black, false, percent, 100);
+    canvas.text({box.width - 64, progressY - 2, 52, box.line}, Label::Progress, black, true, percent, 100);
     const int barY = progressY + 4;
     const int barWidth = width - 64;
     canvas.border({textX, barY, barWidth, 5}, black);
