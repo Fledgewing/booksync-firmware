@@ -11,7 +11,9 @@ top right and no redundant All or bottom See all action.
 The page uses three bounded member rows, 48×72 prepared covers on X4, large
 numbers/small labels, thin outlined cards, contextual fractional numbers and
 small status labels. X3 excludes bitmap storage and uses bounded text. All
-geometry comes from the renderer's safe area; touch targets use at least 50
+geometry comes from the renderer's safe area and actual font line heights. Member
+focus borders clear their heading, stacked statistic labels clear the progress
+bar, and scroll windows reserve the complete action area. Touch targets use at least 50
 design pixels. Cached cover requests/preparation begin after first paint. Paint
 reads only foreground-owned values and prepared bitmap bytes; it never queries
 Library, opens files, decodes covers or starts network work.

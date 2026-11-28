@@ -100,7 +100,8 @@ class SeriesActivity final : public Activity {
   }
   Rect pageRow(uint8_t i) const {
     const auto s = safe();
-    return Rect{s.x + seriesScale(16), seriesTop() + seriesScale(336) + i * seriesScale(91), s.width - seriesScale(32),
+    const int start = std::max(seriesScale(336), seriesScale(318) + seriesTextLine() + seriesScale(6));
+    return Rect{s.x + seriesScale(16), seriesTop() + start + i * seriesScale(91), s.width - seriesScale(32),
                 seriesScale(91)};
   }
   Rect downloadButton() const {
@@ -174,7 +175,8 @@ class SeriesActivity final : public Activity {
   int sheetListTop() const { return series_.scene() == SeriesScene::Queue ? seriesScale(136) : seriesScale(76); }
   int visibleRows() const {
     const auto r = seriesPanel();
-    const int available = r.height - sheetListTop() - seriesScale(6) - actionCount() * seriesScale(54);
+    const int available =
+        r.height - sheetListTop() - seriesScale(12) - seriesScale(6) - actionCount() * seriesScale(54);
     return std::max(1, available / rowHeight());
   }
   Rect sheetRow(uint8_t i) const {
@@ -249,6 +251,26 @@ class SeriesActivity final : public Activity {
     renderer.drawLine(x + z, y + z, x + z + seriesScale(9), y + z + seriesScale(9), 2, true);
     renderer.drawLine(s.x, s.y + seriesScale(58), s.x + s.width, s.y + seriesScale(58));
   }
+  int totalsBarY(int y) const {
+    const auto& plan = series_.plan();
+    const uint32_t values[] = {plan.total, plan.read, plan.reading};
+    const char* labels[] = {tr(STR_SERIES_BOOKS), tr(STR_SERIES_READ), tr(STR_SERIES_READING)};
+    const int width = (safe().width - seriesScale(32)) / 3;
+    int barY = y + seriesScale(48);
+    for (uint8_t i = 0; i < 3; ++i) {
+      char n[16];
+      std::snprintf(n, sizeof(n), "%lu", static_cast<unsigned long>(values[i]));
+      int font = UI_12_FONT_ID;
+      if (renderer.getTextWidth(font, n, EpdFontFamily::BOLD) > width) font = UI_10_FONT_ID;
+      const bool stacked = CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS ||
+                           renderer.getTextWidth(font, n, EpdFontFamily::BOLD) + seriesScale(6) +
+                                   renderer.getTextWidth(SMALL_FONT_ID, labels[i]) >
+                               width;
+      const int labelBottom = y + seriesScale(stacked ? 32 : 8) + renderer.getLineHeight(SMALL_FONT_ID);
+      barY = std::max(barY, labelBottom + seriesScale(6));
+    }
+    return barY;
+  }
   void totals(int y) const {
     const auto s = safe();
     const auto& plan = series_.plan();
@@ -270,14 +292,13 @@ class SeriesActivity final : public Activity {
            labels[i], false, SMALL_FONT_ID);
     }
     if (plan.availability == Availability::Ready && plan.total) {
+      const int barY = totalsBarY(y);
       const unsigned count = std::min<uint32_t>(plan.total, 24);
       const int width = (s.width - seriesScale(32)) / count;
       for (unsigned i = 0; i < count; ++i) {
         const int x = s.x + seriesScale(16) + i * width;
-        renderer.drawRoundedRect(x, y + seriesScale(48), width - seriesScale(3), seriesScale(7), 1, seriesScale(3),
-                                 true);
-        if (i < plan.read)
-          renderer.fillRect(x + 1, y + seriesScale(48) + 1, width - seriesScale(3) - 2, seriesScale(7) - 2);
+        renderer.drawRoundedRect(x, barY, width - seriesScale(3), seriesScale(7), 1, seriesScale(3), true);
+        if (i < plan.read) renderer.fillRect(x + 1, barY + 1, width - seriesScale(3) - 2, seriesScale(7) - 2);
       }
     }
   }
@@ -352,7 +373,7 @@ class SeriesActivity final : public Activity {
          : plan.count                 ? tr(STR_SERIES_DOWNLOAD_NEXT)
                                       : tr(STR_SERIES_DOWNLOADS_MORE),
          true);
-    text(Rect{s.x + seriesScale(16), seriesTop() + seriesScale(318), seriesScale(130), seriesScale(24)},
+    text(Rect{s.x + seriesScale(16), seriesTop() + seriesScale(318), seriesScale(130), seriesTextLine()},
          tr(STR_SERIES_MEMBERS), true);
     for (uint8_t i = 0; i < std::min<uint16_t>(members.count, 3); ++i) {
       const auto r = pageRow(i);
@@ -868,6 +889,26 @@ class SeriesActivity final : public Activity {
 #ifdef SIMULATOR
   bool scenarioInvariant() {
     if (!focusable(focus_)) return false;
+    if (series_.scene() == SeriesScene::Page && series_.members().count &&
+        pageRow(0).y < seriesTop() + seriesScale(318) + seriesTextLine() + seriesScale(6)) {
+      LOG_ERR("BSS", "Series member focus area overlaps heading line");
+      return false;
+    }
+    if (rowCount() && series_.scene() != SeriesScene::Page) {
+      const uint8_t last = std::min<unsigned>(rowCount(), scroll_ + visibleRows()) - 1;
+      if (sheetRow(last).y + rowHeight() + seriesScale(6) > actionRect(0).y) {
+        LOG_ERR("BSS", "Series list window overlaps action area");
+        return false;
+      }
+    }
+#if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
+    if (series_.scene() == SeriesScene::Page && series_.members().count &&
+        totalsBarY(seriesTop() + seriesScale(70)) <
+            seriesTop() + seriesScale(70) + seriesScale(32) + renderer.getLineHeight(SMALL_FONT_ID) + seriesScale(6)) {
+      LOG_ERR("BSS", "Series statistic labels overlap progress bar");
+      return false;
+    }
+#endif
     if (series_.scene() == SeriesScene::Files && focus_ != 0) return false;
     if (series_.scene() == SeriesScene::Count && focus_ != 1) return false;
     if ((series_.scene() == SeriesScene::Preview || series_.scene() == SeriesScene::Review) &&
