@@ -39,7 +39,10 @@ LayoutSource LayoutStore::load() {
 }
 bool LayoutStore::save(LayoutInput input) {
   const bool validInput = validator_.validate(input, device_, spans_, context_);
-  if (input.release) input.release(input.context);
+  if (input.release && !input.release(input.context)) {
+    LOG_ERR("BSL", "Cannot close layout input reader");
+    return false;
+  }
   if (!validInput) return false;
   // Do not overwrite even a damaged primary on an explicit save. Recovery is
   // read-only; a future recovery flow can preserve damaged bytes before repair.
@@ -70,7 +73,10 @@ bool LayoutStore::save(LayoutInput input) {
     if (!writer.write(copy_, n)) return false;
     offset += n;
   }
-  if (input.release) input.release(input.context);
+  if (input.release && !input.release(input.context)) {
+    LOG_ERR("BSL", "Cannot close layout input reader");
+    return false;
+  }
   if (!writer.finish()) return false;
   selected_ = paths_.current;
   return true;
@@ -104,7 +110,7 @@ LayoutEditStatus LayoutStore::edit(LayoutEditor& editor, LayoutEdit request) {
   struct Source {
     const char* path;
     FsFile file;
-    void close() { file.close(); }
+    bool close() { return file.close(); }
   } source{selected_, {}};
   LayoutInput input = Layout::defaults();
   if (source.path) {
@@ -119,10 +125,13 @@ LayoutEditStatus LayoutStore::edit(LayoutEditor& editor, LayoutEdit request) {
                return s.file && s.file.seekSet(offset) && s.file.read(out, n) == static_cast<int>(n);
              },
              &source, static_cast<size_t>(source.file.fileSize()),
-             [](void* context) { static_cast<Source*>(context)->close(); }};
+             [](void* context) { return static_cast<Source*>(context)->close(); }};
   }
   auto result = editor.prepare(input, device_, request);
-  source.close();
+  if (!source.close()) {
+    LOG_ERR("BSL", "Cannot close editor source");
+    result = LayoutEditStatus::StorageError;
+  }
   if (result == LayoutEditStatus::Saved) {
     result = save(editor.output()) ? LayoutEditStatus::Saved : LayoutEditStatus::StorageError;
     source.close();

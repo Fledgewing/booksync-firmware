@@ -48,7 +48,7 @@ LayoutInput LayoutEditor::output() {
           this, bytes_,
           [](void* context) {
             auto& self = *static_cast<LayoutEditor*>(context);
-            if (self.input_.release) self.input_.release(self.input_.context);
+            return !self.input_.release || self.input_.release(self.input_.context);
           }};
 }
 bool LayoutEditor::freeCell(Layout::Span root, Layout::Span page, const char* device, uint8_t w, uint8_t h, uint8_t& x,

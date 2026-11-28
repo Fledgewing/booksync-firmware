@@ -14,7 +14,7 @@ struct LayoutInput {
   void* context = nullptr;
   size_t bytes = 0;
   // Release any lazy reader before publication validates or renames files.
-  void (*release)(void*) = nullptr;
+  bool (*release)(void*) = nullptr;
   static LayoutInput memory(const void* data, size_t bytes);
 };
 // Fixed reusable worker workspace, no heap or JSON tree. Unknown values are

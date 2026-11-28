@@ -335,3 +335,15 @@ TEST(LayoutEditor, UnknownInstancesReserveCellsAndSurviveKnownRemoval) {
   ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
   EXPECT_NE(bytes(editor.output()).find(unknown), std::string::npos);
 }
+TEST(LayoutEditor, FailedInputClosePreventsPublication) {
+  card = {};
+  card.files[paths.current] = original();
+  card.disk = card.files;
+  storage::LayoutStore store(paths, "x4");
+  const auto before = card.files;
+  const auto raw = original();
+  auto input = LayoutInput::memory(raw.data(), raw.size());
+  input.release = [](void*) { return false; };
+  EXPECT_FALSE(store.save(input));
+  EXPECT_EQ(card.files, before);
+}
