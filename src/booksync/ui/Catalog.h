@@ -82,6 +82,12 @@ class CatalogSurface {
   QueryRequest request_{};  // Reused, never a multi-KiB task-stack temporary.
   QueryResult result_{};
   LibraryWindow covers_{};
+  // Dashboard reuses the otherwise idle result entries for eight last-good
+  // previews; these descriptors are the only additional cache storage.
+  std::array<WindowSpan, 2> retainedShelves_{};
+  Provenance retainedShelfProvenance_{};
+  uint32_t retainedShelfBytes_ = 0;
+  uint8_t retainedShelfRows_ = 0;
   CatalogSources sources_{};
   DownloadChoices choices_{};
   BookRow selected_{};

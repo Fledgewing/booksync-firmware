@@ -114,7 +114,7 @@ class CatalogActivity final : public Activity {
     if (count.availability == Availability::Ready)
       std::snprintf(value, sizeof(value), all ? tr(STR_CATALOG_ALL_FORMAT) : "%u", unsigned(count.value));
     else
-      std::snprintf(value, sizeof(value), "%s", "—");
+      std::snprintf(value, sizeof(value), "%s", all ? tr(STR_CATALOG_ALL_UNKNOWN) : "—");
     text(r, value, all ? UI_10_FONT_ID : BITTER_16_FONT_ID);
   }
   void paintCatalogCover(Rect r, const BookRow& book, uint8_t index) const {
@@ -160,17 +160,22 @@ class CatalogActivity final : public Activity {
   void dashboard() const {
     const auto s = safe();
     const int line = renderer.getLineHeight(UI_10_FONT_ID);
+    const auto& window = catalog_->catalogCovers();
+    bool failed = catalog_->catalogState() == CatalogSurface::State::Error;
+    for (uint8_t i = 0; i < window.windowCount && i < 2; ++i)
+      failed = failed || window.windows[i].availability == Availability::Unavailable;
     int top = headerBottom() + 10;
     text(Rect{s.x + 12, top, s.width - 24, line + 4},
-         catalog_->catalogSummaryValue().books.availability == Availability::NotSaved ? tr(STR_HOME_NOT_SAVED)
-         : catalog_->catalogSummaryValue().online                                     ? tr(STR_CATALOG_SAVED)
-                                                                                      : tr(STR_CATALOG_OFFLINE));
+         failed                                                                         ? tr(STR_CATALOG_LOAD_ERROR)
+         : catalog_->catalogState() == CatalogSurface::State::Loading                   ? tr(STR_HOME_LOADING)
+         : catalog_->catalogSummaryValue().books.availability == Availability::NotSaved ? tr(STR_HOME_NOT_SAVED)
+         : catalog_->catalogSummaryValue().online                                       ? tr(STR_CATALOG_SAVED)
+                                                                                        : tr(STR_CATALOG_OFFLINE));
     top += line + 12;
     const int bottom = s.y + s.height - 60;
     const int gap = 10;
     const int tileH = (bottom - top) * 17 / 100;
     const int shelfH = (bottom - top - tileH * 2 - gap * 3) / 2;
-    const auto& window = catalog_->catalogCovers();
     for (uint8_t n = 0; n < 2; ++n) {
       Rect box{s.x + 12, top + n * (shelfH + gap), s.width - 24, shelfH};
       renderer.drawRect(box.x, box.y, box.width, box.height);
@@ -185,7 +190,10 @@ class CatalogActivity final : public Activity {
       if (!span || span->availability != Availability::Ready) {
         text(Rect{box.x + 10, box.y + 54, box.width - 20, line + 4},
              span ? stateTitle(CatalogSurface::catalogAvailabilityState(span->availability, span->count))
-                  : tr(STR_HOME_LOADING));
+                  : stateTitle(catalog_->catalogState()));
+        if ((span && span->availability == Availability::Unavailable) ||
+            (!span && catalog_->catalogState() == CatalogSurface::State::Error))
+          button(Rect{box.x + 10, box.y + 60 + line, 110, 46}, tr(STR_RETRY), n ? 5 : 0);
         continue;
       }
       const auto rows = span->count > 4 ? 4 : span->count;
@@ -370,13 +378,17 @@ class CatalogActivity final : public Activity {
          catalog_->catalogDialog() == CatalogSurface::Dialog::Offline ? tr(STR_CATALOG_OFFLINE_PROMPT)
          : catalog_->catalogDialog() == CatalogSurface::Dialog::Login ? tr(STR_CATALOG_NO_LOGIN)
          : choices                                                    ? tr(STR_DOWNLOAD)
-                                                                      : tr(STR_DOWNLOADING));
+         : catalog_->catalogTransferValue().state == DownloadState::Failed ||
+                 catalog_->catalogTransferValue().state == DownloadState::Canceled
+             ? tr(STR_CATALOG_STOPPED)
+             : tr(STR_DOWNLOADING));
     text(Rect{box.x + 12, box.y + 52, box.width - 24, line}, catalog_->catalogSelectedBook().title.data());
     char label[100];
     if (catalog_->catalogDialog() == CatalogSurface::Dialog::TransferInfo) {
       const auto& job = catalog_->catalogTransferValue();
       if (job.state == DownloadState::Failed)
-        std::snprintf(label, sizeof(label), "%s", errorTitle(job.error));
+        std::snprintf(label, sizeof(label), "%s",
+                      job.error == DownloadError::Unavailable ? tr(STR_DOWNLOAD_FAILED) : errorTitle(job.error));
       else if (job.state == DownloadState::Canceled)
         std::snprintf(label, sizeof(label), "%s", tr(STR_CATALOG_CANCELED));
       else if (job.totalKnown)

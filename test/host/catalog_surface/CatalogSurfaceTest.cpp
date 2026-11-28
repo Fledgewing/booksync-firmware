@@ -402,3 +402,47 @@ TEST(CatalogStateMachine, ChunkProgressOnlyRedrawsCoarseSteps) {
   EXPECT_TRUE(ui.pollCatalog());
 }
 }  // namespace
+
+TEST(CatalogStateMachine, FailedShelfRetryStaysInLibraryAndRequiresExplicitInput) {
+  catalogFixture::SceneLibrary library;
+  library.configureScene(5);
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  const auto batches = library.batches;
+  ui.pollCatalog();
+  EXPECT_EQ(library.batches, batches);
+  ui.selectCatalogControl(0);
+  EXPECT_EQ(ui.activateCatalog(), CommandStatus::Accepted);
+  EXPECT_EQ(library.batches, batches + 1);
+  EXPECT_EQ(ui.catalogPanel(), CatalogSurface::Panel::Dashboard);
+  EXPECT_EQ(library.connects, 0u);
+}
+
+TEST(CatalogStateMachine, LibraryFailureKeepsSameAccountCachedLocalPreviews) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  library.window.fileAvailability[1] = FileAvailability::ServerOnly;
+  ui.pollCatalog();
+  const auto first = ui.catalogCovers().rows[0].key;
+  library.window.count = 0;
+  for (unsigned n = 0; n < 2; ++n) {
+    library.window.windows[n].availability = Availability::Unavailable;
+    library.window.windows[n].count = 0;
+    library.window.windows[n].first = 0;
+    library.window.windows[n].bytes = sizeof(WindowSpan);
+  }
+  library.window.publication = ++library.sequence;
+  ui.pollCatalog();
+  EXPECT_EQ(ui.catalogState(), CatalogSurface::State::Error);
+  ASSERT_EQ(ui.catalogCovers().count, 8);
+  EXPECT_TRUE(ui.catalogCovers().rows[0].key == first);
+  EXPECT_EQ(ui.activateCatalogShelfBook(0), CommandStatus::Accepted);
+  EXPECT_EQ(library.opens, 1u);
+  EXPECT_EQ(ui.activateCatalogShelfBook(1), CommandStatus::Unavailable);
+  EXPECT_EQ(library.starts, 0u);
+  ++library.owner.accountEpoch;
+  ui.pollCatalog();
+  EXPECT_FALSE(ui.catalogLive());
+}

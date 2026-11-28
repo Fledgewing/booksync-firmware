@@ -1344,3 +1344,7 @@ STR_CATALOG_FILE_BYTES_FORMAT: "%llu bytes"
 STR_CATALOG_BOOKS_UNIT: "books"
 STR_CATALOG_COLLECTION_ONE_FORMAT: "books · %u collection"
 STR_CATALOG_COLLECTIONS_FORMAT: "books · %u collections"
+
+STR_CATALOG_ALL_UNKNOWN: "All (—) ›"
+STR_CATALOG_LOAD_ERROR: "Could not load the catalog"
+STR_CATALOG_STOPPED: "Download stopped"

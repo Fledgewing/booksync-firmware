@@ -18,7 +18,7 @@ CatalogSurface::State CatalogSurface::catalogAvailabilityState(Availability valu
 void CatalogSurface::enterCatalog(bool textOnly) {
   accountEpoch_ = library_.snapshot().accountEpoch;
   textOnly_ = textOnly;
-  depth_ = retainedCount_ = 0;
+  depth_ = retainedCount_ = retainedShelfRows_ = 0;
   focus_ = 10;
   current_ = {};
   panel_ = Panel::Dashboard;
@@ -103,6 +103,7 @@ void CatalogSurface::requestCatalogPage() {
 }
 void CatalogSurface::browseCatalog(CatalogRoot root) {
   if (!catalogLive() || !pushCatalogLocation()) return;
+  retainedShelfRows_ = 0;
   current_ = {};
   current_.root = root;
   panel_ = root == CatalogRoot::Authors || root == CatalogRoot::Series ? Panel::Groups
@@ -116,6 +117,7 @@ void CatalogSurface::browseCatalog(CatalogRoot root) {
 }
 void CatalogSurface::browseCatalogIndex() {
   if (!catalogLive() || !pushCatalogLocation()) return;
+  retainedShelfRows_ = 0;
   current_ = {};
   panel_ = Panel::Browse;
   focus_ = 0;
@@ -263,20 +265,50 @@ bool CatalogSurface::pollCatalog() {
     pending_ = false;
     if (panel_ == Panel::Dashboard) {
       library_.readWindow(covers_);
-      if (covers_.count > LibraryRows || covers_.windowCount > LibraryBatchRequests || covers_.bytes > LibraryBytes) {
+      bool valid = covers_.count <= 8 && covers_.windowCount <= 2 && covers_.bytes <= LibraryBytes;
+      for (uint8_t n = 0; valid && n < covers_.windowCount; ++n) {
+        const auto& span = covers_.windows[n];
+        valid = span.count <= 4 && span.first <= covers_.count && span.count <= covers_.count - span.first &&
+                span.bytes <= LibraryBytes && span.bytes >= sizeof(WindowSpan) + span.count * sizeof(BookRow);
+      }
+      for (uint16_t n = 0; valid && n < covers_.count; ++n)
+        valid = catalogTextValid(covers_.rows[n].title) && catalogKeyValid(covers_.rows[n].key);
+      if (!valid) {
         covers_.count = covers_.windowCount = 0;
         state_ = State::Error;
       } else {
         state_ = covers_.windowCount ? State::Ready : State::Loading;
-        for (uint8_t n = 0; n < covers_.windowCount; ++n) {
-          const auto& span = covers_.windows[n];
-          if (n >= 2 || span.count > 4 || span.first > covers_.count || span.count > covers_.count - span.first ||
-              span.bytes > LibraryBytes || span.bytes < sizeof(WindowSpan) + span.count * sizeof(BookRow))
-            state_ = State::Error;
+        for (uint8_t n = 0; n < covers_.windowCount; ++n)
+          if (covers_.windows[n].availability == Availability::Unavailable) state_ = State::Error;
+        if (state_ == State::Ready && covers_.windowCount == 2 &&
+            covers_.windows[0].availability == Availability::Ready &&
+            covers_.windows[1].availability == Availability::Ready) {
+          retainedShelfRows_ = uint8_t(covers_.count);
+          retainedShelfProvenance_ = covers_.provenance;
+          retainedShelfBytes_ = covers_.bytes;
+          for (uint8_t n = 0; n < 2; ++n) retainedShelves_[n] = covers_.windows[n];
+          for (uint8_t n = 0; n < retainedShelfRows_; ++n) {
+            result_.entries[n].book = covers_.rows[n];
+            result_.entries[n].onDevice = covers_.fileAvailability[n] == FileAvailability::OnCard ? QueryTruth::Yes
+                                          : covers_.fileAvailability[n] == FileAvailability::ServerOnly
+                                              ? QueryTruth::No
+                                              : QueryTruth::Unknown;
+          }
+        } else if (state_ == State::Error && retainedShelfRows_ &&
+                   retainedShelfProvenance_.accountEpoch == accountEpoch_) {
+          covers_.count = retainedShelfRows_;
+          covers_.windowCount = 2;
+          covers_.provenance = retainedShelfProvenance_;
+          covers_.bytes = retainedShelfBytes_;
+          covers_.stale = true;
+          for (uint8_t n = 0; n < 2; ++n) covers_.windows[n] = retainedShelves_[n];
+          for (uint8_t n = 0; n < retainedShelfRows_; ++n) {
+            covers_.rows[n] = result_.entries[n].book;
+            covers_.fileAvailability[n] = result_.entries[n].onDevice == QueryTruth::Yes  ? FileAvailability::OnCard
+                                          : result_.entries[n].onDevice == QueryTruth::No ? FileAvailability::ServerOnly
+                                                                                          : FileAvailability::Unknown;
+          }
         }
-        for (uint16_t n = 0; n < covers_.count; ++n)
-          if (!catalogTextValid(covers_.rows[n].title) || !catalogKeyValid(covers_.rows[n].key)) state_ = State::Error;
-        if (state_ == State::Error) covers_.windowCount = covers_.count = 0;
       }
     } else if (panel_ == Panel::Sources) {
       library_.readCatalogSources(sources_);
@@ -472,6 +504,7 @@ CommandStatus CatalogSurface::activateCatalogShelfBook(uint8_t index) {
   if (actual >= covers_.count) return CommandStatus::Unavailable;
   const auto& book = covers_.rows[actual];
   const auto catalogFileTruth = covers_.fileAvailability[actual];
+  if (state_ == State::Error && catalogFileTruth != FileAvailability::OnCard) return CommandStatus::Unavailable;
   return selectCatalogBook(book, catalogFileTruth == FileAvailability::Unknown  ? QueryTruth::Unknown
                                  : catalogFileTruth == FileAvailability::OnCard ? QueryTruth::Yes
                                                                                 : QueryTruth::No);
@@ -551,9 +584,14 @@ CommandStatus CatalogSurface::activateCatalog() {
   if (!catalogLive()) return CommandStatus::Unavailable;
   if (dialog_ != Dialog::None) return catalogDialogAction(focus_);
   if (panel_ == Panel::Dashboard) {
-    if (focus_ == 0 || focus_ == 5)
-      openCatalogShelf(focus_ == 5 ? 1 : 0);
-    else if (focus_ < 5)
+    if (focus_ == 0 || focus_ == 5) {
+      const uint8_t shelf = focus_ == 5 ? 1 : 0;
+      if ((state_ == State::Error && !covers_.windowCount) ||
+          (shelf < covers_.windowCount && covers_.windows[shelf].availability == Availability::Unavailable))
+        requestCatalogPage();
+      else
+        openCatalogShelf(shelf);
+    } else if (focus_ < 5)
       return activateCatalogShelfBook(focus_ - 1);
     else if (focus_ < 10)
       return activateCatalogShelfBook(focus_ - 2);
