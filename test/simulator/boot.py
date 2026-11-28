@@ -97,6 +97,7 @@ subprocess.run([sys.executable, 'test/simulator/daily_widgets.py', profile], cwd
 subprocess.run([sys.executable, 'test/simulator/records_widgets.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/goal_widgets.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/continue_widget.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/booklist_widget.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/credentials.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/version.py', profile], cwd=root, env=env, check=True)
 
@@ -128,4 +129,6 @@ subprocess.run([sys.executable, "test/simulator/catalog_surface.py", profile], c
 subprocess.run([sys.executable, "test/simulator/native_personal.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, "test/simulator/device_bridge.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/reminder_ui.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/booklist_projection.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, "test/simulator/booklist_cancel.py", profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

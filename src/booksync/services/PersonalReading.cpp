@@ -2,6 +2,7 @@
 // Selection semantics follow BookSync companion PersonalReading.kt. Provider
 // arrays are replaced by bounded cooperative cursors for C3 memory constraints.
 #include "PersonalReading.h"
+#include "widgets/BookList.h"
 
 #include <Logging.h>
 
@@ -285,6 +286,10 @@ namespace {
 // This link-only descriptor is never instantiated or invoked by runtime.
 struct ReadingLinkInput {
   booksync::PersonalReading& personal;
+  booksync::BookListSource& bookListSource;
+  booksync::BookListProjection& bookList;
+  booksync::WindowRequest& bookListRequest;
+  uint16_t bookListYear;
   booksync::ReadingStats& stats;
   booksync::StatsSource& source;
   booksync::PageStatsSource& pages;
@@ -304,5 +309,6 @@ extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
   input.stats.combine(input.remote, scope, true, input.day, input.out);
   input.personal.begin(input.kind, input.day, input.pick, scope);
   input.personal.card({}, scope, input.card);
-  return input.stats.tick() && input.personal.tick();
+  return input.stats.tick() && input.personal.tick() &&
+         booksync::projectBookList(input.bookListSource, input.bookListRequest, scope, input.bookListYear, input.bookList);
 }

@@ -1,0 +1,17 @@
+{
+  "reference": "f40w-widgets--05-recently-added.png",
+  "normalizedTile": [
+    456,
+    224
+  ],
+  "crop": [
+    122,
+    52,
+    224,
+    196
+  ],
+  "width": 128,
+  "height": 180,
+  "blackBit": 0,
+  "sha256": "5b035489b1aa93831e30dbeaa3db787e84c1cac4a5bdcd7e53c32ce5b3d5d450"
+}

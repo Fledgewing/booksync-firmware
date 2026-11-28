@@ -9,6 +9,8 @@ struct WidgetView {
   uint32_t total = 0;
   uint16_t count = 0;
   bool stale = false;
+  uint32_t ageDays = 0;
+  bool ageKnown = false;
 };
 struct WidgetBox {
   int width = 0, height = 0, line = 0;

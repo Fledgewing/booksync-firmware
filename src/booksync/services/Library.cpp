@@ -41,6 +41,7 @@ struct LocalState {
   WindowBatchRequest pending{};
   storage::IndexRecord openRecord{};
   BookKey openKey{};
+  std::unique_ptr<BookListProjection> bookListScratch;  // <=1 KiB, allocated once for an X4 preview only.
   std::unique_ptr<LocalQueryState> query;
   std::unique_ptr<StatsWorker> stats;
   ServerAdapter* savedStatsSource = nullptr;  // Borrowed Home-lifetime provider; Bootstrap owns it.
@@ -187,6 +188,15 @@ class OfflineLibrary final : public Library {
   bool requestBatch(WindowBatchRequest batch) override {
     if (!local || !ReadModel::accepts(batch)) return false;
     if (std::string_view(Layout::deviceClass()) == "x3" && batch.personalWidgets) return false;
+    for (uint8_t i = 0; i < batch.count; ++i) {
+      if (batch.windows[i].presentation != WindowPresentation::Preview) continue;
+      if (!local->bookListScratch) {
+        local->bookListScratch = makeUniqueNoThrow<BookListProjection>();
+        if (!local->bookListScratch) LOG_ERR("BSBL", "Cannot allocate bounded Book list preview workspace");
+      }
+      local->model.setBookListScratch(local->bookListScratch.get());
+      break;
+    }
     local->pending = batch;
     local->requested = true;
     return true;
@@ -232,6 +242,16 @@ class OfflineLibrary final : public Library {
       statsValue.clear();
       statsValue.state = StatsCardState::Unavailable;
     }
+  }
+  WindowSource requestedSource = WindowSource::Unknown;
+  CommandStatus browseSource(WindowSource source) override {
+    if (source == WindowSource::Continue || source == WindowSource::Unknown) return CommandStatus::Unsupported;
+    requestedSource = source;
+    return CommandStatus::Accepted;
+  }
+  void retireOpen(BookKey key) override {
+    if (!local || !(local->openKey == key)) return;
+    local->resolveOpen = local->openReady = false;
   }
   CommandStatus open(BookKey key) override {
     if (!local || !local->index.ready() || key.provenance != local->index.provenance() ||
@@ -328,8 +348,23 @@ void publishClockStatus(ClockStatus value) {
     local->model.notifyQueryPublication();
   }
 }
+bool bindHomeBookListSource(BookListSource source, ReadingScope scope, uint16_t year) {
+  if (!local || (scope.owner &&
+                 (scope.owner != accountPresentation.ticket.owner || scope.epoch != accountPresentation.ticket.epoch)))
+    return false;
+  local->model.setBookListSource(source, scope, year);
+  local->requested = true;
+  return true;
+}
 void bindReminders(RemindersFacade& facade) { reminders = &facade; }
 void publishAccountView(AccountView value) {
+  if (local && (accountPresentation.ticket.owner != value.ticket.owner ||
+                accountPresentation.ticket.epoch != value.ticket.epoch)) {
+    local->model.invalidate(Invalidation::Account);
+    local->openReady = local->resolveOpen = false;
+    local->openKey = {};
+    local->requested = true;
+  }
   value.serviceLabel.back() = 0;
   const bool ownerChanged = value.ticket.owner != accountPresentation.ticket.owner ||
       value.ticket.epoch != accountPresentation.ticket.epoch || value.selectedService != accountPresentation.selectedService;
@@ -367,6 +402,11 @@ bool takeCatalogRequest() {
   const bool requested = catalogRequested;
   catalogRequested = false;
   return requested;
+  }
+bool takeSourceBrowseRequest(WindowSource& source) {
+  source = shellLibrary().requestedSource;
+  shellLibrary().requestedSource = WindowSource::Unknown;
+  return source != WindowSource::Unknown;
 }
 bool takeHomeOpenRequest() {
   const bool requested = shellLibrary().openRequested;
@@ -487,9 +527,10 @@ void workLocalLibrary() {
     state.personalPending = state.pending.personalWidgets != 0;
     if (!state.personalPending) state.personal.reset();
     state.model.setContinue(shellLibrary().lastBook, shellLibrary().available);
-    if (state.model.materializeBatch(state.pending) && state.model.availability() == Availability::Ready &&
-        state.history.start())
-      state.model.beginHistory(state.history.source());
+    state.model.materializeBatch(state.pending);
+    // One failed widget must not suppress the native position overlay for its
+    // ready siblings. beginHistory still checks exact native scope/identity.
+    if (state.index.ready() && state.history.start()) state.model.beginHistory(state.history.source());
   }
   if (state.stats && state.stats->tick(currentClock)) state.model.notifyQueryPublication();
   if (state.model.historyBusy()) state.model.historyTick(DeviceIndex::Batch);

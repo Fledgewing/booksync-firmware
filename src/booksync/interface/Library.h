@@ -108,6 +108,8 @@ class Library {
   virtual CommandStatus showCatalogSeries(std::array<char, 64>) { return CommandStatus::Unavailable; }
   virtual CommandStatus showCatalogFilter() { return CommandStatus::Unavailable; }
   virtual CommandStatus showDownloadAccount() { return submit(Intent::OpenAccount); }
+  virtual CommandStatus browseSource(WindowSource) { return CommandStatus::Unavailable; }
+  virtual void retireOpen(BookKey) {}
   virtual CommandStatus open(BookKey) { return CommandStatus::Unavailable; }
   virtual LibraryWindow window() const { return {}; }
   virtual void readWindow(LibraryWindow& out) const { out = window(); }
