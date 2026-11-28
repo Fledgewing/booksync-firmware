@@ -538,8 +538,13 @@ bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePa
           kind = WidgetKind::Shelf;
         else if (widgetId == "library")
           kind = WidgetKind::Browse;
+        else if (widgetId == "clock")
+          kind = WidgetKind::Clock;
+        else if (widgetId == "moon")
+          kind = WidgetKind::Moon;
         else
           installed = false;
+        if (isTimeWidget(kind) && (output.textOnly || g.w != 1 || g.h != 1)) installed = false;
         if (installed) {
           if (output.count == HomeWidgets) {
             LOG_ERR("BSL", "Visible widget budget exceeded");
@@ -612,7 +617,7 @@ const char* Layout::deviceClass() {
 }
 LayoutInput Layout::defaults() {
   static constexpr char raw[] =
-      R"({"schemaVersion":1,"revision":1,"grids":{"android-tablet":{"cols":4,"rows":8},"x4":{"cols":2,"rows":7},"x3":{"cols":2,"rows":7}},"pages":[{"id":"home","tab":"Home","placements":[{"instance":"resume","widget":"continue-reading","version":1,"x":0,"y":0,"w":4,"h":3,"settings":{}},{"instance":"recent","widget":"booklist","version":1,"x":0,"y":3,"w":2,"h":2,"settings":{"src":"recent","style":0,"sort":0,"cap":1}},{"instance":"library","widget":"library","version":1,"x":2,"y":3,"w":2,"h":1,"settings":{}}]}],"overrides":{"x4":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}},"x3":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}}}})";
+      R"({"schemaVersion":1,"revision":1,"grids":{"android-tablet":{"cols":4,"rows":8},"x4":{"cols":2,"rows":6},"x3":{"cols":2,"rows":7}},"pages":[{"id":"home","tab":"Home","placements":[{"instance":"resume","widget":"continue-reading","version":1,"x":0,"y":0,"w":4,"h":3,"settings":{}},{"instance":"recent","widget":"booklist","version":1,"x":0,"y":3,"w":2,"h":2,"settings":{"src":"recent","style":0,"sort":0,"cap":1}},{"instance":"library","widget":"library","version":1,"x":2,"y":3,"w":2,"h":1,"settings":{}}]}],"overrides":{"x4":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}},"x3":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}}}})";
   return LayoutInput::memory(raw, sizeof(raw) - 1);
 }
 }  // namespace booksync

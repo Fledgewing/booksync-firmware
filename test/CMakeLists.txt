@@ -310,3 +310,4 @@ add_subdirectory(host/clock_values)
 
 add_subdirectory(host/sleep)
 add_subdirectory(host/series_plan)
+add_subdirectory(host/time_widgets)

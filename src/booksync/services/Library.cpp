@@ -10,6 +10,8 @@
 #include "RemindersFacade.h"
 #include "SdIndexSource.h"
 #include "booksync/storage/LayoutStore.h"
+#include "widgets/Clock.h"
+#include "widgets/Moon.h"
 namespace booksync {
 namespace {
 struct LocalQueryState {
@@ -36,6 +38,11 @@ struct LocalState {
   SdIndexSource source;
   NativeHistory history;
   WindowBatchRequest pending{};
+  TimeWidgetBatch time{};
+  int64_t timeMinute = -1;
+  ClockEvidence timeEvidence = ClockEvidence::Unknown;
+  int32_t timeOffset = 0;
+  bool twelveHour = false;
   storage::IndexRecord openRecord{};
   BookKey openKey{};
   std::unique_ptr<LocalQueryState> query;
@@ -74,6 +81,7 @@ class OfflineLibrary final : public Library {
     support.clockKnown = currentClock.known();
     return {true, true, false, support};
   }
+  void readTimeWidgets(TimeWidgetBatch& out) const override { out = local ? local->time : TimeWidgetBatch{}; }
   AccountView accountView() const override { return accountPresentation; }
   CommandStatus selectService(ServiceSelection selection) override {
     const auto& current = accountPresentation;
@@ -293,6 +301,22 @@ void leaveLocalLibrary() {
   local->source.close();
   local.reset();
 }
+void workTimeWidgets(bool twelveHour) {
+  if (!local) return;
+  auto& state = *local;
+  if (state.time.requested &&
+      (state.timeMinute != currentClock.utcSeconds / 60 || state.timeEvidence != currentClock.evidence ||
+       state.timeOffset != currentClock.utcOffsetSeconds || state.twelveHour != twelveHour)) {
+    state.timeMinute = currentClock.utcSeconds / 60;
+    state.timeEvidence = currentClock.evidence;
+    state.timeOffset = currentClock.utcOffsetSeconds;
+    state.twelveHour = twelveHour;
+    if (state.time.requested & timeWidgetBit(TimeWidget::Clock))
+      projectClockWidget(currentClock, {TimeCardState::Ready, 0, true, false, twelveHour}, state.time.clock);
+    if (state.time.requested & timeWidgetBit(TimeWidget::Moon)) projectMoonWidget(currentClock, {}, state.time.moon);
+    state.model.notifyQueryPublication();
+  }
+}
 void workLocalLibrary() {
   if (noticeDismissalPending) {
     noticeDismissalPending = false;
@@ -340,6 +364,8 @@ void workLocalLibrary() {
   }
   if (state.requested) {
     state.requested = false;
+    state.time.requested = state.page.textOnly ? 0 : state.pending.timeWidgets;
+    state.timeMinute = -1;
     state.model.setContinue(shellLibrary().lastBook, shellLibrary().available);
     if (state.model.materializeBatch(state.pending) && state.model.availability() == Availability::Ready &&
         state.history.start())

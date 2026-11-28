@@ -14,6 +14,7 @@
 #include "booksync/interface/Reminders.h"
 #include "booksync/interface/Sleep.h"
 #include "booksync/interface/Series.h"
+#include "booksync/interface/TimeWidgets.h"
 
 namespace booksync {
 // UI reads bounded published values. No scans, writes, parsing or transport in
@@ -37,6 +38,7 @@ class Library {
   virtual Snapshot snapshot() const = 0;
   virtual SleepView sleepView() const { return {}; }
   virtual ClockStatus clockStatus() const { return {}; }
+  virtual void readTimeWidgets(TimeWidgetBatch& out) const { out = {}; }
   virtual AccountView accountView() const { return {}; }
   virtual CommandStatus accountAction(AccountFormRequest) { return CommandStatus::Unavailable; }
   virtual void readAccountForm(AccountFormView& out) const { out = {}; }

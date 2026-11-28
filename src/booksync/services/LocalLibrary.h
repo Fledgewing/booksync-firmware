@@ -10,6 +10,8 @@ void publishUpgradeState(bool pending, bool recovery, bool (*dismiss)());
 void enterLocalLibrary();
 void leaveLocalLibrary();
 void workLocalLibrary();
+// Pure main-loop values; safe while a network lease owns storage. Never paint.
+void workTimeWidgets(bool twelveHour = false);
 void invalidateLocalCapture();
 bool takeIndexedOpenRequest(std::string& path);
 }  // namespace booksync

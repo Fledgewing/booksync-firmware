@@ -114,7 +114,7 @@ def ui_source_errors(name, source):
         bare = TOKENS.sub(' ', code)
         # A caller-owned concrete window is a value-copy destination, never an
         # opaque handle. Pointer/other reference types remain forbidden.
-        bare = re.sub(r'([,(]\s*)(LibraryWindow|QueryResult|CoverBitmap|AccountFormView|ReminderList|ReminderDue|SeriesPlanView)\s*&(?=\s+out\s*\))', r'\1\2', bare)
+        bare = re.sub(r'([,(]\s*)(LibraryWindow|QueryResult|CoverBitmap|AccountFormView|ReminderList|ReminderDue|SeriesPlanView|TimeWidgetBatch)\s*&(?=\s+out\s*\))', r'\1\2', bare)
         # Large concrete immutable request values remain caller-owned during
         # dispatch; copying the 3 KiB filter onto a C3 task stack is unsafe.
         bare = re.sub(r'(\(\s*)const\s+(QueryRequest|ReminderMutation|ReminderDue)\s*&(?=\s*[,\)])', r'\1\2', bare)

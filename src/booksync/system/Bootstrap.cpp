@@ -23,11 +23,14 @@
 #include "ReadingGate.h"
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
+#include "booksync/services/Layout.h"
 #include "booksync/services/LocalLibrary.h"
 #include "booksync/services/OfflineLibrary.h"
 #include "booksync/ui/EditorAddRemove.h"
 #include "booksync/ui/Home.h"
 #include "booksync/ui/WidgetHost.h"
+#include "booksync/ui/widgets/Clock.h"
+#include "booksync/ui/widgets/Moon.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -118,20 +121,43 @@ class ShellActivity final : public Activity {
   mutable char defaultPageName[24]{};
 #endif
   std::string bookPath;
-  // One fallible <=6 KiB allocation per Home lifetime: the immutable visible
+  // One fallible <=6 KiB + TimeWidgetBatch allocation per Home lifetime: the immutable visible
   // page is too large for the task stack and must be freed before reader entry.
   std::unique_ptr<WidgetHost> widgets;
   uint8_t focus = 0, focusRow = 0;
   bool lastAvailable = false;
+  bool compactHome() const {
+    return widgets && widgets->page().revision ? !widgets->page().textOnly
+                                               : std::string_view(Layout::deviceClass()) != "x3";
+  }
+  Rect homeSafeArea() const {
+    // The approved footer is reserved once by tileRect, not again by native
+    // button-hint metrics. Bezel-safe bounds still come from the native theme.
+    return UITheme::getInstance().getScreenSafeArea(renderer, !compactHome(), false);
+  }
+  Rect homeHeader(Rect safe) const {
+    return UITheme::getHeaderRect(renderer, compactHome() ? 64 : UITheme::getInstance().getMetrics().headerHeight,
+                                  safe);
+  }
   Rect tileRect(uint8_t index) const {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const auto safe = homeSafeArea();
+    const auto header = homeHeader(safe);
     const auto& pg =
 #if CROSSINK_APP_CAP_HOME_EDITOR
         editor.draftPage() ? *editor.draftPage() :
 #endif
                            widgets->page();
     const auto& p = pg.widgets[index];
+    if (!pg.textOnly) {
+      // Approved compact six-row viewport: 12 px side margins, 8 px gutters,
+      // six px below the existing header and 42 px for the footer. Persisted
+      // custom grids keep their own row/column counts and are never rewritten.
+      const int top = header.y + header.height + 6;
+      const int height = safe.y + safe.height - top - 42 + 8;
+      const int width = safe.width - 24 + 8;
+      return Rect{safe.x + 12 + width * p.x / pg.cols, top + height * p.y / pg.rows, width * p.w / pg.cols - 8,
+                  height * p.h / pg.rows - 8};
+    }
     const int top = header.y + header.height + 16;
     const int height = safe.y + safe.height - top - 56;
     const int width = safe.width - 16;
@@ -146,6 +172,185 @@ class ShellActivity final : public Activity {
     if (!widgets || index >= widgets->page().count) return 1;
     const auto rows = widgets->widgetRows(index, widgetBox(index));
     return rows ? rows : 1;
+  }
+  const char* kindTitle(WidgetKind kind) const {
+    switch (kind) {
+      case WidgetKind::Clock:
+        return tr(STR_HOME_CLOCK);
+      case WidgetKind::Moon:
+        return tr(STR_HOME_MOON);
+      case WidgetKind::Continue:
+        return tr(STR_CONTINUE_READING);
+      case WidgetKind::Shelf:
+        return tr(STR_HOME_SHELF);
+      default:
+        return tr(STR_HOME_BROWSE);
+    }
+  }
+  const char* moonPhase(uint8_t phase) const {
+    static constexpr StrId names[] = {StrId::STR_HOME_MOON_NEW,           StrId::STR_HOME_MOON_WAXING_CRESCENT,
+                                      StrId::STR_HOME_MOON_FIRST_QUARTER, StrId::STR_HOME_MOON_WAXING_GIBBOUS,
+                                      StrId::STR_HOME_MOON_FULL,          StrId::STR_HOME_MOON_WANING_GIBBOUS,
+                                      StrId::STR_HOME_MOON_LAST_QUARTER,  StrId::STR_HOME_MOON_WANING_CRESCENT};
+    return I18N.get(names[phase < 8 ? phase : 0]);
+  }
+  void paintTimeWidget(uint8_t index, Rect rect, bool selected) const {
+    const auto kind = widgets->page().widgets[index].kind;
+    const auto view = widgets->view(index);
+    const auto* clock = widgets->clockCard(index);
+    const auto* moon = widgets->moonCard(index);
+    // Geometry scratch is bounded below 256 bytes; captions are reused per line
+    // on the dedicated render stack. No per-paint allocation or source work.
+    widgets::TimeDrawing drawing;
+    const bool laidOut = clock  ? widgets::Clock::layoutTime(*clock, widgetBox(index), drawing)
+                         : moon ? widgets::Moon::layoutTime(*moon, widgetBox(index), drawing)
+                                : false;
+    renderer.drawRoundedRect(rect.x, rect.y, rect.width, rect.height, 1, 8, true);
+    if (selected) renderer.drawRect(rect.x + 3, rect.y + 3, rect.width - 6, rect.height - 6, 2, true);
+    if (!laidOut) {
+      paintFittedText(UI_10_FONT_ID, rect.x + 10, rect.y + 6, kindTitle(kind), rect.width - 20);
+      paintFittedText(SMALL_FONT_ID, rect.x + 10, rect.y + 32, stateText(view.viewState), rect.width - 20);
+      return;
+    }
+    // Small header symbols use fixed native primitives; no asset/source work.
+    const int iconX = rect.x + rect.width - 26, iconY = rect.y + 7;
+    static constexpr int8_t clockOutline[][2] = {{8, 0},  {12, 2}, {15, 6}, {15, 9}, {12, 13}, {8, 15},
+                                                 {3, 13}, {0, 9},  {0, 6},  {3, 2},  {8, 0}};
+    static constexpr int8_t moonOutline[][2] = {{12, 0}, {8, 3},  {7, 7}, {9, 11}, {13, 13}, {9, 15},
+                                                {4, 14}, {1, 10}, {0, 6}, {3, 2},  {7, 0},   {12, 0}};
+    const auto* outline = clock ? clockOutline : moonOutline;
+    const unsigned outlineCount = clock ? 11 : 12;
+    for (unsigned n = 1; n < outlineCount; ++n)
+      renderer.drawLine(iconX + outline[n - 1][0], iconY + outline[n - 1][1], iconX + outline[n][0],
+                        iconY + outline[n][1]);
+    if (clock) {
+      renderer.drawLine(iconX + 8, iconY + 3, iconX + 8, iconY + 8);
+      renderer.drawLine(iconX + 8, iconY + 8, iconX + 12, iconY + 10);
+    }
+    if (moon && drawing.moon.width) {
+      const auto& c = drawing.moon;
+      const int radius = c.width / 2 - 1;
+      for (int dy = -radius; dy <= radius; ++dy) {
+        int half = radius;
+        while (half * half + dy * dy > radius * radius) --half;
+        const int cx = rect.x + c.x + c.width / 2, y = rect.y + c.y + c.height / 2 + dy;
+        renderer.drawPixel(cx - half, y);
+        renderer.drawPixel(cx + half, y);
+        const int edge = half * moon->terminator / 1000;
+        if (moon->fraction < 500)
+          renderer.drawLine(cx + edge, y, cx + half, y);
+        else
+          renderer.drawLine(cx - half, y, cx - edge, y);
+      }
+    }
+    for (uint8_t i = 0; i < drawing.count; ++i) {
+      const auto& mark = drawing.marks[i];
+      const auto& c = mark.cell;
+      char caption[96]{};
+      const char* text = caption;
+      int font = SMALL_FONT_ID;
+      switch (mark.line) {
+        case widgets::TimeLine::Title:
+          text = kindTitle(kind);
+          font = UI_10_FONT_ID;
+          break;
+        case widgets::TimeLine::Value:
+          font = BITTER_16_FONT_ID;
+          if (clock->twelveHour) {
+            const unsigned hour = clock->reading.local.hour;
+            std::snprintf(caption, sizeof(caption), tr(STR_HOME_CLOCK_12H_FORMAT), hour % 12 ? hour % 12 : 12,
+                          unsigned(clock->reading.local.minute), (hour < 12 ? tr(STR_AM) : tr(STR_PM)));
+          } else {
+            std::snprintf(caption, sizeof(caption), tr(STR_HOME_CLOCK_TIME_FORMAT), unsigned(clock->reading.local.hour),
+                          unsigned(clock->reading.local.minute));
+          }
+          break;
+        case widgets::TimeLine::Date: {
+          static constexpr StrId weekdays[] = {StrId::STR_HOME_SUN_SHORT, StrId::STR_HOME_MON_SHORT,
+                                               StrId::STR_HOME_TUE_SHORT, StrId::STR_HOME_WED_SHORT,
+                                               StrId::STR_HOME_THU_SHORT, StrId::STR_HOME_FRI_SHORT,
+                                               StrId::STR_HOME_SAT_SHORT};
+          static constexpr StrId months[] = {
+              StrId::STR_MONTH_JAN_SHORT, StrId::STR_MONTH_FEB_SHORT, StrId::STR_MONTH_MAR_SHORT,
+              StrId::STR_MONTH_APR_SHORT, StrId::STR_MONTH_MAY_SHORT, StrId::STR_MONTH_JUN_SHORT,
+              StrId::STR_MONTH_JUL_SHORT, StrId::STR_MONTH_AUG_SHORT, StrId::STR_MONTH_SEP_SHORT,
+              StrId::STR_MONTH_OCT_SHORT, StrId::STR_MONTH_NOV_SHORT, StrId::STR_MONTH_DEC_SHORT};
+          const auto& date = clock->reading.local;
+          std::snprintf(caption, sizeof(caption), tr(STR_HOME_CLOCK_DATE_FORMAT),
+                        I18N.get(weekdays[date.weekday < 7 ? date.weekday : 0]), unsigned(date.day),
+                        I18N.get(months[date.month >= 1 && date.month <= 12 ? date.month - 1 : 0]),
+                        unsigned(date.year));
+          break;
+        }
+        case widgets::TimeLine::TimeSource:
+          text = tr(STR_HOME_CLOCK_ESTABLISHED);
+          break;
+        case widgets::TimeLine::TimePhase:
+          text = moonPhase(moon->phase);
+          break;
+        case widgets::TimeLine::Illumination:
+          std::snprintf(caption, sizeof(caption), tr(STR_HOME_MOON_LIT_FORMAT), unsigned(moon->illumination));
+          break;
+        case widgets::TimeLine::Next:
+          std::snprintf(caption, sizeof(caption), tr(STR_HOME_MOON_NEXT_FORMAT), moonPhase(moon->nextPhase),
+                        unsigned((moon->nextSeconds + 43200) / 86400));
+          break;
+        case widgets::TimeLine::Stale:
+          std::snprintf(caption, sizeof(caption), tr(STR_HOME_SAVED_DAYS_FORMAT),
+                        static_cast<unsigned long>(clock ? clock->status.ageDays : moon->status.ageDays));
+          break;
+        case widgets::TimeLine::Retry:
+          text = tr(STR_RETRY);
+          break;
+        default:
+          text = view.viewState == WidgetState::Off        ? tr(STR_HOME_SOURCE_OFF)
+                 : view.viewState == WidgetState::NotSaved ? tr(STR_HOME_NOT_SAVED)
+                 : view.viewState == WidgetState::Unsupported
+                     ? (kind == WidgetKind::Clock ? tr(STR_HOME_CLOCK_UNSUPPORTED) : tr(STR_HOME_MOON_UNSUPPORTED))
+                 : view.viewState == WidgetState::Empty || view.viewState == WidgetState::Known
+                     ? (kind == WidgetKind::Clock ? tr(STR_HOME_CLOCK_EMPTY) : tr(STR_HOME_MOON_EMPTY))
+                     : stateText(view.viewState);
+          break;
+      }
+      if (mark.line == widgets::TimeLine::State &&
+          (view.viewState == WidgetState::Error || view.viewState == WidgetState::Oversize)) {
+        std::snprintf(caption, sizeof(caption), "%s", tr(STR_HOME_WIDGET_DATA_ERROR));
+        size_t split = 0, lastSpace = 0;
+        while (caption[split]) {
+          if (caption[split] == ' ') lastSpace = split;
+          if ((static_cast<unsigned char>(caption[split + 1]) & 0xc0) == 0x80) {
+            ++split;
+            continue;
+          }
+          const char held = caption[split + 1];
+          caption[split + 1] = 0;
+          const bool fits = renderer.getTextWidth(SMALL_FONT_ID, caption) <= c.width;
+          caption[split + 1] = held;
+          if (!fits) break;
+          ++split;
+        }
+        if (caption[split] && lastSpace) split = lastSpace;
+        const bool wrapped = caption[split] != 0 && lastSpace != 0;
+        if (wrapped) caption[split] = 0;
+        renderer.beginTextClip(rect.x + c.x, rect.y + c.y, c.width, c.height);
+        auto ink = renderer.getTextVerticalBounds(SMALL_FONT_ID, caption);
+        paintFittedText(SMALL_FONT_ID, rect.x + c.x, rect.y + c.y - ink.top, caption, c.width);
+        if (wrapped) {
+          const auto* second = caption + split + 1;
+          ink = renderer.getTextVerticalBounds(SMALL_FONT_ID, second);
+          paintFittedText(SMALL_FONT_ID, rect.x + c.x, rect.y + c.y + 20 - ink.top, second, c.width);
+        }
+        renderer.endTextClip();
+        continue;
+      }
+      renderer.beginTextClip(rect.x + c.x, rect.y + c.y, c.width, c.height);
+      const auto style = mark.line == widgets::TimeLine::Title ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
+      const auto ink = renderer.getTextVerticalBounds(font, text, style);
+      const int inkHeight = ink.bottom - ink.top;
+      const int textY = rect.y + c.y - ink.top + std::max(0, (c.height - inkHeight) / 2);
+      paintFittedText(font, rect.x + c.x, textY, text, c.width, true, style);
+      renderer.endTextClip();
+    }
   }
   const char* shelfTitle(WindowSource source) const {
     switch (source) {
@@ -183,14 +388,15 @@ class ShellActivity final : public Activity {
         return tr(STR_HOME_WIDGET_ERROR);
     }
   }
-  void paintFittedText(int font, int x, int y, const char* text, int width, bool black = true) const {
+  void paintFittedText(int font, int x, int y, const char* text, int width, bool black = true,
+                       EpdFontFamily::Style style = EpdFontFamily::REGULAR) const {
     char caption[96]{};
     size_t bytes = 0;
     while (bytes + 1 < sizeof(caption) && text[bytes]) {
       caption[bytes] = text[bytes];
       caption[++bytes] = 0;
       if ((static_cast<unsigned char>(text[bytes]) & 0xc0) == 0x80) continue;
-      if (renderer.getTextWidth(font, caption) > width) {
+      if (renderer.getTextWidth(font, caption, style) > width) {
         do {
           --bytes;
         } while (bytes && (static_cast<unsigned char>(caption[bytes]) & 0xc0) == 0x80);
@@ -198,7 +404,7 @@ class ShellActivity final : public Activity {
         break;
       }
     }
-    renderer.drawText(font, x, y, caption, black);
+    renderer.drawText(font, x, y, caption, black, style);
   }
   void paintWidget(uint8_t index) const {
     const auto r = tileRect(index);
@@ -215,6 +421,10 @@ class ShellActivity final : public Activity {
 #else
     const bool selected = focus == index && !mappedInput.hasTouch();
 #endif
+    if (isTimeWidget(p.kind)) {
+      paintTimeWidget(index, r, selected);
+      return;
+    }
     const bool hero = heroTile && !selected;
     const int font = UI_10_FONT_ID;
     const int line = renderer.getLineHeight(font);
@@ -337,12 +547,12 @@ class ShellActivity final : public Activity {
     return y;
   }
   Rect noticeAction(uint8_t row) const {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto safe = homeSafeArea();
     const int height = renderer.getLineHeight(UI_10_FONT_ID) + 22;
     return Rect{safe.x + 24, safe.y + safe.height - 42 - (2 - row) * (height + 8), safe.width - 48, height};
   }
   void paintNotice() const {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto safe = homeSafeArea();
     const int x = safe.x + 24, width = safe.width - 48;
     int y = safe.y + 12;
     paintFittedText(UI_10_FONT_ID, x, y, tr(STR_BACK), 68);
@@ -386,7 +596,7 @@ class ShellActivity final : public Activity {
         const auto r = noticeAction(i);
         if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) notice.choose(i);
       }
-      const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+      const auto safe = homeSafeArea();
       if (y >= safe.y && y < safe.y + 2 * renderer.getLineHeight(UI_10_FONT_ID) && x >= safe.x && x < safe.x + 100)
         notice.back();
     } else
@@ -396,8 +606,8 @@ class ShellActivity final : public Activity {
   }
 #if CROSSINK_APP_CAP_HOME_EDITOR
   Rect textEditorRow(uint8_t row) const {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const auto safe = homeSafeArea();
+    const auto header = homeHeader(safe);
     const int line = renderer.getLineHeight(UI_10_FONT_ID);
     const int top = header.y + header.height + (editor.panel() == EditorAddRemove::Panel::Select ? 12 : 6 * line);
     const int height = line + 18;
@@ -408,8 +618,8 @@ class ShellActivity final : public Activity {
   void paintTextEditor() const {
     using Panel = EditorAddRemove::Panel;
     const auto panel = editor.panel();
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const auto safe = homeSafeArea();
+    const auto header = homeHeader(safe);
     const char* title = nullptr;
     const char* body = nullptr;
     char selectedTitle[96]{};
@@ -479,14 +689,11 @@ class ShellActivity final : public Activity {
     }
     if (panel == Panel::Reset) return row == 0 ? tr(STR_HOME_KEEP_LAYOUT) : tr(STR_HOME_RESET_LAYOUT);
     if (panel == Panel::Error) return tr(STR_BACK);
-    if (panel == Panel::Add)
-      return row == 0 ? tr(STR_CONTINUE_READING) : row == 1 ? tr(STR_HOME_SHELF) : tr(STR_HOME_BROWSE);
+    if (panel == Panel::Add) return kindTitle(static_cast<WidgetKind>(row));
     const auto count = widgets->page().count;
     if (row < count) {
       const auto kind = widgets->page().widgets[row].kind;
-      return kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)
-             : kind == WidgetKind::Shelf  ? tr(STR_HOME_SHELF)
-                                          : tr(STR_HOME_BROWSE);
+      return kindTitle(kind);
     }
     if (row >= count + 3) {
       const char* labels[] = {tr(STR_HOME_PAGE_PREVIOUS),    tr(STR_HOME_PAGE_NEXT), tr(STR_HOME_PAGE_ADD),
@@ -496,16 +703,16 @@ class ShellActivity final : public Activity {
     return row == count ? tr(STR_HOME_ADD_WIDGET) : row == count + 1 ? tr(STR_HOME_RESET_LAYOUT) : tr(STR_DONE);
   }
   Rect editorHeaderButton(uint8_t index) const {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const auto safe = homeSafeArea();
+    const auto header = homeHeader(safe);
     const int width = (header.width - 24) / (editor.panel() == EditorAddRemove::Panel::Selected ? 2 : 3);
     const int height = renderer.getLineHeight(UI_10_FONT_ID) + 12;
     return Rect{header.x + 12 + index * width, header.y + renderer.getLineHeight(BITTER_14_FONT_ID) + 8, width - 4,
                 height < 50 ? 50 : height};
   }
   Rect editorRow(uint8_t index) const {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const auto safe = homeSafeArea();
+    const auto header = homeHeader(safe);
     const int line = renderer.getLineHeight(UI_10_FONT_ID);
     const int height = line + 26;
     if (editor.panel() == EditorAddRemove::Panel::Name && mappedInput.hasTouch()) {
@@ -532,7 +739,7 @@ class ShellActivity final : public Activity {
     return Rect{safe.x + 24, header.y + header.height + line * 3 + 28 + index * height, safe.width - 48, height};
   }
   Rect editorPageButton(uint8_t index) const {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto safe = homeSafeArea();
     const int width = (safe.width - 16) / 6;
     // Compact button labels fit above Classic's guides without shrinking tiles.
     const int height = mappedInput.hasTouch() ? 52 : renderer.getLineHeight(SMALL_FONT_ID) + 8;
@@ -575,13 +782,14 @@ class ShellActivity final : public Activity {
     editor.namePage(pageNameOption(current < 9 ? current + 1 : 0));
   }
   const char* firstWidgetPageName(uint8_t widget) const {
+    if (widget >= unsigned(WidgetKind::Clock)) return kindTitle(static_cast<WidgetKind>(widget));
     return widget == 0 ? tr(STR_HOME_PAGE_READING) : widget == 1 ? tr(STR_HOME_RECENT) : tr(STR_LIBRARY);
   }
   void paintPageKeyboard() const {
 #if CROSSINK_APP_CAP_TOUCH
     if (!mappedInput.hasTouch()) return;
     namespace fui = freeink::ui;
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto safe = homeSafeArea();
     fui::GfxRendererTarget target(renderer);
     target.setFont(fui::GfxRendererTarget::FONT_SMALL, UI_10_FONT_ID);
     target.setFont(fui::GfxRendererTarget::FONT_BODY, UI_12_FONT_ID);
@@ -608,7 +816,7 @@ class ShellActivity final : public Activity {
 #endif
   }
   Rect editorMoveButton(uint8_t index) const {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto safe = homeSafeArea();
     const int width = (safe.width - 16) / 7;
     return Rect{safe.x + 8 + index * width, safe.y + safe.height - 54,
                 (index == 4 ? safe.width - 16 - index * width : width) - 2, 52};
@@ -635,7 +843,7 @@ class ShellActivity final : public Activity {
         }
       }
     } else {
-      const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+      const auto safe = homeSafeArea();
       renderer.fillRect(safe.x + 8, safe.y + safe.height - 54, safe.width - 16, 52, true);
       renderer.drawText(UI_10_FONT_ID, safe.x + 16, safe.y + safe.height - 52, tr(STR_HOME_EDIT_CARRY_MOVE), false);
       renderer.drawText(UI_10_FONT_ID, safe.x + 16, safe.y + safe.height - 28, tr(STR_HOME_EDIT_CARRY_DROP), false);
@@ -654,8 +862,8 @@ class ShellActivity final : public Activity {
         paintFittedText(UI_10_FONT_ID, r.x + 5, r.y + 4, editorLabel(row), r.width - 10);
       }
       if (panel == Panel::Select) {
-        const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-        const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+        const auto safe = homeSafeArea();
+        const auto header = homeHeader(safe);
         char number[24];
         std::snprintf(number, sizeof(number), tr(STR_HOME_PAGE_FORMAT), widgets->page().page + 1,
                       widgets->page().pages);
@@ -691,8 +899,8 @@ class ShellActivity final : public Activity {
       paintTextEditor();
       return;
     }
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const auto safe = homeSafeArea();
+    const auto header = homeHeader(safe);
     const char* title = panel == Panel::Name                                  ? tr(STR_HOME_PAGE_RENAME)
                         : panel == Panel::Paging                              ? tr(STR_HOME_EDIT_SAVING)
                         : panel == Panel::Add                                 ? tr(STR_HOME_ADD_WIDGET)
@@ -755,8 +963,8 @@ class ShellActivity final : public Activity {
     const bool tapped = mappedInput.wasScreenTapped(x, y);
     if (!active) {
       // The approved Home menu entry is reached with More / header tap.
-      const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-      const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+      const auto safe = homeSafeArea();
+      const auto header = homeHeader(safe);
       if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Right)) ||
           (tapped && x >= header.x + header.width - 80 && y >= header.y && y < header.y + header.height)) {
         if (widgets->page().textOnly) {
@@ -770,8 +978,8 @@ class ShellActivity final : public Activity {
       }
       return false;
     }
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const auto safe = homeSafeArea();
+    const auto header = homeHeader(safe);
     const bool touchBack = tapped && editor.panel() != Panel::Select && editor.panel() != Panel::Selected &&
                            x >= header.x + header.width - 80 && x < header.x + header.width && y >= header.y &&
                            y < header.y + header.height;
@@ -955,6 +1163,7 @@ class ShellActivity final : public Activity {
     }
     {
       RenderLock lock;
+      workTimeWidgets(SETTINGS.clockFormat == 1);
       if (widgets && widgets->pollWidgets()) {
         if (focus >= widgets->page().count) focus = 0;
         if (focusRow >= focusRows(focus)) focusRow = 0;
@@ -1033,13 +1242,16 @@ class ShellActivity final : public Activity {
           for (uint8_t i = 0; i < count; ++i) {
             const auto r = tileRect(i);
             if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) {
+              if (isTimeWidget(widgets->page().widgets[i].kind) &&
+                  widgets->hitWidgetRow(i, widgetBox(i), x - r.x, y - r.y) == 255)
+                continue;
               if (!widgets->retryWidget(i)) {
                 const auto row = widgets->hitWidgetRow(i, widgetBox(i), x - r.x, y - r.y);
                 if (row != 255) widgets->dispatchWidget(i, row);
               }
             }
           }
-          const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+          const auto safe = homeSafeArea();
           if (y >= safe.y + safe.height - 56 && y < safe.y + safe.height && x >= safe.x && x < safe.x + safe.width) {
             const auto& page = widgets->page();
             const int next = page.page + (x < safe.x + safe.width / 2 ? -1 : 1);
@@ -1072,8 +1284,8 @@ class ShellActivity final : public Activity {
       initialRefresh = HalDisplay::FAST_REFRESH;
       return;
     }
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const auto safe = homeSafeArea();
+    const auto header = homeHeader(safe);
 #if CROSSINK_APP_CAP_HOME_EDITOR
     const bool editing = editor.panel() != EditorAddRemove::Panel::Closed;
 #else
@@ -1087,9 +1299,7 @@ class ShellActivity final : public Activity {
       title = tr(STR_HOME_EDIT);
     if (editing && editor.draftPage()) {
       const auto kind = editor.draftPage()->widgets[editor.selected()].kind;
-      title = kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)
-              : kind == WidgetKind::Shelf  ? tr(STR_HOME_SHELF)
-                                           : tr(STR_HOME_BROWSE);
+      title = kindTitle(kind);
     }
 #endif
     int titleWidth = header.width - 24;
@@ -1098,7 +1308,8 @@ class ShellActivity final : public Activity {
 #endif
     renderer.beginTextClip(header.x + 12, header.y, titleWidth, header.height);
     renderer.drawText(BITTER_14_FONT_ID, header.x + 12, header.y + 4, title, true, EpdFontFamily::BOLD);
-    renderer.drawText(UI_10_FONT_ID, header.x + 12, header.y + renderer.getLineHeight(BITTER_14_FONT_ID) + 6,
+    renderer.drawText(compactHome() ? SMALL_FONT_ID : UI_10_FONT_ID, header.x + 12,
+                      header.y + (compactHome() ? 42 : renderer.getLineHeight(BITTER_14_FONT_ID) + 6),
                       editing ? "" : tr(STR_HOME_OFFLINE));
     renderer.endTextClip();
 #if CROSSINK_APP_CAP_HOME_EDITOR
