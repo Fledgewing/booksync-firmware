@@ -15741,6 +15741,14 @@
     "src/booksync/system/RemindersRuntime.h": {
       "role": "system",
       "rationale": "R1 single boot-lifetime local reminder composition with <=4 KiB combined service/command/store state. Link anchor includes dormant policy/store in physical size measurements; activation follows clock/presenter tests."
+    },
+    "src/booksync/services/Clock.h": {
+      "role": "services",
+      "rationale": "F40w prerequisite: validate known-clock civil and UTC values outside paint; pure fixed-size projection with no storage, transport or native settings dependencies."
+    },
+    "src/booksync/services/Clock.cpp": {
+      "role": "services",
+      "rationale": "F40w prerequisite: validate known-clock civil and UTC values outside paint; pure fixed-size projection with no storage, transport or native settings dependencies."
     }
   },
   "generators": {

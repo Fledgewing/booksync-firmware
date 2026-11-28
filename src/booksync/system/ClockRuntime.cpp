@@ -2,6 +2,10 @@
 #include "ClockRuntime.h"
 
 #include <TrustedTime.h>
+#include <Logging.h>
+#include <ctime>
+
+#include "booksync/services/Clock.h"
 
 #include "booksync/services/OfflineLibrary.h"
 namespace booksync {
@@ -20,6 +24,21 @@ void publishRuntimeClock() {
       break;
     case trustedtime::ClockSource::Unknown:
       break;
+  }
+  if (value.known()) {
+    static bool invalidReported = false;
+    const auto now = std::time(nullptr);
+    std::tm civil{};
+    if (localtime_r(&now, &civil)) {
+      ClockDateTime local{static_cast<uint16_t>(civil.tm_year + 1900), static_cast<uint8_t>(civil.tm_mon + 1),
+                          static_cast<uint8_t>(civil.tm_mday), 0, static_cast<uint8_t>(civil.tm_hour),
+                          static_cast<uint8_t>(civil.tm_min), static_cast<uint8_t>(civil.tm_sec)};
+      value = projectClock(value.evidence, static_cast<int64_t>(now), local);
+    } else {
+      value = {};
+    }
+    if (!value.hasDateTime() && !invalidReported) LOG_ERR("BSC", "Known clock has invalid date/time");
+    invalidReported = !value.hasDateTime();
   }
   publishClockStatus(value);
 }
