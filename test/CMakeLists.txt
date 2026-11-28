@@ -332,8 +332,5 @@ add_subdirectory(host/collection_widgets)
 add_subdirectory(host/collection_renderers)
 
 
-add_subdirectory(host/series_ui)
-add_subdirectory(host/stats_widgets)
-add_subdirectory(host/catalog_surface)
 add_subdirectory(host/personal_renderer)
 add_subdirectory(host/personal_widgets)
