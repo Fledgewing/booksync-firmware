@@ -201,7 +201,7 @@ bool ReminderSettings::retryReminders() {
   return true;
 }
 void ReminderSettings::connectReminderTime() {
-  if (screen_ == ReminderScreen::List && !memo_.clockKnown) library_.submit(Intent::ConnectReminderTime);
+  if (live_ && screen_ == ReminderScreen::List && !memo_.clockKnown) library_.submit(Intent::ConnectReminderTime);
 }
 void ReminderSettings::setReminderPage(uint8_t pageValue) {
   if (screen_ == ReminderScreen::List && pageValue < pages()) page_ = pageValue;

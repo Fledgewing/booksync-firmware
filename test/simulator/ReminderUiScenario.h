@@ -10,6 +10,7 @@
 #include <filesystem>
 
 #include "activities/Activity.h"
+#include "booksync/services/OfflineLibrary.h"
 #include "booksync/system/Bootstrap.h"
 #include "booksync/system/ReminderPresenter.h"
 #include "booksync/system/ReminderSettingsScreen.h"
@@ -236,10 +237,23 @@ inline bool tick() {
     paintReminderScene(renderer, fixture, 0);
     pixels(directory, "due-home");
   }
-  if (f == 238) {
+  // A forged Connect on Home cannot open clock UI; navigation cancels a
+  // legitimate queued request before its originating Reminders view is gone.
+  if (f == 238) offlineLibrary().submit(Intent::ConnectReminderTime);
+  if (f == 240) {
+    if (!activityManager.isCurrentActivityNamed("Home")) std::_Exit(71);
+    showReminderSettingsScene(renderer, mappedInputManager, fixture);
+  }
+  if (f == 244) {
+    if (!activityManager.isCurrentActivityNamed("Reminders")) std::_Exit(72);
+    offlineLibrary().submit(Intent::ConnectReminderTime);
+    activityManager.goHome();
+  }
+  if (f == 248) {
+    if (!activityManager.isCurrentActivityNamed("Home")) std::_Exit(73);
     LOG_INF("BSR",
             "BookSync R1 reminder UI PASS: captures=35 input-routes=%u settings-input=%u fresh-edges=%u snapshot=%u "
-            "draft=%u",
+            "draft=%u clock-intents=2",
             testedInputs, testedSettingsInputs, mappedInputManager.hasTouch() ? 2u : 1u, unsigned(sizeof(ReminderList)),
             unsigned(sizeof(ReminderDraft)));
     std::fflush(nullptr);

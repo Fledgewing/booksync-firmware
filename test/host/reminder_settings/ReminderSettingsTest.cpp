@@ -217,6 +217,14 @@ TEST_F(ReminderSettingsTest, UnknownTimeAllowsEditsAndConnectIsExplicit) {
   model.connectReminderTime();
   EXPECT_EQ(library.connects, 1);
 }
+TEST_F(ReminderSettingsTest, RetiredListCannotConnectUntilReentered) {
+  model.backReminders();
+  model.connectReminderTime();
+  EXPECT_EQ(library.connects, 0);
+  model.enterReminders();
+  model.connectReminderTime();
+  EXPECT_EQ(library.connects, 1);
+}
 TEST_F(ReminderSettingsTest, RetiredViewNeverAdoptsLateSaveButDeviceCommandRemains) {
   model.addReminderDraft();
   model.saveReminderDraft();
