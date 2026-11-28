@@ -2977,3 +2977,16 @@ Both new codecs and BPS1/BPS2 have an owned read-only inspector at
 integrity/structure and emits only format/size metadata. Original records are
 never rewritten or repaired. The existing F18 checkpoint capacity is unchanged;
 unpersistable phase replies remain pending without truncation or acknowledgement.
+
+## BSB1 native battery observations (version 1)
+
+The native battery history is a separate, device-scoped journal; it does not
+change reader progress, statistics or EPUB caches. Each segment has a 16-byte
+header (`BSB1`, little-endian segment number and row count, zero reserved bytes),
+then up to 64 records. Each 20-byte record contains the 16-byte observation and
+its CRC32. At 32,768 observations capture stops with a permanent gap; old
+observations are not evicted. Unknown power or clock evidence produces gaps,
+never a discharge estimate. Recovery is read-only, validates complete records,
+and admits one segment per work tick. Original and backup files are never
+repaired by a reader. Details and field meanings are in
+[the battery source contract](booksync/F40w-battery-source.md).

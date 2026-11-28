@@ -6,13 +6,14 @@
 
 #include <Arduino.h>
 #include <CrossInkHalFrontlight.h>
-#include <HalPowerManager.h>
 #include <Logging.h>
 #include <TrustedTime.h>
 
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+
+#include "booksync/system/DeviceRuntime.h"
 #ifndef SIMULATOR
 #include <WiFi.h>
 #include <esp_attr.h>
@@ -88,10 +89,10 @@ battery::CaptureInput observe() {
                   static_cast<uint64_t>(epoch) <= UINT32_MAX;
   if (in.clockKnown) in.epoch = static_cast<uint32_t>(epoch);
 #ifndef SIMULATOR
-  const auto status = powerManager.batteryStatus();
-  in.known = status.supported && status.percentageKnown && status.externalPowerKnown;
-  in.pct = status.percentage;
-  in.mv = status.millivoltsKnown ? status.millivolts : 0;
+  const auto status = sampleNativeBattery();
+  in.known = status.supported && status.percentKnown && status.percent <= 100 && status.externalPowerKnown;
+  in.pct = status.percent;
+  in.mv = status.voltageKnown ? status.millivolts : 0;
   in.usb = status.externalPower;
   in.radio = WiFi.getMode() != WIFI_MODE_NULL;
   in.crash = !continuedSleep;

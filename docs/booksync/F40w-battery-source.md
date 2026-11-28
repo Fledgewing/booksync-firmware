@@ -64,3 +64,11 @@ and interrupt a write using the established power-cut method. Confirm missing
 samples remain gaps and native reader place/behavior is unchanged. Check internal
 free/largest heap and task high-water. No EPUB cache reset is needed. Agents do
 not access devices or serial ports.
+
+
+The pinned X4 battery driver currently proves charge level, voltage and its
+charging input, but leaves external-power presence unknown. Capture therefore
+keeps a gap until the native service can prove that evidence; live percentage
+remains available. Wall-charger absence is not inferred from an idle USB host
+link. Capture reuses the native device service's 30-second checked sample and
+does not add sensor reads to the paint path.
