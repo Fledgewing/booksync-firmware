@@ -124,3 +124,10 @@ void showServiceChoice(GfxRenderer& renderer, MappedInputManager& input, Library
 uint32_t serviceChoicePaints() { return paints; }
 #endif
 }  // namespace booksync
+
+// Keep the approved dormant presentation in device reserve measurements before
+// the separate first-run/settings navigation slice calls the explicit seam.
+extern "C" void booksync_account_surface_link(GfxRenderer& renderer, MappedInputManager& input,
+                                              booksync::Library& library) {
+  booksync::showServiceChoice(renderer, input, library);
+}
