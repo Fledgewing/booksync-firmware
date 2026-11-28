@@ -1,4 +1,12 @@
 {
+  "generators": {
+    "web": "scripts/build_web.py",
+    "i18n": "scripts/gen_i18n.py",
+    "icons": "scripts/generate_icons.py",
+    "scalable-fonts": "scripts/build_scalable_font_assets.py"
+  },
+  "schema": 1,
+  "policy": "New/stale production inputs and changed retained include edges fail. Review the dependency rationale for every inventory change. Product roles are path-owned, not exemptions.",
   "files": {
     ".gitmodules": {
       "role": "retained-build-input",
@@ -10561,30 +10569,30 @@
       "rationale": "F13 main-loop Home lifetime, worker scheduling and indexed-open system handoff; no renderer or transport."
     },
     "src/booksync/services/LookupHistorySource.cpp": {
-      "role": "services",
-      "rationale": "F40w Word prerequisite: bounded read-only capture of saved native lookup records, UTF-8/framing validation, <=256-byte worker steps and explicit missing/partial/changed/oversize errors; no UI, repair, network or second vocabulary writer."
+      "rationale": "F40w Word prerequisite: bounded read-only capture of saved native lookup records, UTF-8/framing validation, <=256-byte worker steps and explicit missing/partial/changed/oversize errors; no UI, repair, network or second vocabulary writer.",
+      "role": "services"
     },
     "src/booksync/services/LookupHistorySource.h": {
-      "role": "services",
-      "rationale": "F40w Word prerequisite: bounded read-only capture of saved native lookup records, UTF-8/framing validation, <=256-byte worker steps and explicit missing/partial/changed/oversize errors; no UI, repair, network or second vocabulary writer."
+      "rationale": "F40w Word prerequisite: bounded read-only capture of saved native lookup records, UTF-8/framing validation, <=256-byte worker steps and explicit missing/partial/changed/oversize errors; no UI, repair, network or second vocabulary writer.",
+      "role": "services"
     },
     "src/booksync/services/LookupPool.cpp": {
-      "role": "services",
       "includes": [
         "Logging.h",
         "LookupPool.h",
         "Memory.h",
         "cstring"
       ],
-      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O."
+      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O.",
+      "role": "services"
     },
     "src/booksync/services/LookupPool.h": {
-      "role": "services",
       "includes": [
         "LookupHistorySource.h",
         "memory"
       ],
-      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O."
+      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O.",
+      "role": "services"
     },
     "src/booksync/services/NativeHistory.cpp": {
       "role": "services",
@@ -10683,21 +10691,21 @@
       "rationale": "R1 bounded reminder presentation through Library; no data I/O, transport or native reader policy in UI."
     },
     "src/booksync/services/SavedLookupPoolSource.cpp": {
-      "role": "services",
       "includes": [
         "SavedLookupPoolSource.h",
         "cstdio",
         "cstring"
       ],
-      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O."
+      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O.",
+      "role": "services"
     },
     "src/booksync/services/SavedLookupPoolSource.h": {
-      "role": "services",
       "includes": [
         "HalStorage.h",
         "LookupPool.h"
       ],
-      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O."
+      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O.",
+      "role": "services"
     },
     "src/booksync/services/SavedNativePassages.cpp": {
       "role": "services",
@@ -10968,8 +10976,8 @@
       "rationale": "F11 worker-only bounded resource admission and PSRAM-first data allocation; main-loop display ownership uses HAL and F10 leases, never UI or backend protocol."
     },
     "src/booksync/system/Bootstrap.cpp": {
-      "rationale": "The X3 Settings entry owns only Home widgets and cannot root native SettingsActivity. F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F34 projects Library-only widget values into foreground drawing and mapped input; fonts prepare on entry, and snapshot/focus mutation is serialized by RenderLock. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O. F36a handles an explicit Library browse intent and restores the parent batch on return. R1 suppresses due overlays during the Home editor or activation notice. The X3 Settings entry owns only Home widgets and cannot root native SettingsActivity. F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F34 projects Library-only widget values into foreground drawing and mapped input; fonts prepare on entry, and snapshot/focus mutation is serialized by RenderLock. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O. F40w installs the X4-only requested device bridge and reuses the native Wi-Fi picker while the sole network owner is idle. ",
       "role": "system",
+      "rationale": "The X3 Settings entry owns only Home widgets and cannot root native SettingsActivity. F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F34 projects Library-only widget values into foreground drawing and mapped input; fonts prepare on entry, and snapshot/focus mutation is serialized by RenderLock. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O. F36a handles an explicit Library browse intent and restores the parent batch on return. R1 suppresses due overlays during the Home editor or activation notice. The X3 Settings entry owns only Home widgets and cannot root native SettingsActivity. F04 owned offline Home shell: public Library values/intents and main-loop retained Activity bridge; no transport or new durable store. F13 adds bounded local snapshot batches and main-loop worker lifecycle with render excluded. F34 projects Library-only widget values into foreground drawing and mapped input; fonts prepare on entry, and snapshot/focus mutation is serialized by RenderLock. F35b adds bounded Library geometry previews and atomic class-local drafts; presentation stays capability-gated and paint performs no I/O. F35c adds revision-checked create/name/reorder through Library intents; source spans preserve unknown page data, X4-only presentation reuses fixed SDK keyboard state and performs no paint I/O. F40w installs the X4-only requested device bridge and reuses the native Wi-Fi picker while the sole network owner is idle. ",
       "includes": [
         "Bootstrap.h",
         "CrossPointState.h",
@@ -15202,13 +15210,6 @@
       "includes": []
     }
   },
-  "generators": {
-    "web": "scripts/build_web.py",
-    "i18n": "scripts/gen_i18n.py",
-    "icons": "scripts/generate_icons.py",
-    "scalable-fonts": "scripts/build_scalable_font_assets.py"
-  },
-  "schema": 1,
   "pinned": {
     "freeink-sdk": "f7fa9b6871192ea27d8aa37a03beaa749462c3ab",
     "freeink-sdk-inputs": [
@@ -16436,6 +16437,5 @@
       "tools/ml_ota.py",
       "x25519-license.txt"
     ]
-  },
-  "policy": "New/stale production inputs and changed retained include edges fail. Review the dependency rationale for every inventory change. Product roles are path-owned, not exemptions."
+  }
 }
