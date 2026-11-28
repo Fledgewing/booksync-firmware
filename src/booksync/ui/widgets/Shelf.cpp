@@ -57,6 +57,8 @@ void Shelf::paint(Canvas& canvas, WidgetView viewValue, WindowSource source, uin
       const int height = box.height - 80;
       if (focusIndex == i + 1) canvas.border({x - 3, 51, width + 6, height + 26}, true, 2, 4);
       canvas.cover({x, 54, width, height}, book, true);
+      if (viewValue.files && viewValue.files[i] == FileAvailability::OnCard)
+        canvas.onCard({x + width - 20, 59, 14, 14});
       canvas.title({x, box.height - 24, width, 20}, book.title.data(), true, false, 192);
     }
   }

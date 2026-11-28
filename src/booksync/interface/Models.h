@@ -51,6 +51,12 @@ enum class WindowSource : uint8_t {
   AllFinished,
   Unknown
 };
+enum class CatalogDestination : uint8_t { Library, BookList };
+struct CatalogRoute {
+  CatalogDestination destination = CatalogDestination::Library;
+  WindowSource source = WindowSource::Unknown;
+  std::array<char, 64> caption{};
+};
 enum class WindowPresentation : uint8_t { Full, Preview };
 struct WindowRequest {
   uint32_t offset = 0;

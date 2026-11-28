@@ -16385,23 +16385,7 @@
       "role": "services",
       "rationale": "F40w Book list worker projection: at most four frozen indexed records, independent preset order/count/year/scope evidence, fixed caller-owned output and no UI, transport, allocation or writer."
     },
-    "src/booksync/ui/catalog/SourceList.h": {
-      "role": "ui",
-      "rationale": "F40w approved compact Book list and shared saved-source destination; bounded Library values/intents only, no transport, filesystem or source selection in UI."
-    },
-    "src/booksync/ui/catalog/SourceList.cpp": {
-      "role": "ui",
-      "rationale": "F40w approved compact Book list and shared saved-source destination; bounded Library values/intents only, no transport, filesystem or source selection in UI."
-    },
     "src/booksync/system/ArtworkCache.h": {
-      "role": "system",
-      "rationale": "F40w foreground native paint/input glue for approved source lists and thumbnails; X4 PSRAM cache is fallible, page bounded and prepared after paint, with no additional framebuffer or reader policy."
-    },
-    "src/booksync/system/SourceListScreen.h": {
-      "role": "system",
-      "rationale": "F40w foreground native paint/input glue for approved source lists and thumbnails; X4 PSRAM cache is fallible, page bounded and prepared after paint, with no additional framebuffer or reader policy."
-    },
-    "src/booksync/system/SourceListScreen.cpp": {
       "role": "system",
       "rationale": "F40w foreground native paint/input glue for approved source lists and thumbnails; X4 PSRAM cache is fallible, page bounded and prepared after paint, with no additional framebuffer or reader policy."
     }

@@ -10,14 +10,14 @@ using namespace booksync;
 using namespace booksync::update;
 struct FakeUpdate {
   Context state{{false, true, false}, true, true, false, false, true};
-  Image image{}, previous{}, boot{};
+  booksync::update::Image image{}, previous{}, boot{};
   bool compatible = false, writeOk = true, locked = false, readingOnLock = false;
   unsigned writes = 0, restarts = 0;
   Feed::Release release{};
   Diagnostics diagnostics;
   Ports ports{this,
               [](void* p) { return static_cast<FakeUpdate*>(p)->state; },
-              [](void* p, bool previous, Image& out) {
+              [](void* p, bool previous, booksync::update::Image& out) {
                 auto& f = *static_cast<FakeUpdate*>(p);
                 if (f.locked) return false;
                 f.locked = true;
@@ -26,7 +26,7 @@ struct FakeUpdate {
                 return true;
               },
               [](void* p) { static_cast<FakeUpdate*>(p)->locked = false; },
-              [](void* p, Image& out) {
+              [](void* p, booksync::update::Image& out) {
                 out = static_cast<FakeUpdate*>(p)->boot;
                 return true;
               },
@@ -34,7 +34,7 @@ struct FakeUpdate {
                 auto& f = *static_cast<FakeUpdate*>(p);
                 return f.compatible && !memcmp(digest, f.previous.digest, 32);
               },
-              [](void* p, bool, const Image&) {
+              [](void* p, bool, const booksync::update::Image&) {
                 auto& f = *static_cast<FakeUpdate*>(p);
                 ++f.writes;
                 return f.writeOk;

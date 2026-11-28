@@ -17,4 +17,4 @@ with tempfile.TemporaryDirectory(prefix='booksync-booklist-ui-') as directory:
     assert not any('Font ' in line and 'not found' in line for line in log.splitlines())
     expected=1 if profile=='simulator-X3' else 3
     assert len(list(out.glob('*.pgm')))==expected
-print(f'BookSync Book list {profile}: accepted book open retired by footer Back PASS')
+print(f'BookSync Book list {profile}: accepted book open retired by approved Back PASS')

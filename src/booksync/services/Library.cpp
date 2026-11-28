@@ -246,6 +246,10 @@ class OfflineLibrary final : public Library {
   WindowSource requestedSource = WindowSource::Unknown;
   CommandStatus browseSource(WindowSource source) override {
     if (source == WindowSource::Continue || source == WindowSource::Unknown) return CommandStatus::Unsupported;
+    if (local) {
+      local->resolveOpen = local->openReady = false;
+      local->openKey = {};
+    }
     requestedSource = source;
     return CommandStatus::Accepted;
   }
@@ -402,7 +406,7 @@ bool takeCatalogRequest() {
   const bool requested = catalogRequested;
   catalogRequested = false;
   return requested;
-  }
+}
 bool takeSourceBrowseRequest(WindowSource& source) {
   source = shellLibrary().requestedSource;
   shellLibrary().requestedSource = WindowSource::Unknown;

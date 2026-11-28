@@ -60,6 +60,7 @@ BookListMeta nativeListMeta(void* context, WindowSource) {
   meta.countKnown = meta.complete = index.ready();
   return meta;
 }
+FileAvailability nativeListFile(void*, WindowSource, uint32_t) { return FileAvailability::OnCard; }
 bool nativeListRow(void* context, WindowSource, uint32_t rank, BookRow& row) {
   auto& index = *static_cast<storage::Index*>(context);
   return index.summary({index.provenance(), rank}, row);
@@ -135,7 +136,7 @@ bool ReadModel::materializeList(WindowSpan& span) {
   const auto provenance = index_.provenance();
   const auto source = registered ? bookListSource_
                       : span.request.source == WindowSource::OnDevice
-                          ? BookListSource{&index_, nativeListMeta, nativeListRow}
+                          ? BookListSource{&index_, nativeListMeta, nativeListRow, nativeListFile}
                           : BookListSource{};
   const auto scope = registered ? bookListScope_ : ReadingScope{provenance.owner, provenance.accountEpoch};
   span.total = 0;
@@ -161,6 +162,7 @@ bool ReadModel::materializeList(WindowSpan& span) {
       return false;
     }
     for (uint16_t i = 0; i < preview.count; ++i) {
+      window_.fileAvailability[window_.count] = preview.files[i];
       window_.rows[window_.count++] = preview.books[i];
       ++span.count;
       span.bytes += sizeof(BookRow);
@@ -216,6 +218,8 @@ bool ReadModel::materializeList(WindowSpan& span) {
       span.availability = Availability::Unavailable;
       return false;
     }
+    window_.fileAvailability[window_.count] =
+        source.file ? source.file(source.context, span.request.source, rank) : FileAvailability::Unknown;
     ++window_.count;
     ++span.count;
     span.bytes += sizeof(BookRow);

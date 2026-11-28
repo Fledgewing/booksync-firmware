@@ -26,7 +26,7 @@ enum class Label : uint8_t {
 struct Box {
   int x = 0, y = 0, w = 0, h = 0;
 };
-enum class Drawing : uint8_t { Fill, Border, Text, Title, SerifTitle, BookJacket };
+enum class Drawing : uint8_t { Fill, Border, Text, Title, SerifTitle, BookJacket, OnCardMark };
 struct PaintCommand {
   Box box{};
   uint64_t first = 0, second = 0;
@@ -54,6 +54,7 @@ class Canvas {
       c->radius = radius;
     }
   }
+  void onCard(Box b) { appendPaint(b, Drawing::OnCardMark, true); }
   void title(Box b, const char* paintCaption, bool black, bool bold = false, uint16_t scale = 0) {
     if (auto* c = appendPaint(b, Drawing::Title, black)) {
       c->caption = paintCaption;

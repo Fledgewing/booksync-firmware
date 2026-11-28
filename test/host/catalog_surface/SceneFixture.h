@@ -39,7 +39,8 @@ class SceneLibrary final : public Library {
  public:
   unsigned scene = 0, queries = 0, batches = 0, starts = 0, opens = 0, connects = 0, cancelCalls = 0, resumes = 0,
            detailsCalls = 0, seriesCalls = 0;
-  unsigned coverRequests = 0;
+  unsigned coverRequests = 0, retiredOpenCalls = 0;
+  void retireOpen(BookKey) override { ++retiredOpenCalls; }
   mutable unsigned reads = 0;
   Snapshot owner{};
   CatalogSummary summary{};
@@ -112,6 +113,12 @@ class SceneLibrary final : public Library {
   }
   Subscription subscribe() const override { return {sequence, 1, true}; }
   CommandStatus submit(Intent) override { return CommandStatus::Accepted; }
+  bool requestWindow(WindowRequest value) override {
+    WindowBatchRequest batch;
+    batch.count = 1;
+    batch.windows[0] = value;
+    return requestBatch(batch);
+  }
   bool requestBatch(WindowBatchRequest batch) override {
     ++batches;
     window = {};

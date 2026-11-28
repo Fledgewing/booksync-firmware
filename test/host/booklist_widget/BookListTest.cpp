@@ -231,3 +231,22 @@ TEST(BookListProjection, SavedAgeIsWorkerEvidenceAndUnknownAgeNeverLooksZeroDays
   EXPECT_FALSE(out.ageKnown);
   EXPECT_EQ(out.ageDays, 0u);
 }
+
+TEST(BookListProjection, FileEvidenceRemainsIndependentAndRetiresWithItsSnapshot) {
+  Fake f;
+  BookListProjection out;
+  auto source = f.source();
+  ASSERT_TRUE(projectBookList(source, request(WindowSource::Recent), account, 2026, out));
+  for (auto file : out.files) EXPECT_EQ(file, FileAvailability::Unknown);
+  source.file = [](void*, WindowSource, uint32_t rank) {
+    return rank % 2 ? FileAvailability::ServerOnly : FileAvailability::OnCard;
+  };
+  ASSERT_TRUE(projectBookList(source, request(WindowSource::Recent), account, 2026, out));
+  EXPECT_EQ(out.files[0], FileAvailability::OnCard);
+  EXPECT_EQ(out.files[1], FileAvailability::ServerOnly);
+  f.change = true;
+  f.peeks = 0;
+  ASSERT_TRUE(projectBookList(source, request(WindowSource::Recent), account, 2026, out));
+  EXPECT_EQ(out.state, PersonalState::NotSaved);
+  for (auto file : out.files) EXPECT_EQ(file, FileAvailability::Unknown);
+}

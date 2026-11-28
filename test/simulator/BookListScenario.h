@@ -28,7 +28,11 @@ class Fixture final : public Library {
   unsigned coverIntents = 0;
   WindowSource selected = WindowSource::Unknown;
   Capabilities capabilities() const override { return {}; }
-  Snapshot snapshot() const override { return {}; }
+  Snapshot snapshot() const override {
+    Snapshot out;
+    out.accountEpoch = 3;
+    return out;
+  }
   HomePage homePage() const override { return page; }
   bool requestHomePage(uint8_t) override { return true; }
   Subscription subscribe() const override { return {data.publication, 1, true}; }
@@ -61,7 +65,8 @@ class Fixture final : public Library {
   }
   static uint32_t sourceTotal(WindowSource source) {
     constexpr uint32_t counts[] = {14, 6, 37, 18, 8, 5, 18, 12, 312};
-    for (uint8_t i = 0; i < 9; ++i) if (Sources[i] == source) return counts[i];
+    for (uint8_t i = 0; i < 9; ++i)
+      if (Sources[i] == source) return counts[i];
     return 0;
   }
   static BookListMeta meta(void* context, WindowSource source) {
@@ -99,7 +104,11 @@ class Fixture final : public Library {
     data.publication = ++sequence;
     data.windowCount = 1;
     data.provenance = {4, 3, 17, 0};
-    projectBookList({this, meta, book}, batch.windows[0], {17, 3}, 2026, preview);
+    projectBookList({this, meta, book,
+                     [](void*, WindowSource, uint32_t rank) {
+                       return rank % 2 ? FileAvailability::ServerOnly : FileAvailability::OnCard;
+                     }},
+                    batch.windows[0], {17, 3}, 2026, preview);
     auto& span = data.windows[0];
     span.request = batch.windows[0];
     span.total = preview.total;
@@ -115,7 +124,10 @@ class Fixture final : public Library {
                                                                       : Availability::Ready;
     if (preview.state == PersonalState::Oversized) span.bytes = span.request.bytes + 1;
     data.count = preview.count;
-    for (uint16_t i = 0; i < preview.count; ++i) data.rows[i] = preview.books[i];
+    for (uint16_t i = 0; i < preview.count; ++i) {
+      data.rows[i] = preview.books[i];
+      data.fileAvailability[i] = preview.files[i];
+    }
     return true;
   }
   bool requestWindow(WindowRequest request) override {
@@ -131,7 +143,10 @@ class Fixture final : public Library {
     span.availability = Availability::Ready;
     span.bytes = sizeof(WindowSpan) + span.count * sizeof(BookRow);
     data.count = span.count;
-    for (uint16_t i = 0; i < span.count; ++i) book(this, request.source, request.offset + i, data.rows[i]);
+    for (uint16_t i = 0; i < span.count; ++i) {
+      book(this, request.source, request.offset + i, data.rows[i]);
+      data.fileAvailability[i] = FileAvailability::OnCard;
+    }
     return true;
   }
 };
@@ -186,14 +201,12 @@ inline bool tick() {
 #if CROSSINK_APP_CAP_TOUCH
     if (mappedInputManager.hasTouch()) {
       const auto area = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-      if (frame == 58) mappedInputManager.simulatorInjectTouchDown(area.x + 40, area.y + area.height - 30);
-      if (frame == 59) mappedInputManager.simulatorInjectTouchRelease(area.x + 40, area.y + area.height - 30);
+      if (frame == 58) mappedInputManager.simulatorInjectTouchDown(area.x + 40, area.y + 24);
+      if (frame == 59) mappedInputManager.simulatorInjectTouchRelease(area.x + 40, area.y + 24);
     } else
 #endif
     {
-      if (frame == 58 || frame == 60)
-        mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Up));
-      if (frame == 62) mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
+      if (frame == 58) mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Back);
     }
   }
   if (frame < 80) return true;
