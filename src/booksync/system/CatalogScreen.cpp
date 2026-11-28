@@ -201,7 +201,7 @@ class CatalogActivity final : public Activity {
         } else {
           const int w = (box.width - 24) / 4;
           paintCatalogCover(Rect{box.x + 8 + i * w, box.y + 50, w - 7, box.height - line - 62}, book, span->first + i);
-          text(Rect{box.x + 8 + i * w, box.y + box.height - line - 5, w - 7, line}, book.title.data());
+          text(Rect{box.x + 8 + i * w, box.y + box.height - line - 5, w - 7, line}, book.title.data(), SMALL_FONT_ID);
         }
       }
     }
@@ -217,14 +217,22 @@ class CatalogActivity final : public Activity {
       text(Rect{box.x + 8, box.y + 7, box.width - 40, line}, I18n::getInstance().get(labels[n]), UI_12_FONT_ID);
       icon(box, n);
       number(Rect{box.x + 8, box.y + line + 8, box.width - 16, tileH - line - 12}, counts[n]);
+      char subtitle[96];
+      std::snprintf(subtitle, sizeof(subtitle), "%s", n == 1 || n == 2 ? tr(STR_BROWSE) : tr(STR_CATALOG_BOOKS_UNIT));
+      if (n == 0 && catalog_->catalogSummaryValue().collections.availability == Availability::Ready) {
+        const auto collections = catalog_->catalogSummaryValue().collections.value;
+        if (collections == 1)
+          std::snprintf(subtitle, sizeof(subtitle), tr(STR_CATALOG_COLLECTION_ONE_FORMAT), unsigned(collections));
+        else
+          std::snprintf(subtitle, sizeof(subtitle), tr(STR_CATALOG_COLLECTIONS_FORMAT), unsigned(collections));
+      }
       if (n == 3 && catalog_->catalogSummaryValue().linked.availability == Availability::Ready &&
-          catalog_->catalogSummaryValue().sourceLabel[0]) {
-        char label[80];
-        std::snprintf(label, sizeof(label), tr(STR_CATALOG_SOURCE_FORMAT),
+          catalog_->catalogSummaryValue().sourceLabel[0])
+        std::snprintf(subtitle, sizeof(subtitle), tr(STR_CATALOG_SOURCE_FORMAT),
                       unsigned(catalog_->catalogSummaryValue().linked.value),
                       catalog_->catalogSummaryValue().sourceLabel.data());
-        text(Rect{box.x + box.width / 2, box.y + line + 8, box.width / 2 - 8, line}, label);
-      }
+      const int subtitleLine = renderer.getLineHeight(SMALL_FONT_ID);
+      text(Rect{box.x + 8, box.y + tileH - subtitleLine - 5, box.width - 16, subtitleLine}, subtitle, SMALL_FONT_ID);
       hit(box, n + 10);
     }
   }
