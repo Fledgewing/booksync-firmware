@@ -338,3 +338,25 @@ TEST(TimeHost, TooSmallGeometryHasNoInvisibleRetryTarget) {
 TEST(TimeGeometry, ApprovedMoonUsesFullDrawingAndKeepsStaleFooterSeparate) {
  MoonWidget value;value.status.state=TimeCardState::Ready;value.status.stale=true;widgets::TimeDrawing drawing;ASSERT_TRUE(widgets::Moon::layoutTime(value,{220,104,16,false,true},drawing));EXPECT_EQ(drawing.moon.width,54);EXPECT_EQ(drawing.moon.height,54);for(unsigned i=0;i<drawing.count;++i)EXPECT_LE(drawing.marks[i].cell.y+drawing.marks[i].cell.height,104);EXPECT_FALSE(widgets::Moon::layoutTime(value,{224,96,16,false,false},drawing));
 }
+
+TEST(TimeMoonRaster, WhiteAreaMatchesIlluminationAndSideAcrossLunation) {
+  // Independent disc-area count: the gallery uses white for illuminated surface.
+  struct Phase { uint16_t fraction; int16_t cosine; double white; };
+  for (const auto phase : {Phase{0,1000,0}, Phase{125,707,.1465}, Phase{250,0,.5}, Phase{375,-707,.8535}, Phase{500,-1000,1}, Phase{625,-707,.8535}, Phase{750,0,.5}, Phase{875,707,.1465}}) {
+    MoonWidget value; value.fraction=phase.fraction;value.terminator=phase.cosine;
+    unsigned total=0, shadow=0,left=0,right=0;
+    for(int y=-24;y<=24;++y) {
+      const auto span=widgets::Moon::shadowRow(value,24,y);
+      for(int x=-24;x<=24;++x) if(x*x+y*y<=24*24) {
+        ++total;
+        if(span.width && x>=span.x && x<span.x+span.width) {++shadow;if(x<0)++left;else if(x>0)++right;}
+      }
+    }
+    EXPECT_NEAR(double(total-shadow)/total,phase.white,.035) << phase.fraction;
+    if(phase.fraction==250) EXPECT_GT(left,right*10);
+    if(phase.fraction==750) EXPECT_GT(right,left*10);
+  }
+}
+TEST(TimeMoonRaster, InvalidRowsProduceNoPixels) {
+ MoonWidget value;EXPECT_EQ(widgets::Moon::shadowRow(value,0,0).width,0);EXPECT_EQ(widgets::Moon::shadowRow(value,24,25).width,0);value.terminator=1001;EXPECT_EQ(widgets::Moon::shadowRow(value,24,0).width,0);
+}

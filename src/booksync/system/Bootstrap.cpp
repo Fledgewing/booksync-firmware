@@ -327,7 +327,7 @@ class ShellActivity final : public Activity {
     renderer.drawRoundedRect(rect.x, rect.y, rect.width, rect.height, 1, 8, true);
     if (selected) renderer.drawRect(rect.x + 3, rect.y + 3, rect.width - 6, rect.height - 6, 2, true);
     if (!laidOut) {
-      paintTimeText(rect,{10,6,rect.width-20,18},kindTitle(kind),SMALL_FONT_ID,240,true);
+      paintTimeText(rect,{10,6,rect.width-20,18},kindTitle(kind),UI_10_FONT_ID,192,true);
       paintFittedText(SMALL_FONT_ID, rect.x + 10, rect.y + 32, clock || moon ? tr(STR_HOME_WIDGET_SMALL_TILE) : stateText(view.viewState), rect.width - 20);
       return;
     }
@@ -348,18 +348,15 @@ class ShellActivity final : public Activity {
     }
     if (moon && drawing.moon.width) {
       const auto& c = drawing.moon;
-      const int radius = c.width / 2 - 1;
+      const int radius = c.width * 29 / 64;
       for (int dy = -radius; dy <= radius; ++dy) {
         int half = radius;
         while (half * half + dy * dy > radius * radius) --half;
         const int cx = rect.x + c.x + c.width / 2, y = rect.y + c.y + c.height / 2 + dy;
         renderer.drawPixel(cx - half, y);
         renderer.drawPixel(cx + half, y);
-        const int edge = half * moon->terminator / 1000;
-        if (moon->fraction < 500)
-          renderer.drawLine(cx + edge, y, cx + half, y);
-        else
-          renderer.drawLine(cx - half, y, cx - edge, y);
+        const auto shadow = moon ? widgets::Moon::shadowRow(*moon, radius, dy) : WidgetCell{};
+        if (shadow.width) renderer.drawLine(cx + shadow.x, y, cx + shadow.x + shadow.width - 1, y);
       }
     }
     for (uint8_t i = 0; i < drawing.count; ++i) {
@@ -461,14 +458,17 @@ class ShellActivity final : public Activity {
       }
       if(mark.line==widgets::TimeLine::Illumination){
         char number[4];std::snprintf(number,sizeof(number),"%u",unsigned(moon->illumination));
-        paintTimeText(rect,c,number,SMALL_FONT_ID,400,true);
-        const int width=renderer.getTextWidth(SMALL_FONT_ID,number,EpdFontFamily::BOLD)*400/256;
+        paintTimeText(rect,c,number,UI_12_FONT_ID,267,true);
+        const int width=renderer.getTextWidth(UI_12_FONT_ID,number,EpdFontFamily::BOLD)*267/256;
         paintTimeText(rect,{c.x+width+3,c.y+11,c.width-width-3,16},tr(STR_HOME_MOON_LIT_UNIT),SMALL_FONT_ID,192);
       }else{
         const bool title=mark.line==widgets::TimeLine::Title;
         const bool date=mark.line==widgets::TimeLine::Date;
-        const int scale=title?240:mark.line==widgets::TimeLine::Value?544:mark.line==widgets::TimeLine::TimeSource || mark.line==widgets::TimeLine::Stale?144:mark.line==widgets::TimeLine::Next?160:192;
-        paintTimeText(rect,c,text,SMALL_FONT_ID,scale,title || date || mark.line==widgets::TimeLine::TimePhase);
+        const bool value = mark.line == widgets::TimeLine::Value;
+        const bool phase = mark.line == widgets::TimeLine::TimePhase;
+        const int font = value ? UI_12_FONT_ID : title || date || phase ? UI_10_FONT_ID : SMALL_FONT_ID;
+        const int scale = title ? 192 : value ? 363 : date || phase ? 154 : mark.line == widgets::TimeLine::Next ? 160 : mark.line == widgets::TimeLine::TimeSource || mark.line == widgets::TimeLine::Stale ? 144 : 192;
+        paintTimeText(rect,c,text,font,scale,title || date || value || phase);
       }
     }
   }

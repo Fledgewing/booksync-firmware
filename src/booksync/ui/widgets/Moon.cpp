@@ -1,12 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "booksync/ui/widgets/Moon.h"
 namespace booksync::widgets {
+WidgetCell Moon::shadowRow(const MoonWidget& value, int16_t radius, int16_t y) {
+  if (radius <= 0 || y < -radius || y > radius || value.terminator < -1000 || value.terminator > 1000 || value.fraction >= 1000) return {};
+  int half = radius;
+  while (half * half + y * y > radius * radius) --half;
+  if (value.terminator == -1000) return {};
+  const int edge = half * value.terminator / 1000;
+  const int first = value.fraction < 500 ? -half : -edge;
+  const int last = value.fraction < 500 ? edge : half;
+  return {first, y, last - first + 1, 1};
+}
+
 bool Moon::layoutTime(const MoonWidget& timeValue, WidgetBox box, TimeDrawing& out) {
   auto status = timeValue.status;
   status.state = boundedMoonCard(timeValue);
   if (!timeFrame(status, sizeof(timeValue), box, out)) return false;
   if (status.state != TimeCardState::Ready) return true;
-  out.moon = {10, 32, 54, 54};
+  out.moon = {10, 36, 54, 54};
   timeLine(out, TimeLine::TimePhase, 76, 30, box.width - 86, 15);
   timeLine(out, TimeLine::Illumination, 76, 46, box.width - 86, 28);
   timeLine(out, TimeLine::Next, 76, timeValue.status.stale ? 74 : 78, box.width - 86, 12);
