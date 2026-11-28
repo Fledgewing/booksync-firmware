@@ -9,6 +9,18 @@ constexpr unsigned ReminderDueBytes = 1024;
 constexpr unsigned ReminderServiceBytes = 4096;
 constexpr unsigned ReminderScratchBytes = 1024;
 constexpr unsigned ReminderStoreBytes = 8192;
+// Support and current availability are distinct. Interval add/delete/time fields
+// are deliberately absent; the singleton supports edit/enable/Done/Turn off.
+struct ReminderCapabilities {
+  bool time = false, interval = false, localEdit = false, snooze = false;
+  bool sleep = false, clockKnown = false;
+  uint8_t timeLimit = ReminderTimeLimit, messageCharacters = 60;
+  uint16_t messageBytes = 240;
+  uint8_t intervals[4] = {20, 30, 45, 60};
+  constexpr ReminderCapabilities(bool supported = false)
+      : time(supported), interval(supported), localEdit(supported), snooze(supported) {}
+  constexpr operator bool() const { return time ? interval : false; }
+};
 enum class ReminderSource : uint8_t { Local, Managed };
 enum class ReminderKind : uint8_t { Time, Interval };
 enum class ReminderStorage : uint8_t { Ready, Recovered, Unreadable };
@@ -43,6 +55,7 @@ struct ReminderRow {
 };
 struct ReminderEvents {
   uint64_t changed = 0, clockChanged = 0, due = 0;
+  ReminderKind changedKind = ReminderKind::Time, dueKind = ReminderKind::Time;
 };
 struct ReminderList {
   uint64_t nextMutationKey = 0;

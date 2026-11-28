@@ -24,15 +24,20 @@ void RemindersFacade::work(const ReminderNow& now, bool input) {
     case Pending::None:
       break;
   }
-  if (request != Pending::None && result_.status == ReminderStatus::Saved) ++events_.changed;
+  if (request != Pending::None && result_.status == ReminderStatus::Saved) {
+    ++events_.changed;
+    events_.changedKind = result_.id == 1 ? ReminderKind::Interval : ReminderKind::Time;
+  }
   const auto id = due_.id, revision = due_.revision;
   const auto date = due_.day;
   const auto sequence = due_.sequence;
   const bool previous = ready_;
   ready_ = service_.next(now, due_);
   if (ready_ &&
-      (!previous || id != due_.id || revision != due_.revision || date != due_.day || sequence != due_.sequence))
+      (!previous || id != due_.id || revision != due_.revision || date != due_.day || sequence != due_.sequence)) {
     ++events_.due;
+    events_.dueKind = due_.kind;
+  }
 }
 void RemindersFacade::list(ReminderList& out) const {
   out.clear();

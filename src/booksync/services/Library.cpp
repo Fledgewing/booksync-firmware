@@ -66,7 +66,12 @@ class OfflineLibrary final : public Library {
   bool openRequested = false;
   BookRow lastBook{};
   ClockStatus clockStatus() const override { return currentClock; }
-  Capabilities capabilities() const override { return {true, true, false, reminders != nullptr}; }
+  Capabilities capabilities() const override {
+    ReminderCapabilities support{reminders != nullptr};
+    support.sleep = reminders && reminders->sleepAvailable();
+    support.clockKnown = currentClock.known();
+    return {true, true, false, support};
+  }
   AccountView accountView() const override { return accountPresentation; }
   CommandStatus selectService(ServiceSelection selection) override {
     const auto& current = accountPresentation;

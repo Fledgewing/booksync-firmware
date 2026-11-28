@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <ctime>
+#include <unordered_map>
 
 #include "booksync/services/Reminders.h"
 #include "booksync/services/RemindersFacade.h"
@@ -738,5 +739,97 @@ TEST_F(RemindersTest, LosingClockAfterVisibleClaimCannotPersistAnInventedSnoozeW
   now.wall = 0;
   EXPECT_EQ(service.respond(grant.token, 7, ReminderAction::Snooze10, now).status, ReminderStatus::Unavailable);
   EXPECT_EQ(service.respond(grant.token, 7, ReminderAction::GotIt, now).status, ReminderStatus::Saved);
+}
+}  // namespace
+
+namespace {
+TEST_F(RemindersTest, AmbiguousFailureCannotAcknowledgeAnotherValidPayloadWithSameChecksum) {
+  ASSERT_EQ(add().status, ReminderStatus::Saved);
+  auto desired = service.reminderData();
+  ReminderRecord* row = nullptr;
+  for (auto& candidate : desired.rows)
+    if (candidate.id) row = &candidate;
+  ASSERT_NE(row, nullptr);
+  const auto& original = card.files[paths.current];
+  uint32_t prefix = 2166136261u;
+  for (size_t i = 16; i < original.size() - 241; ++i) prefix = (prefix ^ static_cast<uint8_t>(original[i])) * 16777619u;
+  // Host-only deterministic birthday search. Product storage must compare exact
+  // intended bytes rather than treating this non-cryptographic checksum as ID.
+  std::unordered_map<uint32_t, uint32_t> seen;
+  seen.reserve(200000);
+  uint32_t first = 0, second = 0;
+  bool found = false;
+  for (uint32_t i = 0; i < 1000000 && !found; ++i) {
+    char text[9]{};
+    std::snprintf(text, sizeof(text), "%08x", unsigned(i));
+    uint32_t hash = prefix;
+    for (unsigned j = 0; j < 8; ++j) hash = (hash ^ static_cast<uint8_t>(text[j])) * 16777619u;
+    const auto inserted = seen.emplace(hash, i);
+    if (!inserted.second) {
+      first = inserted.first->second;
+      second = i;
+      found = true;
+    }
+  }
+  ASSERT_TRUE(found);
+  std::snprintf(row->fields.message, sizeof(row->fields.message), "%08x", unsigned(first));
+  ASSERT_TRUE(store.save(desired));
+  const auto before = card;
+  const auto oldBytes = card.files[paths.current];
+  std::snprintf(row->fields.message, sizeof(row->fields.message), "%08x", unsigned(second));
+  card.events.clear();
+  ASSERT_TRUE(store.save(desired));
+  EXPECT_EQ(oldBytes.substr(12, 4), card.files[paths.current].substr(12, 4));
+  ASSERT_NE(oldBytes, card.files[paths.current]);
+  const auto fault = std::find(card.events.begin(), card.events.end(), "file-sync:before") - card.events.begin();
+  ASSERT_LT(static_cast<size_t>(fault), card.events.size());
+  card = before;
+  card.events.clear();
+  card.fail = static_cast<int>(fault);
+  EXPECT_FALSE(store.save(desired));
+  EXPECT_EQ(card.files[paths.current], oldBytes);
+}
+}  // namespace
+
+namespace {
+TEST(ReminderCapabilities, TaggedKindsExposeOnlyBoundedLocalOperations) {
+  ReminderCapabilities unavailable;
+  EXPECT_FALSE(unavailable);
+  EXPECT_FALSE(unavailable.sleep);
+  EXPECT_FALSE(unavailable.clockKnown);
+  ReminderCapabilities supported{true};
+  EXPECT_TRUE(supported);
+  EXPECT_TRUE(supported.time);
+  EXPECT_TRUE(supported.interval);
+  EXPECT_TRUE(supported.localEdit);
+  EXPECT_EQ(supported.timeLimit, 8);
+  EXPECT_EQ(supported.messageCharacters, 60);
+  EXPECT_EQ(supported.messageBytes, 240);
+  EXPECT_EQ(supported.intervals[0], 20);
+  EXPECT_EQ(supported.intervals[1], 30);
+  EXPECT_EQ(supported.intervals[2], 45);
+  EXPECT_EQ(supported.intervals[3], 60);
+}
+}  // namespace
+
+namespace {
+TEST_F(RemindersTest, EventsTagTheChangedKindWithoutPaintWork) {
+  RemindersFacade facade{service};
+  facade.work(now);
+  ReminderMutation m{};
+  m.id = 1;
+  m.revision = 1;
+  m.key = 1;
+  m.operation = ReminderOperation::Edit;
+  m.fields.kind = ReminderKind::Interval;
+  m.fields.enabled = true;
+  m.fields.intervalMinutes = 20;
+  ASSERT_EQ(facade.mutate(m).status, ReminderStatus::Pending);
+  facade.work(now);
+  card.events.clear();
+  const auto event = facade.events();
+  EXPECT_NE(event.changed, 0);
+  EXPECT_EQ(event.changedKind, ReminderKind::Interval);
+  EXPECT_TRUE(card.events.empty());
 }
 }  // namespace

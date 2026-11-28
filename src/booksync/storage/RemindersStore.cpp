@@ -11,16 +11,32 @@ static_assert(Bytes <= ReminderStoreBytes);
 struct Codec {
   FsFile* file = nullptr;
   FilePublish* output = nullptr;
-  bool reading = false, ok = true;
+  bool reading = false, ok = true, comparing = false;
   uint32_t hash = 2166136261u;
   void writeBytes(const void* data, size_t n) {
     if (!ok) return;
-    if (output) ok = output->write(data, n);
+    if (comparing) {
+      const auto* expected = static_cast<const uint8_t*>(data);
+      uint8_t actual[8]{};
+      for (size_t offset = 0; offset < n;) {
+        const size_t count = n - offset < sizeof(actual) ? n - offset : sizeof(actual);
+        if (file->read(actual, count) != static_cast<int>(count) || std::memcmp(actual, expected + offset, count)) {
+          ok = false;
+          return;
+        }
+        offset += count;
+      }
+    } else if (output)
+      ok = output->write(data, n);
     const auto* p = static_cast<const uint8_t*>(data);
     for (size_t i = 0; i < n; ++i) hash = (hash ^ p[i]) * 16777619u;
   }
   void bytes(void* data, size_t n) {
     if (!ok) return;
+    if (comparing) {
+      writeBytes(data, n);
+      return;
+    }
     if (reading)
       ok = file->read(data, n) == static_cast<int>(n);
     else if (output)
@@ -181,14 +197,25 @@ bool RemindersStore::save(const ReminderData& data) {
   payload(out, data);
   if (!out.ok) return false;
   if (writer.finish()) return true;
-  // An ambiguous last directory barrier is reconciled against the exact intended
-  // checksum, and confirmed durably before acknowledging the change.
+  // Reconcile exact intended bytes, not just the non-cryptographic checksum:
+  // a valid older envelope can have the same hash. One reader and 8-byte compare
+  // scratch preserve both the single-open-file rule and the worker stack budget.
   auto file = Storage.open(paths_.current, O_RDONLY);
   bool matches = false;
   if (file) {
-    Codec check{&file, nullptr, true};
-    matches = check.number(0, 4) == Magic && check.number(0, 4) == Version && check.number(0, 4) == Payload &&
-              check.number(0, 4) == hash.hash && check.ok;
+    Codec check{&file};
+    check.comparing = true;
+#if SIZE_MAX < UINT64_MAX
+    check.ok = file.fileSize64() == Bytes;
+#else
+    check.ok = file.fileSize() == Bytes;
+#endif
+    check.number(Magic, 4);
+    check.number(Version, 4);
+    check.number(Payload, 4);
+    check.number(hash.hash, 4);
+    payload(check, data);
+    matches = check.ok;
   }
   const bool closed = file.close();
   return matches && closed && writer.confirm();

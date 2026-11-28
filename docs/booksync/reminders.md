@@ -43,7 +43,7 @@ staging never becomes authoritative on load. Missing storage starts with no time
 rows and eye rest Off/20. If neither committed file validates, bytes are retained
 and scheduling/mutations are refused. Corrupt current plus valid backup schedules
 only the validated backup and reports recovery. Explicit saves do not overwrite a
-damaged current. F06 confirmation reconciles a failed final publication barrier
+damaged current. Exact streaming comparison plus F06 confirmation reconciles a failed final publication barrier
 before reporting success. Handles are explicitly closed.
 
 Budgets are enforced at compile time: combined runtime service, store scratch and

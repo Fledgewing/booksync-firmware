@@ -14,7 +14,7 @@
 - BookSync distinguishes live synchronized, accepted RTC and validated deep-sleep time from a stale persisted expiry floor, so bedtime scheduling can wait for a known clock.
 - BookSync journals finish, status and rating intents behind confirmed outgoing position delivery, preserving uncertain results and restart-safe Undo; new recovery presentations and live delivery remain off.
 - BookSync adds the approved account states and manual/phone sign-in presentations on X4 Pro, Classic and X3, with masked transient input, explicit Check and closed-form epoch guards; the offline adapter continues to report account sign-in as unsupported.
-- BookSync adds bounded local bedtime and eye-rest scheduling, durable claims and snoozes, and validated atomic reminder storage behind Library; clock provenance and approved presentation follow in separate R1 slices.
+- BookSync adds bounded local bedtime and eye-rest scheduling, durable claims and snoozes, and validated atomic reminder storage behind Library; approved presentation follows in a separate R1 slice.
 
 - BookSync selects saved personal reading records with stable provider precedence and deterministic picks, and projects local/account reading statistics with explicit coverage and overlap-safe Today watermarks.
 - BookSync Home supports snapped widget movement, supported-size cycling and cancelable carry/drop on X4 Pro touch and Classic buttons, saved as one revision-checked atomic edit.

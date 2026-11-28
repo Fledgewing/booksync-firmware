@@ -13,6 +13,7 @@ class RemindersFacade {
   ReminderResult claim(const ReminderDue&, uint64_t);
   ReminderResult respond(uint64_t, uint64_t, ReminderAction);
   bool retry();
+  bool sleepAvailable() const { return false; }
   ReminderResult result() const { return result_; }
   ReminderEvents events() const { return events_; }
   bool due(ReminderDue& out) const;
