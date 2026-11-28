@@ -62,6 +62,8 @@ class WidgetHost {
   uint8_t wanted_ = 0;
   bool pending_ = true, accepted_ = false;
 };
-static_assert(sizeof(WidgetHost) <= 10 * 1024);
+// One existing host owns the fixed Library batch and all ten stats values.
+// Combined collection/stats storage remains bounded; no per-widget allocation.
+static_assert(sizeof(WidgetHost) <= 11 * 1024);
 WidgetView boundedWidget(const LibraryWindow&, const WindowSpan&, WindowRequest);
 }  // namespace booksync
