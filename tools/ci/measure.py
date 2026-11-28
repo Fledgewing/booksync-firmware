@@ -51,6 +51,17 @@ def main():
     for name in ('firmware.bin', 'firmware.elf', 'firmware.map', 'partitions.bin'):
         if not (build / name).is_file() or not (build / name).stat().st_size:
             raise SystemExit(f'missing build evidence: {name}')
+    # Hardware compiler gate emits per-function frame evidence for F39. Keep it
+    # separate from unavailable runtime task high-water measurements.
+    frames = []
+    for name in ('PersonalReading', 'ReadingStats'):
+        paths = list((build / 'src/booksync/services').glob(name + '*.su'))
+        if not paths:
+            raise SystemExit(f'missing reading stack evidence: {name}')
+        for path in paths:
+            frames.append(path.read_text())
+    out.mkdir(parents=True, exist_ok=True)
+    (out / 'reading-stack-usage.txt').write_text(''.join(frames))
     validate_partition_binary(build / 'partitions.bin', config)
     subprocess.run([sys.executable, str(root / 'tools/test/test-home-map.py'),
                     str(build / 'firmware.map')], check=True)

@@ -13300,7 +13300,7 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F35a adds isolated editor HAL/interaction scenario coverage. F18d exercises private state checkpoints, native writeback and durable fake-server restart scenarios. F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change. F23 invokes the opt-in synthetic download/fault/restart scenario before normal boot. F18c adds only the synthetic durable annotation lifecycle scenario entry point. F22 adds offline neutral queries over committed synthetic catalog generations, restart/paging and unsupported coverage.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F35a adds isolated editor HAL/interaction scenario coverage. F18d exercises private state checkpoints, native writeback and durable fake-server restart scenarios. F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change. F23 invokes the opt-in synthetic download/fault/restart scenario before normal boot. F18c adds only the synthetic durable annotation lifecycle scenario entry point. F22 adds offline neutral queries over committed synthetic catalog generations, restart/paging and unsupported coverage. F39 invokes bounded offline personal/stats scenarios with saved page history and normalized fake account snapshots.",
       "includes": [
         "../../test/simulator/AccountScenario.h",
         "../../test/simulator/ActivationScenario.h",
@@ -13319,6 +13319,7 @@
         "../../test/simulator/LifecycleStateScenario.h",
         "../../test/simulator/LifecycleStatsScenario.h",
         "../../test/simulator/LocatorScenario.h",
+        "../../test/simulator/PersonalReadingScenario.h",
         "../../test/simulator/QueriesScenario.h",
         "../../test/simulator/ReaderCaptureScenario.h",
         "../../test/simulator/SyncOwnerScenario.h",
@@ -15464,6 +15465,27 @@
     "src/booksync/services/Queries.cpp": {
       "role": "services",
       "rationale": "F22 worker-only paged projections over neutral source cursors and committed F13/F21 snapshots; fixed reusable workspace, explicit unsupported predicates, no UI or network."
+    },
+    "src/booksync/services/PersonalReading.cpp": {
+      "role": "services",
+      "rationale": "F39 worker-only saved personal-provider selection and neutral page-time/statistics precedence; bounded cursors, explicit scope/coverage and exact inclusion watermarks. No transport, acquisition, UI or native-store mutation."
+    },
+    "src/booksync/services/PersonalReading.h": {
+      "role": "services",
+      "rationale": "F39 worker-only saved personal-provider selection and neutral page-time/statistics precedence; bounded cursors, explicit scope/coverage and exact inclusion watermarks. No transport, acquisition, UI or native-store mutation."
+    },
+    "src/booksync/services/ReadingStats.cpp": {
+      "role": "services",
+      "rationale": "F39 worker-only saved personal-provider selection and neutral page-time/statistics precedence; bounded cursors, explicit scope/coverage and exact inclusion watermarks. No transport, acquisition, UI or native-store mutation."
+    },
+    "src/booksync/services/ReadingStats.h": {
+      "role": "services",
+      "rationale": "F39 worker-only saved personal-provider selection and neutral page-time/statistics precedence; bounded cursors, explicit scope/coverage and exact inclusion watermarks. No transport, acquisition, UI or native-store mutation."
+    },
+    "tools/ci/reading_stack.py": {
+      "role": "build-tool",
+      "rationale": "F39 hardware-only compiler stack-use gate for fixed personal/stats workspaces; emits stack usage evidence and fails frames above 256 bytes without changing runtime behavior. No SDK, transport or UI dependency.",
+      "includes": []
     }
   },
   "generators": {

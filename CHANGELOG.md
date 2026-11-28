@@ -2,6 +2,8 @@
 
 ### Added
 
+- BookSync selects saved personal reading records with stable provider precedence and deterministic picks, and projects local/account reading statistics with explicit coverage and overlap-safe Today watermarks.
+
 - BookSync captures bounded timestamped reading-page history and checkpoints stats batches through its sole sync owner, retaining explicit coverage gaps and reconciling uncertain uploads without counting reading time twice; live delivery remains deferred.
 - BookSync Home supports local add/remove/reset widget edits on X4 Pro and Classic, with revision checks and atomic saves. The X3 Settings-list editor remains pending design approval.
 - BookSync checkpoints read/unread/finished state and ratings through its single sync owner, preserving uncertain deliveries, explicit clears and deferred native writeback across restarts; validated against a fake server.

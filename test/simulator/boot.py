@@ -95,4 +95,5 @@ subprocess.run([sys.executable, 'test/simulator/lifecycle_state.py', profile], c
 
 subprocess.run([sys.executable, 'test/simulator/activation.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/lifecycle_annotations.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/personal_reading.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

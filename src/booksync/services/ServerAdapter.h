@@ -10,6 +10,7 @@ namespace booksync {
 class SyncOwner;
 class CatalogSource;
 class DownloadSource;
+struct RemoteReadingStats;
 // Only the serial owner can mint this capability. No public/default constructor,
 // copying or moving; adapter writes must require the live owner's borrowed token.
 class SyncWriterToken final {
@@ -43,6 +44,9 @@ class ServerAdapter : public AuthAdapter {
   virtual ~ServerAdapter() = default;
   virtual Capabilities capabilities() const = 0;
   virtual Snapshot cachedSnapshot() const = 0;
+  // Normalized saved account statistics; no network or fetch-time inclusion inference.
+  // False leaves the caller's result absent. Publication is separate from F18b delivery.
+  virtual bool cachedReadingStats(RemoteReadingStats&) const { return false; }
   // Borrowed worker cursor, absent until authenticated catalog transport is available.
   virtual CatalogSource* catalogSource() { return nullptr; }
   virtual DownloadSource* downloadSource() { return nullptr; }
