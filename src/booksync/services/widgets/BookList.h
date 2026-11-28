@@ -17,10 +17,12 @@ struct BookListSource {
   void* context = nullptr;
   BookListMeta (*peek)(void*, WindowSource) = nullptr;
   bool (*read)(void*, WindowSource, uint32_t rank, BookRow&) = nullptr;
+  FileAvailability (*file)(void*, WindowSource, uint32_t rank) = nullptr;
 };
 struct BookListProjection {
   static constexpr uint16_t MaxRows = 4;
   std::array<BookRow, MaxRows> books{};
+  std::array<FileAvailability, MaxRows> files{};
   Provenance provenance{};
   WindowRequest request{};
   uint32_t total = 0, bytes = 0;

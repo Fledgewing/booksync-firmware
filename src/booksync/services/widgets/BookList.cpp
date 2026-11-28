@@ -6,6 +6,7 @@ namespace booksync {
 void BookListProjection::clear() {
   static_assert(sizeof(BookRow) <= 256);
   for (auto& book : books) book = {};
+  files.fill(FileAvailability::Unknown);
   provenance = {};
   request = {};
   total = bytes = count = year = 0;
@@ -83,6 +84,7 @@ bool projectBookList(BookListSource source, WindowRequest request, ReadingScope 
       return rejectBookList(out, PersonalState::Unavailable, "Saved selection read failed");
     if (row.title.back() || row.key.provenance != meta.provenance)
       return rejectBookList(out, PersonalState::Unavailable, "Saved row has invalid text or scope");
+    out.files[i] = source.file ? source.file(source.context, request.source, i) : FileAvailability::Unknown;
     for (uint16_t previous = 0; previous < i; ++previous)
       if (out.books[previous].key == row.key)
         return rejectBookList(out, PersonalState::Unavailable, "Saved selection contains a duplicate book");
