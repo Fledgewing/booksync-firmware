@@ -358,3 +358,39 @@ TEST_F(Covers, StaleEpochCannotReAdoptOldAccount) {
   complete(j, {8, 2});
 }
 }  // namespace
+namespace {
+TEST_F(Covers, FailedAdmissionKeepsDrainingUntilDisplayRestored) {
+  bool stopped = false;
+  Admission low{{&stopped, [](void*) { return MemorySnapshot{1024, 1024, 0}; }, [](void*) { return true; },
+                 [](void*) { return true; }, [](void* p) { return *static_cast<bool*>(p); }},
+                true};
+  low.setReading(false);
+  CoverJobs j(low, "/cover.tmp");
+  auto id = start(j);
+  j.tick(owner);
+  EXPECT_TRUE(j.busy());
+  EXPECT_FALSE(low.displayReady());
+  EXPECT_EQ(source.opens, 0u);
+  j.tick(owner);
+  EXPECT_TRUE(j.busy());
+  stopped = true;
+  j.tick(owner);
+  EXPECT_FALSE(j.busy());
+  EXPECT_TRUE(low.displayReady());
+  EXPECT_FALSE(low.busy());
+  EXPECT_EQ(j.result(id, owner), DeliveryResult::Unavailable);
+}
+TEST_F(Covers, BusyAdmissionDoesNotFinishAnotherWorkersLease) {
+  ASSERT_EQ(admission.begin(TAILNET_JOB_CATALOG), AdmissionResult::Admitted);
+  auto resource = admission.acquire(Resource::Worker);
+  CoverJobs j(admission, "/cover.tmp");
+  auto id = start(j);
+  j.tick(owner);
+  EXPECT_FALSE(j.busy());
+  EXPECT_TRUE(admission.permitted());
+  EXPECT_EQ(source.opens, 0u);
+  EXPECT_EQ(j.result(id, owner), DeliveryResult::Unavailable);
+  resource.reset();
+  EXPECT_TRUE(admission.finish());
+}
+}  // namespace

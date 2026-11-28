@@ -103,7 +103,11 @@ void CoverJobs::tick(DeliveryTicket t) {
   }
   auto& entry = cache_[slot_];
   if (pending_) {
-    if (admission_.begin(TAILNET_JOB_TRANSFER) != AdmissionResult::Admitted) {
+    const auto admitted = admission_.begin(TAILNET_JOB_TRANSFER);
+    if (admitted != AdmissionResult::Admitted) {
+      // A failed begin may still own a parked display while teardown retries.
+      // Busy belongs to another service and must never be finished here.
+      draining_ = admitted != AdmissionResult::Busy && admission_.busy();
       settle(false);
       return;
     }
