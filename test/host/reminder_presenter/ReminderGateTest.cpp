@@ -210,3 +210,30 @@ TEST_F(ReminderGateTest, ClaimTicketTimeoutDoesNotConsumeStillEligibleOccurrence
   facade.work(now);
   EXPECT_EQ(facade.result().status, ReminderStatus::Saved);
 }
+
+TEST_F(ReminderGateTest, RetiredObsoleteVisibleSheetCannotBeReplacedWithoutFreshInput) {
+  auto permit = ReadingGate::reminderPermit(library, claim, {true, true, false});
+  ASSERT_TRUE(ReadingGate::drawReminder(permit, context()));
+  ReminderMutation add{};
+  add.key = service.nextMutation();
+  add.fields.enabled = true;
+  add.fields.minute = 1262;
+  add.fields.days = 127;
+  const auto second = service.mutate(add, now);
+  ASSERT_EQ(second.status, ReminderStatus::Saved);
+  now.wall += 60;
+  now.elapsed += 60000;
+  ReminderMutation remove{};
+  remove.operation = ReminderOperation::Delete;
+  remove.id = claim.id;
+  remove.revision = claim.revision;
+  remove.key = service.nextMutation();
+  ASSERT_EQ(service.mutate(remove, now).status, ReminderStatus::Saved);
+  service.retire(claim.lifetime);
+  ReminderDue due{};
+  EXPECT_FALSE(service.next(now, due));
+  service.activity(now, true);
+  service.retire(0);  // A forged zero lifetime cannot suppress the fresh candidate.
+  ASSERT_TRUE(service.next(now, due));
+  EXPECT_EQ(due.id, second.id);
+}

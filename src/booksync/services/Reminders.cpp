@@ -453,7 +453,8 @@ bool Reminders::sleepFailed(uint64_t token, uint64_t owner) {
   return false;
 }
 void Reminders::retire(uint64_t owner) {
-  if (owner_ == owner) {
+  if (owner && owner_ == owner) {
+    if (grant_.drawn) waiting_ = true;  // An obsolete visible sheet cannot cascade into its replacement.
     live_ = false;
     sleepPending_ = false;
     owner_ = 0;
