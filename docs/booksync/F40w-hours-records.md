@@ -33,8 +33,9 @@ upload time or an unverified cumulative reader total.
 The hourly accumulator adds fixed worker storage; it performs no per-event heap
 allocation. The eight-widget host is 9,040 bytes, batch 2,944 bytes and shared
 worker 28,864 bytes on the host compiler. These are bounded Home-lifetime
-allocations released before reader entry, not C3 allocations or hardware heap
-measurements. Compiler frame gates remain 256 bytes.
+allocations released before reader entry. The inline host payload also occupies
+space on X3; the optional worker is allocated only for X4 stats. These object
+bounds are not hardware heap measurements. Compiler frame gates remain 256 bytes.
 
 ## Verification
 

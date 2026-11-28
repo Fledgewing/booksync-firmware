@@ -23,6 +23,7 @@ class EditorAddRemove {
   uint8_t focus() const { return focus_; }
   uint8_t selected() const { return selected_; }
   uint8_t rows() const;
+  uint8_t firstVisibleRow(uint8_t capacity) const;
   char* nameBuffer() { return name_.data(); }
   const char* pageName() const { return name_.data(); }
   bool hasPageName() const {

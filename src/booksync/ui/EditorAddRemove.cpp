@@ -17,6 +17,10 @@ uint8_t EditorAddRemove::rows() const {
   if (panel_ == Panel::Reset) return 2;                                 // Keep first.
   return 1;
 }
+uint8_t EditorAddRemove::firstVisibleRow(uint8_t capacity) const {
+  if (panel_ != Panel::Add || !capacity || focus_ < capacity) return 0;
+  return focus_ - capacity + 1;
+}
 void EditorAddRemove::stepEditor(int direction) {
   if (panel_ == Panel::Closed || panel_ == Panel::Waiting || panel_ == Panel::Paging) return;
   if (panel_ == Panel::Selected && !library_.homePage().textOnly) {

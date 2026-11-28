@@ -991,3 +991,25 @@ TEST(LayoutGeometry, CalendarSizesMatchApproval) {
   EXPECT_FALSE(supportedGeometry(WidgetKind::Monthly, 1, 1));
   EXPECT_FALSE(supportedGeometry(WidgetKind::Monthly, 2, 2));
 }
+
+TEST(EditorAddRemove, EveryInstalledAddEntryHasAVisibleFocusedViewport) {
+  EditorFixture lib;
+  lib.page.revision = 7;
+  lib.page.count = 3;
+  EditorAddRemove ui(lib);
+  ui.enter();
+  ui.chooseEditor(3);
+  ASSERT_EQ(ui.panel(), EditorAddRemove::Panel::Add);
+  ASSERT_EQ(ui.rows(), uint8_t(WidgetKind::Count));
+  for (uint8_t index = 0; index < ui.rows(); ++index) {
+    ASSERT_EQ(ui.focus(), index);
+    for (uint8_t capacity : {uint8_t(1), uint8_t(7), uint8_t(10)}) {
+      const auto first = ui.firstVisibleRow(capacity);
+      EXPECT_LE(first, index);
+      EXPECT_LT(index, first + capacity);
+    }
+    ui.stepEditor(1);
+  }
+  ui.activateEditor();
+  EXPECT_EQ(lib.captured.widget, WidgetKind(uint8_t(WidgetKind::Count) - 1));
+}

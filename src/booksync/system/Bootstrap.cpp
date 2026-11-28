@@ -556,7 +556,8 @@ class ShellActivity final : public Activity {
         std::snprintf(text, sizeof(text), "%s", number);
       }
       paintStatText(UI_10_FONT_ID, r.x + cell.x, r.y + cell.y, text, cell.width, 224 * unit / 108);
-      paintStatText(UI_10_FONT_ID, r.x + cell.x, r.y + 54 * unit / 108, I18N.get(labels[column]), cell.width + 6, metadata);
+      paintStatText(UI_10_FONT_ID, r.x + cell.x, r.y + 54 * unit / 108, I18N.get(labels[column]), cell.width + 6,
+                    metadata);
     }
     renderer.drawLine(r.x + 10, r.y + 74 * unit / 108, r.x + r.width - 10, r.y + 74 * unit / 108);
     paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 84 * unit / 108,
@@ -1019,7 +1020,10 @@ class ShellActivity final : public Activity {
       const int width = (safe.width - 56) / 2;
       return Rect{safe.x + 24 + (index - 11) * (width + 8), top + 8 * rowHeight, width, rowHeight};
     }
-    return Rect{safe.x + 24, header.y + header.height + line * 3 + 28 + index * height, safe.width - 48, height};
+    const int top = header.y + header.height + line * 3 + 28;
+    const int capacity = std::max(1, (safe.y + safe.height - 48 - top) / height);
+    const int first = editor.firstVisibleRow(uint8_t(capacity));
+    return Rect{safe.x + 24, top + (int(index) - first) * height, safe.width - 48, height};
   }
   Rect editorPageButton(uint8_t index) const {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
@@ -1226,6 +1230,9 @@ class ShellActivity final : public Activity {
         if (i < start || i >= start + 7) continue;
       }
       const auto r = editorRow(i);
+      if (panel == Panel::Add &&
+          (r.y < header.y + header.height + lineHeight * 3 + 28 || r.y + r.height > safe.y + safe.height - 48))
+        continue;
       renderer.drawRect(r.x, r.y, r.width, r.height, i == editor.focus() ? 3 : 1, true);
       paintFittedText(UI_10_FONT_ID, r.x + 12, r.y + 10, editorLabel(i), r.width - 24);
     }
@@ -1371,6 +1378,10 @@ class ShellActivity final : public Activity {
       } else
         for (uint8_t i = 0; i < editor.rows(); ++i) {
           const auto r = editorRow(i);
+          if (editor.panel() == Panel::Add &&
+              (r.y < header.y + header.height + renderer.getLineHeight(UI_10_FONT_ID) * 3 + 28 ||
+               r.y + r.height > safe.y + safe.height - 48))
+            continue;
           if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) {
             if (editor.panel() == Panel::Add) editor.namePage(firstWidgetPageName(i));
             editor.chooseEditor(i);
