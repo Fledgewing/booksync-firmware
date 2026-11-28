@@ -120,6 +120,7 @@ class HomeSettingsActivity final : public Activity {
         const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
         const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
         const int top = header.y + header.height + renderer.getLineHeight(UI_10_FONT_ID) + 32;
+        if (x < safe.x + 100 && y < safe.y + 40) { activityManager.goHome(); return; }
         if (x >= safe.x + 24 && x < safe.x + safe.width - 24 && y >= top && y < top + 112) {
           focus = (y - top) / 56; activate = true;
         }
@@ -140,12 +141,17 @@ class HomeSettingsActivity final : public Activity {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
     const int line = renderer.getLineHeight(UI_10_FONT_ID);
-    renderer.drawText(BITTER_14_FONT_ID, header.x + 12, header.y + 4, tr(STR_SETTINGS_TITLE));
-    renderer.drawText(UI_10_FONT_ID, safe.x + 24, header.y + header.height + 16, tr(STR_CAT_DISPLAY));
+    renderer.drawText(UI_10_FONT_ID, safe.x + 12, safe.y + 8, tr(STR_BACK));
+    renderer.drawText(BITTER_14_FONT_ID, header.x + 12, header.y + 32, tr(STR_SETTINGS_TITLE));
     const int top = header.y + header.height + line + 32;
     for (unsigned i = 0; i < 2; ++i) {
       renderer.drawRect(safe.x + 24, top + i * 56, safe.width - 48, line + 18, focus == i ? 3 : 1);
-      renderer.drawText(UI_10_FONT_ID, safe.x + 36, top + i * 56 + 8, i ? tr(STR_REMINDERS) : tr(STR_HOME_WIDGETS));
+      const char* label = i ? tr(STR_REMINDERS) : tr(STR_HOME_WIDGETS);
+      if constexpr (CROSSINK_APP_REMINDER_TEXT_LAYOUT) {
+        char numbered[96]{};
+        std::snprintf(numbered, sizeof(numbered), tr(STR_REMINDER_NUMBERED_FORMAT), i + 1, label);
+        renderer.drawText(UI_10_FONT_ID, safe.x + 36, top + i * 56 + 8, numbered);
+      } else renderer.drawText(UI_10_FONT_ID, safe.x + 36, top + i * 56 + 8, label);
     }
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_HOME_PREV), tr(STR_HOME_NEXT));
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

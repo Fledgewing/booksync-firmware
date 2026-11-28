@@ -380,6 +380,8 @@ bool reminderLoop(GfxRenderer& renderer, MappedInputManager& input, bool page, b
 }
 }  // namespace booksync
 #ifdef SIMULATOR
+#include <SDL.h>
+extern HalGPIO gpio;
 namespace booksync {
 uint64_t reminderSceneInputCount() { return sceneInputCount; }
 bool reminderSceneHidden() { return presenter().hidden; }
@@ -426,35 +428,70 @@ bool inputReminderScene(GfxRenderer& renderer, MappedInputManager& input, Librar
   due.revision = 1;
   if (state == 8) due.kind = ReminderKind::Interval;
   p.sheet.enterSheet(due, {ReminderSource::Local, due.kind, 2, 1, 1, 7, 0, 0}, true);
-  input.simulatorInjectPress(B::Confirm);
+#if CROSSINK_APP_CAP_TOUCH
+  const auto opening = geometry(renderer, p.sheet.view());
+  if (input.hasTouch())
+    input.simulatorInjectTouchDown(opening.x + 24, opening.actionY + 12);
+  else
+#endif
+    input.simulatorInjectPress(B::Confirm);
   inputs(p, renderer, input);
   input.simulatorClearInputFrame();
-  input.simulatorInjectRelease(B::Confirm);
+#if CROSSINK_APP_CAP_TOUCH
+  if (input.hasTouch())
+    input.simulatorInjectTouchRelease(opening.x + 24, opening.actionY + 12);
+  else
+#endif
+    input.simulatorInjectRelease(B::Confirm);
   inputs(p, renderer, input);
   if (!p.sheet.view().open || p.sheet.draining()) {
     input.setMenuMode(menu);
     return false;
   }
-  auto key = [&](B button) {
+  // Real native HAL edges traverse MappedInputManager's configured physical
+  // front/side mapping, instead of its logical-button test injection bypass.
+  auto key = [&](SDL_Scancode scancode) {
+    for (const auto kind : {SDL_KEYDOWN, SDL_KEYUP}) {
+      input.simulatorClearInputFrame();
+      gpio.beginFrame();
+      SDL_Event event{};
+      event.type = kind;
+      event.key.keysym.scancode = scancode;
+      SDL_PushEvent(&event);
+      gpio.update();
+      inputs(p, renderer, input);
+    }
+    gpio.beginFrame();
+  };
+#if CROSSINK_APP_CAP_TOUCH
+  auto tapAction = [&](unsigned action) {
+    const auto r = geometry(renderer, p.sheet.view());
+    const int x = r.x + r.width / 2, y = r.actionY + int(action) * 52 + 12;
     input.simulatorClearInputFrame();
-    input.simulatorInjectPress(button);
+    input.simulatorInjectTouchDown(x, y);
     inputs(p, renderer, input);
     input.simulatorClearInputFrame();
-    input.simulatorInjectRelease(button);
+    input.simulatorInjectTouchRelease(x, y);
     inputs(p, renderer, input);
   };
-  if (state >= 1 && state <= 5) {
-    key(B::Right);
-    if (state != 1) key(B::Right);
+#else
+  const auto tapAction = [](unsigned) {};
+#endif
+  if (!input.hasTouch() && state >= 1 && state <= 5) {
+    key(SDL_SCANCODE_RIGHT);
+    if (state != 1) key(SDL_SCANCODE_RIGHT);
   }
-  if (state <= 2)
-    key(B::Confirm);
-  else if (state == 3)
-    key(B::PageBack);
+  if (state <= 2) {
+    if (input.hasTouch())
+      tapAction(state);
+    else
+      key(SDL_SCANCODE_RETURN);
+  } else if (state == 3)
+    key(SDL_SCANCODE_UP);
   else if (state == 4)
-    key(B::PageForward);
+    key(SDL_SCANCODE_DOWN);
   else if (state == 5)
-    key(B::Back);
+    key(SDL_SCANCODE_ESCAPE);
 #if CROSSINK_APP_CAP_TOUCH
   else if (state == 6 || state == 7) {
     const auto r = geometry(renderer, p.sheet.view());
@@ -470,8 +507,12 @@ bool inputReminderScene(GfxRenderer& renderer, MappedInputManager& input, Librar
   }
 #endif
   else if (state == 8) {
-    key(B::Right);
-    key(B::Confirm);
+    if (input.hasTouch())
+      tapAction(1);
+    else {
+      key(SDL_SCANCODE_RIGHT);
+      key(SDL_SCANCODE_RETURN);
+    }
   }
   // A long drag may become the native dismiss gesture; it must never sleep.
   const bool okay = state == 7 ? !p.sheet.sleepRequested() : !p.sheet.view().open;

@@ -166,6 +166,7 @@ inline bool tick() {
     unsigned inputs = 0;
     for (unsigned i = 0; i < 9; ++i) {
       if ((i == 6 || i == 7) && !mappedInputManager.hasTouch()) continue;
+      if (i == 5 && mappedInputManager.hasTouch()) continue;
       fixture.response = ReminderStatus::Saved;
       fixture.writes = 0;
       if (!inputReminderScene(renderer, mappedInputManager, fixture, i)) {

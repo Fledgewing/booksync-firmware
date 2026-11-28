@@ -12312,6 +12312,7 @@
         "ReminderClaimRetry.h",
         "ReminderPresenter.h",
         "ReminderText.h",
+        "SDL.h",
         "activities/Activity.h",
         "activities/RenderLock.h",
         "algorithm",
