@@ -535,7 +535,7 @@ class ShellActivity final : public Activity {
     const auto* records = widgets->statsRecords(index);
     if (!records) return;
     const auto r = tileRect(index);
-    const int unit = std::min(r.height, 108), metadata = 144 * unit / 108;
+    const int unit = std::min(r.height, 108), metadata = 128 * unit / 108;
     static constexpr StrId labels[] = {StrId::STR_HOME_STATS_RECORD_PAGES, StrId::STR_HOME_STATS_RECORD_SESSION,
                                        StrId::STR_HOME_STATS_RECORD_DAY, StrId::STR_HOME_STATS_RECORD_BOOKS,
                                        StrId::STR_HOME_STATS_RECORD_STREAK};
@@ -556,8 +556,7 @@ class ShellActivity final : public Activity {
         std::snprintf(text, sizeof(text), "%s", number);
       }
       paintStatText(UI_10_FONT_ID, r.x + cell.x, r.y + cell.y, text, cell.width, 224 * unit / 108);
-      paintStatText(UI_10_FONT_ID, r.x + cell.x, r.y + 54 * unit / 108, I18N.get(labels[column]), cell.width + 6,
-                    metadata);
+      paintStatText(UI_10_FONT_ID, r.x + cell.x, r.y + 54 * unit / 108, I18N.get(labels[column]), cell.width, metadata);
     }
     renderer.drawLine(r.x + 10, r.y + 74 * unit / 108, r.x + r.width - 10, r.y + 74 * unit / 108);
     paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 84 * unit / 108,

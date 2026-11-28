@@ -182,3 +182,18 @@ TEST(WhenRecordsGeometry, ProfilesStatesAndAllColumns) {
   EXPECT_FALSE(widgets::When::hourColumn(card, hours, {224, 108, 18, false, false}, 0, mark));
   EXPECT_FALSE(widgets::Records::recordCell(card, {456, 108, 18, false, false}, 0, mark));
 }
+
+TEST(WhenRecordsGeometry, ApprovedRecordColumnsKeepEightPixelGutters) {
+  StatsCard card;
+  card.state = StatsCardState::Ready;
+  for (bool touch : {false, true}) {
+    widgets::StatsMark previous, current;
+    ASSERT_TRUE(widgets::Records::recordCell(card, {456, 108, 18, false, touch}, 0, previous));
+    for (unsigned column = 1; column < 5; ++column) {
+      ASSERT_TRUE(widgets::Records::recordCell(card, {456, 108, 18, false, touch}, column, current));
+      EXPECT_GE(current.x - previous.x - previous.width, 8);
+      previous = current;
+    }
+    EXPECT_GE(previous.x + previous.width, 445);
+  }
+}

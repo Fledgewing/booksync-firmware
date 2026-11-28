@@ -6,9 +6,9 @@ bool Records::recordCell(const StatsCard& statsValue, WidgetBox box, unsigned in
   if (boundedStatsCard(statsValue) != StatsCardState::Ready || box.textOnly || box.width < 240 || box.height < 80 ||
       index >= 5)
     return false;
-  out = {10 + int(index) * (box.width - 20) / 5,
+  out = {10 + int(index) * (box.width - 12) / 5,
          box.height * 26 / 108,
-         (box.width - 20) / 5 - 6,
+         (box.width - 52) / 5,
          box.height * 45 / 108,
          true,
          false,
