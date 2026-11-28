@@ -168,6 +168,7 @@ TEST_F(FinishTest, NewerChoicePreventsOldUndo) {
   ASSERT_EQ(owner.activate(), SyncResult::Ready);
   drain(owner);
   EXPECT_EQ(toy.writes, 4U);
+  EXPECT_EQ(finish.undo(intent, "toy:grove", "scope:fern", undo), JournalResult::Invalid);
 }
 TEST_F(FinishTest, MalformedOrFutureIntentNeverReachesAdapter) {
   const std::string future = "BSFI\2future";

@@ -11,7 +11,7 @@ namespace booksync {
 using namespace storage;
 namespace {
 constexpr size_t PayloadBytes = 37;
-constexpr std::string_view Cancelled = "BSFC1";
+constexpr std::string_view Cancelled = "BSFC1", Superseded = "BSFS1";
 uint64_t get(const char* p) {
   uint64_t n = 0;
   for (unsigned i = 0; i < 8; ++i) n |= uint64_t(uint8_t(p[i])) << (8 * i);
@@ -67,7 +67,7 @@ bool Finish::decode(std::string_view p, FinishIntent& out) {
 bool Finish::settled(const JournalEntry& e) {
   FinishIntent v;
   return decode(e.payload, v) && !e.attempting &&
-         (e.acknowledged == LifecycleJournal::AllPhases || e.checkpoint == Cancelled);
+         (e.acknowledged == LifecycleJournal::AllPhases || (e.checkpoint == Cancelled || e.checkpoint == Superseded));
 }
 JournalResult Finish::enqueue(uint64_t position, std::string_view adapter, std::string_view account,
                               std::string_view document, FinishValues before, FinishValues desired,
@@ -97,6 +97,7 @@ JournalResult Finish::undo(uint64_t id, std::string_view adapter, std::string_vi
   FinishIntent intent;
   if (original.adapter != adapter || original.owner != account || !decode(original.payload, intent) || intent.undoOf)
     return finishFailure(JournalResult::Invalid);
+  if (original.checkpoint == Superseded) return finishFailure(JournalResult::Invalid);
   if (original.checkpoint == Cancelled) {
     undoId = id;
     return JournalResult::Ok;
@@ -211,9 +212,9 @@ SyncResult Finish::step(const SyncWriterToken& token, ServerAdapter& adapter, co
       if (newer.document != e.document || !recognizes(newer.payload)) continue;
       FinishIntent choice;
       if (!decode(newer.payload, choice)) return SyncResult::StorageError;
-      if (!choice.undoOf && newer.checkpoint != Cancelled) {
-        return journal_.checkpoint(e.id, Cancelled) == JournalResult::Ok ? SyncResult::Advanced
-                                                                         : SyncResult::StorageError;
+      if (!choice.undoOf && newer.checkpoint != Cancelled && newer.checkpoint != Superseded) {
+        return journal_.checkpoint(e.id, Superseded) == JournalResult::Ok ? SyncResult::Advanced
+                                                                          : SyncResult::StorageError;
       }
     }
     if (r != JournalResult::NotFound) return SyncResult::StorageError;

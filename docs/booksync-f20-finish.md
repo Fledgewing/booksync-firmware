@@ -73,7 +73,8 @@ malformed payloads block mutation/delivery and retain original bytes.
 
 For finish records, ack bits mean: 0 position barrier, 1 State, 2 Status,
 3 Rating, 4 Apply. Attempt remains phase+1. `BSFC1` in the checkpoint marks
-atomic cancellation/supersession; otherwise checkpoint bytes preserve the
+atomic cancellation; `BSFS1` marks supersession and refuses stale Undo. Otherwise
+checkpoint bytes preserve the
 F18 resolved identity. The existing recovery reader plus `Finish::decode`
 can inspect the new payload without issuing a write. No EPUB cache change.
 
