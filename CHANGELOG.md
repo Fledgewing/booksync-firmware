@@ -2,6 +2,7 @@
 
 ### Added
 
+- BookSync admits verified updates only at Home after reading, activation recovery and network/display ownership are clear; local boot receipts prove completion or interruption, and previous-version returns require current durable-state compatibility proof. The installer remains offline with fake ports.
 - BookSync selects saved personal reading records with stable provider precedence and deterministic picks, and projects local/account reading statistics with explicit coverage and overlap-safe Today watermarks.
 - BookSync Home supports snapped widget movement, supported-size cycling and cancelable carry/drop on X4 Pro touch and Classic buttons, saved as one revision-checked atomic edit.
 - BookSync adds the approved three-profile library-service picker with epoch-scoped selection and a secret-free account projection. Account/sign-in screens remain pending design approval; setup navigation integration remains deferred.

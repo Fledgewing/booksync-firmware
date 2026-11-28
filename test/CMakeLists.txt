@@ -297,3 +297,6 @@ add_subdirectory(host/personal_reading)
 add_subdirectory(host/account_surface)
 add_subdirectory(host/lifecycle_progress)
 add_subdirectory(host/copy_jobs)
+
+
+add_subdirectory(host/update_install)

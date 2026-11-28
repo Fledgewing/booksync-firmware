@@ -13326,6 +13326,7 @@
         "../../test/simulator/QueriesScenario.h",
         "../../test/simulator/ReaderCaptureScenario.h",
         "../../test/simulator/SyncOwnerScenario.h",
+        "../../test/simulator/UpdateInstallScenario.h",
         "../../test/simulator/UpdateScenario.h",
         "../../test/simulator/VersionScenario.h",
         "../../test/simulator/WidgetScenario.h",
@@ -15533,6 +15534,42 @@
     "src/booksync/services/CopyJobs.cpp": {
       "role": "services",
       "rationale": "F24 bounded neutral copy classification uses scoped F08/F18 evidence and the single F23 worker/journal for verified replacement, recovery and durable identity linking; no UI or adapter dependency."
+    },
+    "src/booksync/system/Update.h": {
+      "role": "system",
+      "rationale": "F32 serial install/return admission and bounded local boot receipts; F30 trust, F31 version, F11 ownership and F12/F29 readiness. No live feed, UI, transport or library writer.",
+      "includes": [
+        "Diagnostics.h",
+        "ReadingGate.h",
+        "UpdatePick.h",
+        "UpdateVerify.h"
+      ]
+    },
+    "src/booksync/system/Update.cpp": {
+      "role": "system",
+      "rationale": "F32 serial install/return admission and bounded local boot receipts; F30 trust, F31 version, F11 ownership and F12/F29 readiness. No live feed, UI, transport or library writer.",
+      "includes": [
+        "Logging.h",
+        "Update.h",
+        "cstring"
+      ]
+    },
+    "src/booksync/system/Diagnostics.h": {
+      "role": "system",
+      "rationale": "F32 serial install/return admission and bounded local boot receipts; F30 trust, F31 version, F11 ownership and F12/F29 readiness. No live feed, UI, transport or library writer.",
+      "includes": [
+        "booksync/storage/FilePublish.h",
+        "cstdint"
+      ]
+    },
+    "src/booksync/system/Diagnostics.cpp": {
+      "role": "system",
+      "rationale": "F32 serial install/return admission and bounded local boot receipts; F30 trust, F31 version, F11 ownership and F12/F29 readiness. No live feed, UI, transport or library writer.",
+      "includes": [
+        "Diagnostics.h",
+        "Logging.h",
+        "cstring"
+      ]
     }
   },
   "generators": {
