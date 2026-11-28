@@ -103,3 +103,10 @@ F18c adds `test/simulator/lifecycle_annotations.py` to every profile boot gate: 
 annotation/bookmark scenarios, eight abrupt exits and 40 boots against separately
 persisted fake server, workspace and synthetic native annotations. Hardware images
 retain the dormant phase for reserve measurement. See `docs/booksync/F18c.md`.
+
+F39 adds `test/simulator/personal_reading.py` to each profile boot gate: seven
+offline local/account/zero/absent/watermark/coverage scenarios over eight boots,
+using real saved page segments and neutral account fixtures. Deterministic personal
+picks share the service policy. `docs/booksync/F39.md` describes the frozen cursor,
+coverage evidence and maintainer hardware checks. No presentation or live sync is
+activated. The full dormant service is retained in hardware size measurements.

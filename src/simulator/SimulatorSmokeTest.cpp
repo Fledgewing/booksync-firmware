@@ -9,6 +9,7 @@
 #include "../../test/simulator/LifecycleStatsScenario.h"
 #include "../../test/simulator/LifecycleStateScenario.h"
 #include "../../test/simulator/LifecycleAnnotationsScenario.h"
+#include "../../test/simulator/PersonalReadingScenario.h"
 #include "../../test/simulator/DeliveryScenario.h"
 #include "../../test/simulator/AccountScenario.h"
 #include "../../test/simulator/CatalogScenario.h"
@@ -12186,6 +12187,7 @@ void prepareSimulatorSmokeState() {
   runLifecycleStatsScenario();
   runLifecycleStateScenario();
   runLifecycleAnnotationsScenario();
+  runPersonalReadingScenario();
   runSyncOwnerScenario();
   runLifecycleJournalScenario();
   runDeliveryScenario();
