@@ -2,6 +2,7 @@
 """Check linked symbols and map objects for retired native network writers."""
 from pathlib import Path
 import argparse
+import re
 import subprocess
 import sys
 
@@ -10,8 +11,14 @@ sys.path.insert(0, str(ROOT / 'test/host'))
 from test_native_writers_retired import RETIRED, ARCHIVED
 
 
-def check(elf, nm='nm', map_path=None):
+def check(elf, nm='nm', map_path=None, environment=None):
     symbols = subprocess.check_output([str(nm), '-C', str(elf)], text=True)
+    # Full native Settings is retained for Pro touch recovery, but must not be
+    # rooted by BookSync's bounded button-profile Settings entry. Inspect live
+    # demangled ELF symbols: maps also list discarded input sections.
+    if environment in ('default', 'x4-classic') and re.search(
+            r'\bSettingsActivity\b|\bActivityManager::goToSettings\(', symbols):
+        raise RuntimeError('native Settings root linked into button image: ' + environment)
     forbidden = sorted(set(m[0] for m in RETIRED.finditer(symbols)))
     if forbidden:
         raise RuntimeError('retired linked symbols: ' + ', '.join(forbidden))
@@ -44,5 +51,6 @@ if __name__ == '__main__':
     p.add_argument('elf', type=Path)
     p.add_argument('--nm', default='nm')
     p.add_argument('--map', type=Path)
+    p.add_argument('--environment', choices=('default', 'x4-classic', 'x4-pro'))
     args = p.parse_args()
-    check(args.elf, args.nm, args.map)
+    check(args.elf, args.nm, args.map, args.environment)

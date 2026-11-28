@@ -7,6 +7,7 @@
 namespace booksync {
 // Neutral retained-runtime bridge. Main loop only; uses ActivityManager ownership.
 Library& homeLibrary();
+void showHomeSettings(GfxRenderer& renderer, MappedInputManager& input);
 std::unique_ptr<Activity> createHomeEditor(GfxRenderer& renderer, MappedInputManager& input);
 void showHome(GfxRenderer& renderer, MappedInputManager& input, HalDisplay::RefreshMode refresh);
 #ifdef SIMULATOR

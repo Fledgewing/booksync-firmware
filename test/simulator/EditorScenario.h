@@ -186,10 +186,14 @@ inline bool settingsTick(const char* directory) {
   static unsigned frame = 0;
   const auto f = frame++;
   mappedInputManager.simulatorClearInputFrame();
-  if (f == 0) activityManager.goToSettings();
+  if (f == 0) showHome(renderer, mappedInputManager, HalDisplay::FAST_REFRESH);
   if (f == 8)
-    mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Down));
-  if (f == 10) mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
+    mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Right));
+  if (f == 12) {
+    if (!activityManager.isCurrentActivityNamed("Settings")) std::_Exit(26);
+    capture(directory, "x3-settings-menu");
+  }
+  if (f == 14) mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
   if (f == 30) {
     if (!activityManager.isCurrentActivityNamed("Home")) std::_Exit(24);
     capture(directory, "x3-settings-entry");
@@ -197,6 +201,10 @@ inline bool settingsTick(const char* directory) {
   if (f == 32) mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Back);
   if (f == 45) {
     if (!activityManager.isCurrentActivityNamed("Settings")) std::_Exit(25);
+  }
+  if (f == 47) mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Back);
+  if (f == 60) {
+    if (!activityManager.isCurrentActivityNamed("Home")) std::_Exit(27);
     LOG_INF("BSE", "BookSync X3 Settings entry/back PASS");
     std::fflush(nullptr);
     std::_Exit(0);

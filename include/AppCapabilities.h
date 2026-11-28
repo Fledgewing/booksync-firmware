@@ -51,3 +51,10 @@
 #else
 #define CROSSINK_APP_CAP_HOME_EDITOR 0
 #endif
+
+// Only X3/C3 uses the Settings-list editor entry. X4 has its spatial editor.
+#if (defined(FREEINK_DEVICE_X3) && FREEINK_DEVICE_X3) || defined(SIMULATOR_DEVICE_X3)
+#define CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS 1
+#else
+#define CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS 0
+#endif
