@@ -114,7 +114,8 @@ TEST_P(ContinueSizes, TextAndActionsRemainInsideSupportedOrRetainedSize) {
     EXPECT_GE(command.box.h, 0);
     EXPECT_LE(command.box.x + command.box.w, box.width);
     EXPECT_LE(command.box.y + command.box.h, box.height);
-    if (command.kind == widgets::Drawing::Fill && command.box.h == 5) progressBottom = command.box.y + command.box.h;
+    if (command.kind == widgets::Drawing::Fill && command.radius == 0 && command.box.h < 10)
+      progressBottom = command.box.y + command.box.h;
     if (command.kind == widgets::Drawing::Border && command.radius == 24) {
       resumeTop = command.box.y;
       EXPECT_GE(command.box.w, 50);
@@ -237,4 +238,37 @@ TEST(ContinueGeometry, AllStatesAndContextStayInsideBothX4TilesWithoutTextOverla
                                  values, profile, true);
         booksync::test::expectTextGeometry(commands, profile.width, profile.height);
       }
+}
+
+TEST(ContinueGeometry, ApprovedProgressAndClassicActionOutlineUseTheirExactCells) {
+  BookRow book;
+  book.title[0] = 'A';
+  ContinueValues value;
+  value.supplied = value.progressKnown = true;
+  value.state = ContinueState::Ready;
+  value.progressPercent = 36;
+  for (bool touch : {false, true}) {
+    widgets::Canvas canvas;
+    widgets::Continue::paint(canvas, {WidgetState::Known, &book, 1, 1}, value, {456, 224, 25, false, touch}, true);
+    bool bar = false, outline = false;
+    for (uint8_t i = 0; i < canvas.count; ++i) {
+      const auto& c = canvas.commands[i];
+      if (c.kind == widgets::Drawing::Border && c.box.x == 144 && c.box.y == 125) {
+        EXPECT_EQ(c.box.w, 248);
+        EXPECT_EQ(c.box.h, 7);
+        bar = true;
+      }
+      if (c.kind == widgets::Drawing::Border && c.radius == 27) {
+        EXPECT_EQ(c.box.x, 140);
+        EXPECT_EQ(c.box.y, 143);
+        EXPECT_EQ(c.box.w, 116);
+        EXPECT_EQ(c.box.h, 58);
+        EXPECT_FALSE(c.black);
+        EXPECT_EQ(c.thickness, 2);
+        outline = true;
+      }
+    }
+    EXPECT_TRUE(bar);
+    EXPECT_EQ(outline, !touch);
+  }
 }
