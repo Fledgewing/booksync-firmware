@@ -33,10 +33,15 @@ bool ReadingStats::splitHour(uint64_t stamp, StatsHourSlice& out) const {
   out.end = uint64_t((hour + 1) * 3600 - int64_t(offset_) * 60);
   return out.end > stamp;
 }
+void ReadingStats::discard() {
+  // Member reset keeps the fixed accumulator in its owning workspace.
+  published_ = {};
+  busy_ = false;
+}
 bool ReadingStats::begin(StatsSource source, uint64_t now, int16_t offset, ReadingValue watermark,
                          StatsCalendar calendar) {
   busy_ = false;
-  published_ = {};  // Never reuse a prior account's successful history after failure.
+  discard();
   pending_ = {};
   if (!source.next || !now || now > uint64_t(INT64_MAX - 172800) || offset < -1440 || offset > 1440) {
     LOG_ERR("BSRS", "Stats source or calendar unavailable");

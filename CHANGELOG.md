@@ -2,6 +2,8 @@
 
 ### Fixed
 
+- BookSync Home retains an independently saved account best-streak record when native history is unavailable.
+
 - BookSync Home keeps every installed widget reachable in Add through Classic button focus and Pro touch scrolling.
 
 - BookSync captures reader progress before a bounded sleep drain even with plugins disabled, retires stale sleep presentation ownership on return, and preserves native sleep screens while new artwork awaits approval.
@@ -12,6 +14,8 @@
 - BookSync Home widgets no longer pulls the retired native Settings screen graph into button images; X3 uses a bounded Settings entry and X4 keeps its spatial editor. Physical symbol guards reject regressions.
 
 ### Added
+
+- BookSync Home adds compact account Reading goal and measured Finish forecast cards on X4 Pro and Classic, with explicit missing evidence and automatic clock/date freshness.
 
 - BookSync Home adds compact When you read and Reading records widgets on X4 Pro and Classic, with local-hour history and explicit per-record source availability.
 

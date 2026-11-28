@@ -3,6 +3,8 @@
 
 #include <Logging.h>
 
+#include <cstdlib>
+#include <cstring>
 #include <ctime>
 namespace booksync {
 namespace {
@@ -59,21 +61,27 @@ bool StatsWorker::splitHour(void*, uint64_t stamp, StatsHourSlice& out) {
   out = {end, uint8_t(date.tm_hour)};
   return end > stamp;
 }
-bool StatsWorker::begin(uint16_t requested, Provenance provenance, bool clockKnown, ServerAdapter* adapter) {
+bool StatsWorker::begin(uint16_t requested, Provenance provenance, const ClockStatus& clock, ServerAdapter* adapter) {
   busy_ = false;
   published_.requested = requested;
-  for (auto& card : published_.cards) card.clear();
+  clearCards();
+  clock_ = clock;
+  adapter_ = adapter;
+  localFailed_ = false;
+  const auto* zone = std::getenv("TZ");
+  std::snprintf(timezone_.data(), timezone_.size(), "%s", zone ? zone : "");
   options_.provenance = provenance;
   scope_ = {provenance.owner, provenance.accountEpoch};
-  const time_t now = std::time(nullptr);
+  const auto now = clock.utcSeconds;
   StatsDaySlice day;
-  if (!clockKnown || now <= 0 || !split(nullptr, uint64_t(now), day)) return true;
+  if (!clock.hasDateTime() || !split(nullptr, uint64_t(now), day)) return true;
   today_ = day.day;
-  remoteReady_ = adapter && adapter->cachedReadingStats(remote_) && remote_.scope == scope_ && scope_.owner != 0;
-  const auto recovered = journal_.recover();
+  loadSaved();
+  const auto recovered = Storage.ready() ? journal_.recover() : storage::JournalResult::IoError;
   if (recovered != storage::JournalResult::Ok) {
     LOG_ERR("BSW", "Stats history unavailable: %u", unsigned(recovered));
-    options_.availability = StatsCardState::Unavailable;
+    localFailed_ = true;
+    stats_.discard();
     publish();
     return true;
   }
@@ -82,54 +90,110 @@ bool StatsWorker::begin(uint16_t requested, Provenance provenance, bool clockKno
   // remain account-independent; no upload watermark is inferred from them.
   busy_ = stats_.begin(cursor_.freeze({}, 0, uint64_t(now), false), uint64_t(now), 0, {}, {split, nullptr, splitHour});
   if (!busy_) {
-    options_.availability = StatsCardState::Unavailable;
+    localFailed_ = true;
     publish();
   }
   return !busy_;
 }
 void StatsWorker::publish() {
-  const auto now = std::time(nullptr);
+  const auto now = clock_.utcSeconds;
   options_.now = now > 0 ? uint64_t(now) : 0;
+  options_.today = today_;
   stats_.combine(remoteReady_ ? &remote_ : nullptr, scope_, true, today_, snapshot_);
   if (published_.requested & statsWidgetBit(StatsWidget::Week)) {
-    statsFreshness(options_, snapshot_.daysCoverage, now > 0 ? uint64_t(now) : 0);
+    freshness(snapshot_.daysCoverage);
     projectWeek(snapshot_, options_, published_.cards[unsigned(StatsWidget::Week)]);
   }
   if (published_.requested & statsWidgetBit(StatsWidget::Today)) {
-    statsFreshness(options_,
-                   snapshot_.nativeToday.known ? snapshot_.nativeTodayCoverage : snapshot_.accountTodayCoverage,
-                   now > 0 ? uint64_t(now) : 0);
+    freshness(snapshot_.nativeToday.known ? snapshot_.nativeTodayCoverage : snapshot_.accountTodayCoverage);
     projectToday(snapshot_, options_, published_.cards[unsigned(StatsWidget::Today)]);
   }
   if (published_.requested & statsWidgetBit(StatsWidget::Pages)) {
-    statsFreshness(options_, snapshot_.recordsCoverage, now > 0 ? uint64_t(now) : 0);
+    freshness(snapshot_.recordsCoverage);
     projectPages(snapshot_, options_, published_.cards[unsigned(StatsWidget::Pages)]);
   }
   if (published_.requested & statsWidgetBit(StatsWidget::Year)) {
-    statsFreshness(options_, snapshot_.daysCoverage, now > 0 ? uint64_t(now) : 0);
+    freshness(snapshot_.daysCoverage);
     projectYear(snapshot_, options_, published_.cards[unsigned(StatsWidget::Year)], published_.year);
   }
   if (published_.requested & statsWidgetBit(StatsWidget::Monthly)) {
-    statsFreshness(options_, snapshot_.daysCoverage, now > 0 ? uint64_t(now) : 0);
+    freshness(snapshot_.daysCoverage);
     projectMonthly(snapshot_, options_, published_.cards[unsigned(StatsWidget::Monthly)], published_.months);
   }
   if (published_.requested & statsWidgetBit(StatsWidget::When)) {
-    statsFreshness(options_, snapshot_.hoursCoverage, options_.now);
+    freshness(snapshot_.hoursCoverage);
     projectWhen(snapshot_, options_, published_.cards[unsigned(StatsWidget::When)], published_.hours);
   }
   if (published_.requested & statsWidgetBit(StatsWidget::Records)) {
-    statsFreshness(options_, snapshot_.recordsCoverage, options_.now);
+    freshness(snapshot_.recordsCoverage.saved ? snapshot_.recordsCoverage
+              : snapshot_.finished.known      ? snapshot_.finishedCoverage
+                                              : snapshot_.streakCoverage);
     projectRecords(snapshot_, options_, published_.cards[unsigned(StatsWidget::Records)], published_.records);
   }
+  if (published_.requested & statsWidgetBit(StatsWidget::Goal)) {
+    freshness(snapshot_.goalCoverage);
+    projectGoal(snapshot_, options_, published_.cards[unsigned(StatsWidget::Goal)], published_.goal);
+  }
+  if (published_.requested & statsWidgetBit(StatsWidget::Forecast)) {
+    if (forecastReady_) {
+      options_.availability = StatsCardState::Ready;
+      statsFreshness(options_, forecast_.card.timeLeftCoverage, options_.now);
+      projectForecast(forecast_, options_, published_.cards[unsigned(StatsWidget::Forecast)], published_.forecast);
+    } else {
+      auto& value = published_.cards[unsigned(StatsWidget::Forecast)];
+      value.clear();
+      value.provenance = options_.provenance;
+      published_.forecast = {};
+    }
+  }
   if (published_.requested & statsWidgetBit(StatsWidget::Streak)) {
-    statsFreshness(options_, snapshot_.streakCoverage, now > 0 ? uint64_t(now) : 0);
+    freshness(snapshot_.streakCoverage);
     projectStreak(snapshot_, options_, published_.cards[unsigned(StatsWidget::Streak)]);
   }
 }
-bool StatsWorker::tick() {
-  if (!busy_) return false;
+void StatsWorker::clearCards() {
+  for (auto& value : published_.cards) value.clear();
+}
+void StatsWorker::freshness(const ReadingCoverage& coverage) {
+  options_.availability = localFailed_ && (!coverage.saved || coverage.origin == ReadingOrigin::ThisReader)
+                              ? StatsCardState::Unavailable
+                              : StatsCardState::Ready;
+  statsFreshness(options_, coverage, options_.now);
+}
+void StatsWorker::loadSaved() {
+  refreshedAt_ = clock_.utcSeconds > 0 ? uint64_t(clock_.utcSeconds) : 0;
+  remoteReady_ = adapter_ && adapter_->cachedReadingStats(remote_) && remote_.scope == scope_ && scope_.owner != 0;
+  forecastReady_ = adapter_ && (published_.requested & statsWidgetBit(StatsWidget::Forecast)) &&
+                   adapter_->cachedReadingForecast(forecast_);
+}
+bool StatsWorker::tick(const ClockStatus& clock) {
+  if (!published_.requested) return false;
+  if (!clock.hasDateTime()) {
+    if (!clock_.hasDateTime()) return false;
+    clock_ = {};
+    busy_ = false;
+    clearCards();
+    return true;
+  }
+  const auto* zone = std::getenv("TZ");
+  const bool changed = clock.local.year != clock_.local.year || clock.local.month != clock_.local.month ||
+                       clock.local.day != clock_.local.day || clock.utcOffsetSeconds != clock_.utcOffsetSeconds ||
+                       clock.utcSeconds < clock_.utcSeconds ||
+                       std::strncmp(timezone_.data(), zone ? zone : "", timezone_.size()) != 0;
+  if (!clock_.hasDateTime() || changed) {
+    begin(published_.requested, options_.provenance, clock, adapter_);
+    return true;
+  }
+  clock_ = clock;
+  if (!busy_) {
+    if (uint64_t(clock.utcSeconds) - refreshedAt_ < 60) return false;
+    loadSaved();
+    publish();
+    return true;
+  }
   if (!stats_.tick()) {
-    options_.availability = StatsCardState::Unavailable;
+    localFailed_ = true;
+    stats_.discard();
     busy_ = false;
   } else
     busy_ = stats_.busy();

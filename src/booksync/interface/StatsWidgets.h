@@ -2,7 +2,7 @@
 #pragma once
 #include "Models.h"
 namespace booksync {
-enum class StatsWidget : uint8_t { Week, Streak, Year, Monthly, Today, Pages, When, Records, Count };
+enum class StatsWidget : uint8_t { Week, Streak, Year, Monthly, Today, Pages, When, Records, Goal, Forecast, Count };
 constexpr unsigned StatsWidgetCount = unsigned(StatsWidget::Count);
 enum class StatsCardState : uint8_t { NotSaved, Ready, Empty, Off, Unsupported, Unavailable, Oversize };
 enum class StatsCardSource : uint8_t { Unknown, Reader, Account };
@@ -55,12 +55,27 @@ struct StatsRecords {
   std::array<StatsMetric, 5> values{};  // visits, session seconds, best-day visits, books, streak.
   std::array<StatsCardSource, 5> sources{};
 };
+struct StatsGoal {
+  uint64_t difference = 0;
+  uint32_t paceTenths = 0;
+  uint16_t year = 0;
+  uint8_t percent = 0;
+  bool ahead = false;
+};
+struct StatsForecast {
+  std::array<char, 96> title{};
+  uint16_t year = 0;
+  uint8_t month = 0, day = 0, weekday = 0;
+  bool dateKnown = false, finished = false;
+};
 struct StatsWidgetBatch {
   std::array<StatsCard, StatsWidgetCount> cards{};
   StatsYear year{};
   StatsMonths months{};
   StatsHours hours{};
   StatsRecords records{};
+  StatsGoal goal{};
+  StatsForecast forecast{};
   uint16_t requested = 0;
 };
 constexpr uint16_t statsWidgetBit(StatsWidget id) { return 1u << unsigned(id); }

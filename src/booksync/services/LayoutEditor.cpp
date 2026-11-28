@@ -345,18 +345,20 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
       if (!removed) return LayoutEditStatus::Invalid;
     } else {
       if (page.count >= HomeWidgets || p.instanceCount_ >= 128) return LayoutEditStatus::NoSpace;
-      const char* widget = edit.widget == WidgetKind::Continue  ? "continue-reading"
-                           : edit.widget == WidgetKind::Shelf   ? "booklist"
-                           : edit.widget == WidgetKind::Browse  ? "library"
-                           : edit.widget == WidgetKind::Week    ? "this-week"
-                           : edit.widget == WidgetKind::Streak  ? "reading-streak"
-                           : edit.widget == WidgetKind::Today   ? "today"
-                           : edit.widget == WidgetKind::Pages   ? "pages-read"
-                           : edit.widget == WidgetKind::Year    ? "year-in-reading"
-                           : edit.widget == WidgetKind::When    ? "when-you-read"
-                           : edit.widget == WidgetKind::Records ? "reading-records"
-                           : edit.widget == WidgetKind::Monthly ? "monthly-reading"
-                                                                : nullptr;
+      const char* widget = edit.widget == WidgetKind::Continue   ? "continue-reading"
+                           : edit.widget == WidgetKind::Shelf    ? "booklist"
+                           : edit.widget == WidgetKind::Browse   ? "library"
+                           : edit.widget == WidgetKind::Week     ? "this-week"
+                           : edit.widget == WidgetKind::Streak   ? "reading-streak"
+                           : edit.widget == WidgetKind::Today    ? "today"
+                           : edit.widget == WidgetKind::Pages    ? "pages-read"
+                           : edit.widget == WidgetKind::Year     ? "year-in-reading"
+                           : edit.widget == WidgetKind::Goal     ? "reading-goal"
+                           : edit.widget == WidgetKind::Forecast ? "finish-forecast"
+                           : edit.widget == WidgetKind::When     ? "when-you-read"
+                           : edit.widget == WidgetKind::Records  ? "reading-records"
+                           : edit.widget == WidgetKind::Monthly  ? "monthly-reading"
+                                                                 : nullptr;
       if (!widget) return LayoutEditStatus::Invalid;
       if (!std::strcmp(device, "x3") && isStatsWidget(edit.widget)) return LayoutEditStatus::Invalid;
       const uint8_t h = edit.widget == WidgetKind::Browse || isStatsWidget(edit.widget) ? 1 : 2;

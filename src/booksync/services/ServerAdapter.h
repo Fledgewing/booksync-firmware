@@ -12,6 +12,7 @@ struct FinishRequest;
 class CatalogSource;
 class DownloadSource;
 struct RemoteReadingStats;
+struct ReadingForecast;
 // Only the serial owner can mint this capability. No public/default constructor,
 // copying or moving; adapter writes must require the live owner's borrowed token.
 class SyncWriterToken final {
@@ -49,6 +50,9 @@ class ServerAdapter : public AuthAdapter {
   // Normalized saved account statistics; no network or fetch-time inclusion inference.
   // False leaves the caller's result absent. Publication is separate from F18b delivery.
   virtual bool cachedReadingStats(RemoteReadingStats&) const { return false; }
+  // F39 current-reader evidence, exact book/edition and measured pace. Cached
+  // only: false until native binding/coverage is proven, never a title join.
+  virtual bool cachedReadingForecast(ReadingForecast&) const { return false; }
   // Borrowed worker cursor, absent until authenticated catalog transport is available.
   virtual CatalogSource* catalogSource() { return nullptr; }
   // Serialized worker session selection; connector tokens are process-local.

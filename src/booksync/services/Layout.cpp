@@ -610,6 +610,10 @@ bool Layout::installedKind(std::string_view id, bool textOnly, WidgetKind& kind)
     kind = WidgetKind::Pages;
   else if (!textOnly && id == "year-in-reading")
     kind = WidgetKind::Year;
+  else if (!textOnly && id == "reading-goal")
+    kind = WidgetKind::Goal;
+  else if (!textOnly && id == "finish-forecast")
+    kind = WidgetKind::Forecast;
   else if (!textOnly && id == "when-you-read")
     kind = WidgetKind::When;
   else if (!textOnly && id == "reading-records")
