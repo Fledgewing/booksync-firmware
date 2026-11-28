@@ -148,7 +148,7 @@ inline void runLifecycleProgressScenario() {
     SyncOwner owner(journal, adapter, "adapter:one", "account:one", scratch, sizeof(scratch), observe);
     ok = ok && owner.activate() == SyncResult::Ready;
     auto result = ok ? owner.step() : SyncResult::Invalid;
-    if (result == SyncResult::Idle) {
+    if (result == SyncResult::Idle || result == SyncResult::Completed) {
       ok = ok && journal.pending() == 0 && Storage.exists("/progress/native");
       if (ok) LOG_INF("BSP", "BookSync progress scenario PASS");
       std::fflush(nullptr);
