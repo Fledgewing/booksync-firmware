@@ -7,6 +7,8 @@ namespace booksync::server {
 // Session credentials and signed/expiring acquisition paths stay in this port.
 struct DownloadTarget {
   storage::SourceIdentity identity{};
+  std::array<char, 64> version{};
+  std::array<char, 65> proof{};
   std::array<char, 1024> path{};
 };
 struct DownloadHeaders {
@@ -30,6 +32,8 @@ class Download final : public DownloadSource {
   explicit Download(DownloadTransport& transport) : transport_(transport) {}
   ~Download() override { close(); }
   bool open(const DownloadSpec&, uint64_t offset, const char* validator, DownloadReply&) override;
+  DownloadError error() const override { return error_; }
+  bool verify(FsFile&, const DownloadSpec&, DownloadCheck) override;
   int read(void*, size_t capacity) override;
   bool finish() override;
   void close() override;
@@ -38,6 +42,7 @@ class Download final : public DownloadSource {
   DownloadTransport& transport_;
   DownloadTarget target_{};
   DownloadHeaders headers_{};
+  DownloadError error_ = DownloadError::Unavailable;
   uint64_t expected_ = 0, received_ = 0;
   bool opened_ = false, known_ = false, metadataOnly_ = false;
 };

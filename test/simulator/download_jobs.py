@@ -13,7 +13,9 @@ if profile not in ('x4-pro-simulator', 'x4-classic-simulator', 'simulator-X3'):
 out = root / 'reports' / profile
 out.mkdir(parents=True, exist_ok=True)
 groups = (('download',), ('retired',), ('digest',), ('edition',), ('space',),
-          ('cancel', 'recover-canceled'), ('cut', 'resume'), ('cut-published', 'resume-published'))
+          ('cancel', 'recover-canceled'), ('cut', 'resume'), ('cut-published', 'resume-published'),
+          ('proof-download',), ('proof-digest',), ('proof-edition',),
+          ('proof-cut', 'proof-resume'), ('proof-cut-published', 'proof-resume-published'))
 boots = 0
 for group in groups:
     with tempfile.TemporaryDirectory(prefix='booksync-download-', dir=out) as directory:
@@ -26,12 +28,12 @@ for group in groups:
                                     env=env, capture_output=True, text=True, timeout=60)
             log = result.stdout + result.stderr
             (out / f'download-{mode}.log').write_text(log)
-            cut = mode.startswith('cut')
+            cut = mode.startswith(('cut', 'proof-cut'))
             if result.returncode != (73 if cut else 0) or ('intentional power cut' if cut else 'BookSync download scenario PASS') not in log:
                 raise SystemExit(f'F23 failed: {profile} {mode}\n{log[-4000:]}')
             boots += 1
 (out / 'download-jobs.json').write_text(json.dumps({
-    'profile': profile, 'result': 'PASS', 'boots': boots, 'power_cuts': 2,
+    'profile': profile, 'result': 'PASS', 'boots': boots, 'power_cuts': 4,
     'payload_allocations': 0, 'chunk_bytes': 1024,
     'runtime_memory': 'Fixed workspace size logged. Native heap/stack values do not qualify hardware acceptance.'
 }, indent=2) + '\n')

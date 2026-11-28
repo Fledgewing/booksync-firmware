@@ -6,10 +6,13 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "booksync/server/bookorbit/Download.h"
 #include "booksync/services/DownloadJobs.h"
 inline void runDownloadJobsScenario() {
   const char* mode = std::getenv("BOOKSYNC_DOWNLOAD_JOBS_SCENARIO");
   if (!mode) return;
+  const bool protocol = std::strncmp(mode, "proof-", 6) == 0;
+  if (protocol) mode += 6;
   using namespace booksync;
   static Admission admission({nullptr, [](void*) { return MemorySnapshot{128 * 1024, 64 * 1024, 0}; },
                               [](void*) { return true; }, [](void*) { return true; }, [](void*) { return true; }},
@@ -29,6 +32,11 @@ inline void runDownloadJobsScenario() {
   std::strcpy(spec.path.data(), "/downloads/book.epub");
   spec.bytes = 3;
   spec.sizeKnown = true;
+  if (protocol) {
+    spec.identity.revision = {};
+    std::strcpy(spec.version.data(), "opaque-version");
+    std::strcpy(spec.proof.data(), "900150983cd24fb0d6963f7d28e17f72");
+  }
   struct Source final : DownloadSource {
     uint64_t position = 0, requested = 0;
     bool wrongDigest = false, wrongEdition = false;
@@ -55,6 +63,46 @@ inline void runDownloadJobsScenario() {
     void close() override {}
   };
   static Source source;
+  struct Transport final : server::DownloadTransport {
+    uint64_t position = 0, requested = 0;
+    unsigned opens = 0;
+    bool wrongDigest = false, wrongEdition = false;
+    bool resolve(const DownloadSpec& selected, server::DownloadTarget& out) override {
+      out.identity = selected.identity;
+      out.version = selected.version;
+      out.proof = selected.proof;
+      if (wrongEdition) ++out.identity.edition.bytes[0];
+      std::strcpy(out.path.data(), "/fixture/acquisition");
+      return true;
+    }
+    bool open(const char*, uint64_t offset, const char*, server::DownloadHeaders& out) override {
+      ++opens;
+      position = requested = offset;
+      out = {};
+      out.status = offset ? 206 : 200;
+      out.lengthKnown = true;
+      out.contentLength = 3 - offset;
+      std::strcpy(out.etag.data(), "\"revision\"");
+      if (offset)
+        std::snprintf(out.contentRange.data(), out.contentRange.size(), "bytes %llu-2/3",
+                      static_cast<unsigned long long>(offset));
+      return true;
+    }
+    int read(void* out, size_t) override {
+      if (position == 3) return 0;
+      *static_cast<char*>(out) = wrongDigest ? 'x' : "abc"[position];
+      ++position;
+      return 1;
+    }
+    bool finish() override { return true; }
+    void close() override {}
+  };
+  static Transport transport;
+  static server::Download adapter(transport);
+  DownloadSource& selectedSource =
+      protocol ? static_cast<DownloadSource&>(adapter) : static_cast<DownloadSource&>(source);
+  auto sourceOpens = [&]() { return protocol ? transport.opens : source.opens; };
+  auto sourceRequested = [&]() { return protocol ? transport.requested : source.requested; };
   struct State {
     uint64_t free = DownloadJobs::Headroom + 10000;
     unsigned links = 0;
@@ -72,20 +120,20 @@ inline void runDownloadJobsScenario() {
   const auto prior = jobs.status({7, 1});
   const bool resume = !std::strcmp(mode, "resume") || !std::strcmp(mode, "resume-published");
   if (!std::strcmp(mode, "recover-canceled")) {
-    ok = ok && prior.state == DownloadState::Canceled && source.opens == 0 &&
+    ok = ok && prior.state == DownloadState::Canceled && sourceOpens() == 0 &&
          !Storage.exists("/downloads/book.epub.tmp");
   } else {
-    if (!std::strcmp(mode, "digest")) source.wrongDigest = true;
-    if (!std::strcmp(mode, "edition")) source.wrongEdition = true;
+    if (!std::strcmp(mode, "digest")) source.wrongDigest = transport.wrongDigest = true;
+    if (!std::strcmp(mode, "edition")) source.wrongEdition = transport.wrongEdition = true;
     if (!std::strcmp(mode, "space")) state.free = DownloadJobs::Headroom + 2;
-    const uint64_t id = resume ? prior.id : jobs.start(spec, source, {7, 1});
+    const uint64_t id = resume ? prior.id : jobs.start(spec, selectedSource, {7, 1});
     ok = ok && id;
     if (resume) {
-      ok = ok && prior.state == DownloadState::Paused && source.opens == 0 && jobs.resume(id, source, {7, 1});
+      ok = ok && prior.state == DownloadState::Paused && sourceOpens() == 0 && jobs.resume(id, selectedSource, {7, 1});
       if (!std::strcmp(mode, "resume"))
-        ok = ok && source.requested <= 1;
+        ok = ok && sourceRequested() <= 1;
       else
-        ok = ok && source.opens == 0;
+        ok = ok && sourceOpens() == 0;
     }
     unsigned opens = 0;
     Delivery origin({7, 1}, 0, DeliveryPolicy::Owner,

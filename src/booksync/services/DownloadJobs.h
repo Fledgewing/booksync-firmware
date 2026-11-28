@@ -46,6 +46,8 @@ class DownloadJobs {
   DownloadPorts ports_;
   Admission::Token tls_, worker_, catalog_;
   DownloadSource* source_ = nullptr;
+  DownloadSource* proofSource_ = nullptr;
+  storage::Revision computed_{};
   DeliveryTicket owner_{};
   DownloadStatus status_{};
   std::array<char, 244> staging_{}, backup_{};
@@ -55,7 +57,8 @@ class DownloadJobs {
   uint64_t flushed_ = 0;
   bool artifactOpen_ = false;
   bool running_ = false, draining_ = false, scoped_ = false;
-  static constexpr size_t JournalBytes = 782;
+  static constexpr size_t JournalBytes = 911;
+  static_assert(JournalBytes <= Chunk);
   bool codec(bool encode);
   bool save();
   bool same(DeliveryTicket) const;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstring>
 
 #include "booksync/server/bookorbit/Download.h"
@@ -14,13 +15,15 @@ struct DownloadTest : testing::Test {
   uint64_t free = DownloadJobs::Headroom + 10000;
   unsigned links = 0;
   bool linkOk = true;
+  storage::SourceIdentity linked{};
   Admission admission{{nullptr, [](void*) { return MemorySnapshot{128 * 1024, 64 * 1024, 0}; },
                        [](void*) { return true; }, [](void*) { return true; }, [](void*) { return true; }},
                       true};
   DownloadPorts ports{this, [](void* p) { return static_cast<DownloadTest*>(p)->free; },
-                      [](void* p, const DownloadSpec&) {
+                      [](void* p, const DownloadSpec& selected) {
                         auto& f = *static_cast<DownloadTest*>(p);
                         ++f.links;
+                        f.linked = selected.identity;
                         return f.linkOk;
                       }};
   struct Source : DownloadSource {
@@ -400,19 +403,26 @@ struct HttpDownloadTest : DownloadTest {
   struct Transport : booksync::server::DownloadTransport {
     booksync::server::DownloadHeaders headers{};
     unsigned closes = 0, opens = 0;
-    bool finishOk = true;
+    bool finishOk = true, changedVersion = false, changedProof = false;
+    uint64_t position = 0;
     bool resolve(const DownloadSpec& spec, booksync::server::DownloadTarget& out) override {
       out.identity = spec.identity;
+      out.proof = spec.proof;
+      out.version = spec.version;
+      if (changedVersion) std::strcpy(out.version.data(), "other-version");
+      if (changedProof) std::strcpy(out.proof.data(), "00000000000000000000000000000000");
       std::strcpy(out.path.data(), "/selected/acquisition");
       return true;
     }
-    bool open(const char*, uint64_t, const char*, booksync::server::DownloadHeaders& out) override {
+    bool open(const char*, uint64_t offset, const char*, booksync::server::DownloadHeaders& out) override {
+      position = offset;
       ++opens;
       out = headers;
       return true;
     }
     int read(void* out, size_t) override {
-      *static_cast<char*>(out) = 'b';
+      if (position == 3) return 0;
+      *static_cast<char*>(out) = "abc"[position++];
       return 1;
     }
     bool finish() override { return finishOk; }
@@ -482,4 +492,127 @@ TEST_F(HttpDownloadTest, RangeDeclineLengthAndFinalAuthorizationChecked) {
   transport.finishOk = false;
   EXPECT_FALSE(source.finish());
 }
+TEST_F(HttpDownloadTest, PrivateReaderProofProducesCanonicalShaBeforeLink) {
+  auto expected = spec.identity.revision;
+  spec.identity.revision = {};
+  std::strcpy(spec.version.data(), "opaque-version");
+  std::strcpy(spec.proof.data(), "900150983cd24fb0d6963f7d28e17f72");
+  transport.headers.status = 200;
+  transport.headers.lengthKnown = true;
+  transport.headers.contentLength = 3;
+  booksync::server::Download source(transport);
+  DownloadJobs j(journal, admission, ports);
+  ASSERT_TRUE(j.recover(scope, owner));
+  const auto id = j.start(spec, source, owner);
+  ASSERT_NE(id, 0u);
+  complete(j);
+  EXPECT_EQ(j.result(id, owner), DeliveryResult::Ready);
+  EXPECT_EQ(linked.revision, expected);
+  EXPECT_EQ(card.files[spec.path.data()], "abc");
+}
+TEST_F(HttpDownloadTest, WrongReaderProofNeverPublishesOrIssuesIdentity) {
+  spec.identity.revision = {};
+  std::strcpy(spec.proof.data(), "00000000000000000000000000000000");
+  transport.headers.status = 200;
+  transport.headers.lengthKnown = true;
+  transport.headers.contentLength = 3;
+  booksync::server::Download source(transport);
+  DownloadJobs j(journal, admission, ports);
+  ASSERT_TRUE(j.recover(scope, owner));
+  ASSERT_NE(j.start(spec, source, owner), 0u);
+  complete(j);
+  EXPECT_EQ(j.status(owner).error, DownloadError::Digest);
+  EXPECT_EQ(links, 0u);
+  EXPECT_FALSE(Storage.exists(spec.path.data()));
+}
+TEST_F(HttpDownloadTest, ChangedVersionOrReaderProofRejectsBeforeBody) {
+  spec.identity.revision = {};
+  std::strcpy(spec.version.data(), "opaque-version");
+  std::strcpy(spec.proof.data(), "900150983cd24fb0d6963f7d28e17f72");
+  booksync::server::Download source(transport);
+  DownloadReply reply;
+  transport.changedVersion = true;
+  EXPECT_FALSE(source.open(spec, 0, "", reply));
+  EXPECT_EQ(source.error(), DownloadError::Edition);
+  transport.changedVersion = false;
+  transport.changedProof = true;
+  EXPECT_FALSE(source.open(spec, 0, "", reply));
+  EXPECT_EQ(source.error(), DownloadError::Edition);
+  EXPECT_EQ(transport.opens, 0u);
+}
+TEST_F(HttpDownloadTest, FirstAcquisitionProofSurvivesRestartAndExactRange) {
+  auto expected = spec.identity.revision;
+  spec.identity.revision = {};
+  std::strcpy(spec.version.data(), "opaque-version");
+  std::strcpy(spec.proof.data(), "900150983cd24fb0d6963f7d28e17f72");
+  transport.headers.status = 200;
+  transport.headers.lengthKnown = true;
+  transport.headers.contentLength = 3;
+  std::strcpy(transport.headers.etag.data(), "\"revision\"");
+  booksync::server::Download source(transport);
+  uint64_t id;
+  {
+    DownloadJobs j(journal, admission, ports);
+    ASSERT_TRUE(j.recover(scope, owner));
+    id = j.start(spec, source, owner);
+    ASSERT_NE(id, 0u);
+    j.tick(owner);
+  }
+  card.restart();
+  transport.headers.status = 206;
+  transport.headers.contentLength = 2;
+  std::strcpy(transport.headers.contentRange.data(), "bytes 1-2/3");
+  DownloadJobs j(journal, admission, ports);
+  ASSERT_TRUE(j.recover(scope, owner));
+  ASSERT_TRUE(j.resume(id, source, owner));
+  complete(j);
+  EXPECT_EQ(j.result(id, owner), DeliveryResult::Ready);
+  EXPECT_EQ(linked.revision, expected);
+}
+
+TEST_F(HttpDownloadTest, ReaderProofUsesExactBoundedReaderWindows) {
+  std::string payload(8193, 'a');
+  for (size_t i = 0; i < payload.size(); ++i) payload[i] = char('a' + i % 23);
+  card.files["/proof"] = payload;
+  std::strcpy(spec.proof.data(), "3e2237c1452fdf42baebef1e0811e130");
+  booksync::server::Download source(transport);
+  uint8_t scratch[1024];
+  auto file = Storage.open("/proof", O_RDONLY);
+  ASSERT_TRUE(file);
+  card.events.clear();
+  EXPECT_TRUE(source.verify(file, spec, {scratch, sizeof(scratch), [](void*) { return true; }, nullptr}));
+  EXPECT_EQ(std::count(card.events.begin(), card.events.end(), "read"), 3);
+  ASSERT_TRUE(file.close());
+  // A sampled byte fails the reader proof; the worker independently hashes the
+  // whole file for canonical revision rather than reusing this partial proof.
+  card.files["/proof"][1024] = '!';
+  file = Storage.open("/proof", O_RDONLY);
+  EXPECT_FALSE(source.verify(file, spec, {scratch, sizeof(scratch), [](void*) { return true; }, nullptr}));
+  EXPECT_TRUE(file.close());
+  EXPECT_EQ(transport.opens, 0u);
+}
+TEST_F(HttpDownloadTest, ReaderProofStopsBeforeIoAtReadingGate) {
+  card.files["/proof"] = "abc";
+  std::strcpy(spec.proof.data(), "900150983cd24fb0d6963f7d28e17f72");
+  booksync::server::Download source(transport);
+  uint8_t scratch[1024];
+  auto file = Storage.open("/proof", O_RDONLY);
+  ASSERT_TRUE(file);
+  card.events.clear();
+  EXPECT_FALSE(source.verify(file, spec, {scratch, sizeof(scratch), [](void*) { return false; }, nullptr}));
+  EXPECT_TRUE(card.events.empty());
+  EXPECT_TRUE(file.close());
+}
+TEST_F(HttpDownloadTest, UnknownCanonicalRevisionRequiresAnAdapterVerifier) {
+  spec.identity.revision = {};
+  std::strcpy(spec.proof.data(), "opaque-proof");
+  DownloadJobs j(journal, admission, ports);
+  ASSERT_TRUE(j.recover(scope, owner));
+  ASSERT_NE(j.start(spec, DownloadTest::source, owner), 0u);
+  complete(j);
+  EXPECT_EQ(j.status(owner).error, DownloadError::Digest);
+  EXPECT_EQ(links, 0u);
+  EXPECT_FALSE(Storage.exists(spec.path.data()));
+}
+
 }  // namespace

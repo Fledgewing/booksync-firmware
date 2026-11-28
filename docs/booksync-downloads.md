@@ -20,8 +20,9 @@ checks admission before each chunk, hashing read, and publication. Status is a
 value copy; progress includes an ID and monotonic sequence. Only the private
 adapter resolves acquisition paths with current authorization. It rejects
 redirects, non-relative targets, weak validators and malformed/mismatched ranges.
-Final framing/authorization, exact edition/revision, whole-file SHA-256, F06
-publication and durable identity linking all precede Ready. Full card/short write
+Final framing/authorization, exact edition/version and the adapter's frozen
+reader proof are verified first. The worker then computes/persists canonical
+whole-file SHA-256 (or compares an already known revision). F06 publication and durable identity linking all precede Ready. Full card/short write
 failures keep the previous complete file and resumable staging. The adapter port
 must use bounded I/O timeouts and be drained before display ownership is returned.
 

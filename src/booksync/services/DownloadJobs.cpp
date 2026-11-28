@@ -13,7 +13,7 @@
 #endif
 namespace booksync {
 namespace {
-constexpr std::array<uint8_t, 8> Magic{'B', 'S', 'D', 'L', 1, 0, 0, 0};
+constexpr std::array<uint8_t, 8> Magic{'B', 'S', 'D', 'L', 2, 0, 0, 0};
 uint32_t checksum(const void* data, size_t n, uint32_t hash = 2166136261u) {
   const auto* p = static_cast<const uint8_t*>(data);
   while (n--) hash = (hash ^ *p++) * 16777619u;
@@ -23,9 +23,18 @@ template <size_t N>
 bool text(const std::array<char, N>& s, bool required = true) {
   return (!required || s[0]) && std::memchr(s.data(), 0, N);
 }
+template <size_t N>
+bool nonzero(const std::array<uint8_t, N>& value) {
+  for (auto byte : value)
+    if (byte) return true;
+  return false;
+}
 bool sameSelection(const DownloadSpec& a, const DownloadSpec& b) {
-  return a.identity == b.identity && a.server == b.server && a.account == b.account && a.book == b.book &&
-         a.file == b.file && a.variant == b.variant;
+  return a.identity.book == b.identity.book && a.identity.edition == b.identity.edition &&
+         (!nonzero(a.identity.revision.bytes) || !nonzero(b.identity.revision.bytes) ||
+          a.identity.revision == b.identity.revision) &&
+         a.proof == b.proof && a.version == b.version && a.server == b.server && a.account == b.account &&
+         a.book == b.book && a.file == b.file && a.variant == b.variant;
 }
 bool scopeMatches(const DownloadSpec& s, storage::ScopeView scope) {
   return scope.server == s.server.data() && scope.account == s.account.data();
@@ -113,6 +122,8 @@ bool DownloadJobs::codec(bool encode) {
   bytes(s.book.data(), 64);
   bytes(s.file.data(), 64);
   bytes(s.variant.data(), 64);
+  bytes(s.version.data(), 64);
+  bytes(s.proof.data(), 65);
   bytes(s.path.data(), 240);
   number(s.bytes);
   uint8_t known = s.sizeKnown ? 1 : 0;
@@ -134,7 +145,9 @@ bool DownloadJobs::save() {
 }
 bool DownloadJobs::accepts(const DownloadSpec& s) const {
   if (!text(s.server) || !text(s.account) || !text(s.book) || !text(s.file) || !text(s.variant, false) ||
-      !text(s.path) || !storage::valid(s.identity) || (s.sizeKnown && (!s.bytes || s.bytes > MaxBytes)))
+      !text(s.path) || !text(s.version, false) || !text(s.proof, false) || !nonzero(s.identity.book.bytes) ||
+      !nonzero(s.identity.edition.bytes) || (!nonzero(s.identity.revision.bytes) && !s.proof[0]) ||
+      (s.sizeKnown && (!s.bytes || s.bytes > MaxBytes)))
     return false;
   const char* p = s.path.data();
   const size_t n = std::strlen(p);
@@ -230,6 +243,7 @@ bool DownloadJobs::admit() {
 void DownloadJobs::settle(DownloadState state, DownloadError error) {
   if (source_) source_->close();
   source_ = nullptr;
+  proofSource_ = nullptr;
   if (artifactOpen_) {
     if (!artifact_.checkpoint()) LOG_ERR("BSD", "Partial download checkpoint failed");
     artifactOpen_ = false;
@@ -262,8 +276,11 @@ bool DownloadJobs::verify(FsFile& file) {
     if (file.read(buffer_.data(), n) != int(n) || !hash.add(buffer_.data(), n)) return false;
     remaining -= n;
   }
-  uint8_t digest[32];
-  return hash.finish(digest) && !std::memcmp(digest, record_.spec.identity.revision.bytes.data(), 32);
+  if (!hash.finish(computed_.bytes.data())) return false;
+  if (nonzero(record_.spec.identity.revision.bytes)) return computed_ == record_.spec.identity.revision;
+  DownloadCheck check{buffer_.data(), buffer_.size(),
+                      [](void* p) { return static_cast<DownloadJobs*>(p)->admission_.permitted(); }, this};
+  return proofSource_ && proofSource_->verify(file, record_.spec, check) && admission_.permitted();
 }
 bool DownloadJobs::verifyPath(const char* path) {
   FsFile file = Storage.open(path, O_RDONLY);
@@ -318,9 +335,10 @@ bool DownloadJobs::resume(uint64_t id, DownloadSource& source, DeliveryTicket cu
 }
 bool DownloadJobs::begin(DownloadSource& source) {
   status_.error = DownloadError::None;
+  proofSource_ = &source;
   // A cut after rename or failed identity link reuses verified complete bytes.
   if (Storage.exists(record_.spec.path.data())) {
-    if (!verifyPath(record_.spec.path.data())) {
+    if (!nonzero(record_.spec.identity.revision.bytes) || !verifyPath(record_.spec.path.data())) {
       fail(DownloadError::Digest);
       return false;
     }
@@ -341,13 +359,14 @@ bool DownloadJobs::begin(DownloadSource& source) {
       return false;
     }
     // A full but unverified/corrupt staging file must restart on explicit Resume.
-    if (record_.spec.sizeKnown && status_.received == record_.spec.bytes && !verifyPath(staging_.data()))
+    if (nonzero(record_.spec.identity.revision.bytes) && record_.spec.sizeKnown &&
+        status_.received == record_.spec.bytes && !verifyPath(staging_.data()))
       status_.received = 0;
   }
   source_ = &source;
   reply_ = {};
   if (!source.open(record_.spec, status_.received, record_.validator.data(), reply_)) {
-    fail(DownloadError::Unavailable);
+    fail(source.error());
     return false;
   }
   if (reply_.identity != record_.spec.identity) {
@@ -491,7 +510,26 @@ void DownloadJobs::tick(DeliveryTicket current) {
     return;
   }
   if (!verifyPath(staging_.data())) {
+    if (!admission_.permitted()) {
+      settle(DownloadState::Paused);
+      return;
+    }
+    // Rejected bytes cannot become a resumable prefix. Never remove a complete
+    // destination or reader sidecar; this run exclusively owns this staging.
+    if (Storage.exists(staging_.data()) && !Storage.remove(staging_.data()))
+      LOG_ERR("BSD", "Rejected staging retained");
     fail(DownloadError::Digest);
+    return;
+  }
+  // Publish canonical identity evidence BEFORE renaming. A cut after rename or
+  // a link retry can then verify SHA-256 without reopening protocol transport.
+  record_.spec.identity.revision = computed_;
+  record_.spec.bytes = status_.received;
+  record_.spec.sizeKnown = true;
+  status_.total = status_.received;
+  status_.totalKnown = true;
+  if (!save()) {
+    fail(DownloadError::StorageFailure);
     return;
   }
   storage::FilePublish publish({record_.spec.path.data(), staging_.data(), backup_.data()}, artifactValid, this);
