@@ -3,6 +3,7 @@
 
 #include <Logging.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <limits>
@@ -26,11 +27,29 @@ struct QueueCodec {
   size_t bytes = 0;
   uint32_t hash = Basis;
   bool ok = true;
-  void blob(void* p, size_t n) {
-    if (reader) ok = reader->read(p, n) == int(n) && ok;
+  FsFile* comparison = nullptr;
+  void observe(const void* p, size_t n) {
+    if (!ok) return;
+    if (comparison) {
+      const auto* expected = static_cast<const uint8_t*>(p);
+      uint8_t actual[8]{};
+      for (size_t offset = 0; offset < n;) {
+        const auto count = std::min(n - offset, sizeof(actual));
+        if (comparison->read(actual, count) != int(count) || std::memcmp(actual, expected + offset, count)) {
+          ok = false;
+          return;
+        }
+        offset += count;
+      }
+    }
     hash = queueHash(hash, p, n);
     bytes += n;
-    if (writer) ok = writer->write(p, n) && ok;
+    if (writer) ok = writer->write(p, n);
+  }
+  void blob(void* p, size_t n) {
+    if (!ok) return;
+    if (reader) ok = reader->read(p, n) == int(n);
+    observe(p, n);
   }
   template <typename T>
   void number(T& value, unsigned n) {
@@ -68,9 +87,7 @@ struct QueueCodec {
     size_t remaining = N - length;
     while (remaining) {
       const size_t n = remaining < sizeof(Zeros) ? remaining : sizeof(Zeros);
-      hash = queueHash(hash, Zeros, n);
-      bytes += n;
-      if (writer) ok = writer->write(Zeros, n) && ok;
+      observe(Zeros, n);
       remaining -= n;
     }
   }
@@ -139,19 +156,6 @@ struct QueueCodec {
     }
   }
 };
-// Kept out of the codec frame: reconciliation owns one bounded read handle,
-// after the publisher has closed its writer. No record-sized stack temporary.
-__attribute__((noinline)) bool queueConfirm(FilePublish& writer, PublishPaths paths, size_t length, uint32_t hash) {
-  if (!writer.confirm()) return false;
-  FsFile file = Storage.open(paths.current, O_RDONLY);
-  uint8_t stored[4]{};
-  bool saved = file && file.fileSize() == length && file.seekSet(length - 4) && file.read(stored, 4) == 4;
-  uint32_t actual = 0;
-  for (unsigned i = 0; i < 4; ++i) actual |= uint32_t(stored[i]) << (8 * i);
-  saved = saved && actual == hash;
-  if (file) saved = file.close() && saved;
-  return saved;
-}
 void clearQueueSpec(DownloadSpec& s) {
   s.identity = {};
   s.server.fill(0);
@@ -215,7 +219,7 @@ bool SeriesQueueStore::scopeMatches(const DownloadSpec& s) const {
 }
 bool SeriesQueueStore::validRecord(const SeriesQueueRecord& r) const {
   if (!r.id || !r.sequence || !r.token || r.count < 1 || r.count > SeriesNextMax || r.request.count < 1 ||
-      r.request.count > SeriesNextMax || !queueText(r.request.key, true))
+      r.request.count > SeriesNextMax || r.count > r.request.count || !queueText(r.request.key, true))
     return false;
   for (uint8_t i = 0; i < r.count; ++i) {
     const auto& row = r.books[i];
@@ -314,6 +318,30 @@ bool SeriesQueueStore::loadFile(PublishPaths paths, SeriesQueueIndex* index, Ser
   const bool closed = file.close();
   return closed && ok && (index ? validIndex(*index) : validRecord(*record));
 }
+// Reconcile exact intended bytes, including sequence and normalized strings.
+// Checksums detect damage; they never identify a durable acknowledged mutation.
+__attribute__((noinline)) bool SeriesQueueStore::confirmFile(FilePublish& writer, PublishPaths paths, size_t length,
+                                                             SeriesQueueIndex* index, SeriesQueueRecord* record) {
+  if (!writer.confirm()) return false;
+  FsFile file = Storage.open(paths.current, O_RDONLY);
+  if (!file) return false;
+  bool saved = file.fileSize() == length;
+  QueueCodec codec;
+  codec.comparison = &file;
+  codec.observe(recordMode_ ? RecordMagic : IndexMagic, 8);
+  codec.text(server_);
+  codec.text(account_);
+  if (index)
+    codec.index(*index);
+  else
+    codec.record(*record);
+  const auto hash = codec.hash;
+  uint8_t tail[4];
+  for (unsigned i = 0; i < 4; ++i) tail[i] = hash >> (8 * i);
+  codec.observe(tail, 4);
+  saved = codec.ok && codec.bytes == length && saved;
+  return file.close() && saved;
+}
 bool SeriesQueueStore::saveFile(PublishPaths paths, SeriesQueueIndex* index, SeriesQueueRecord* record) {
   if (!scopeValid_ || !(index ? validIndex(*index) : validRecord(*record))) {
     LOG_ERR("BSQ", "Invalid Series queue publication");
@@ -346,7 +374,7 @@ bool SeriesQueueStore::saveFile(PublishPaths paths, SeriesQueueIndex* index, Ser
   for (unsigned i = 0; i < 4; ++i) tail[i] = hash >> (8 * i);
   const bool written = codec.ok && codec.bytes + 4 == length && writer.write(tail, 4);
   bool saved = written && writer.finish();
-  if (!saved && written) saved = queueConfirm(writer, paths, length, hash);
+  if (!saved && written) saved = confirmFile(writer, paths, length, index, record);
   expectedId_ = wanted;
   if (!saved) LOG_ERR("BSQ", "Series queue checkpoint failed");
   return saved;
@@ -375,6 +403,7 @@ bool SeriesQueueStore::save(uint8_t slot, SeriesQueueRecord& record) {
 }
 bool SeriesQueueStore::project(uint8_t slot, uint64_t id, SeriesQueueView& out) {
   out.clear();
+  out.availability = Availability::Unavailable;
   if (!id || !setSlot(slot)) return false;
   recordMode_ = true;
   expectedId_ = id;

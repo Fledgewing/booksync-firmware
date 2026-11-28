@@ -42,7 +42,7 @@ class SeriesQueue {
   DeliveryTicket owner_{};
   uint64_t revision_ = 1;
   uint8_t slot_ = 4, row_ = SeriesNextMax, cursor_ = 0, bound_ = 4;
-  bool valid_ = false, ready_ = false, dirty_ = false, indexDirty_ = false, preparing_ = false;
+  bool valid_ = false, ready_ = false, dirty_ = false, indexDirty_ = false, preparing_ = false, retiring_ = false;
   bool allowed() const;
   bool connected() const;
   bool checkpoint();

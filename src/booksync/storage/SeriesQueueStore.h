@@ -61,6 +61,7 @@ class SeriesQueueStore {
   bool validIndex(const SeriesQueueIndex&) const;
   bool loadFile(PublishPaths, SeriesQueueIndex*, SeriesQueueRecord*);
   bool saveFile(PublishPaths, SeriesQueueIndex*, SeriesQueueRecord*);
+  bool confirmFile(FilePublish&, PublishPaths, size_t, SeriesQueueIndex*, SeriesQueueRecord*);
   static bool validFile(FsFile&, void*);
 };
 static_assert(sizeof(SeriesQueueRecord) <= 16 * 1024);

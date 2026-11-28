@@ -211,12 +211,17 @@ bool SeriesQueue::applyCancel() {
   return checkpoint();
 }
 void SeriesQueue::tick(DeliveryTicket current) {
-  if (!ready_) return;
+  if (!ready_) {
+    if (retiring_ && engine_.busy()) engine_.tick(current);
+    return;
+  }
   if (!queueTicket(current, owner_)) {
     // The transfer engine observes the same changed owner and drains privately.
     if (engine_.busy()) engine_.tick(current);
     requested_.fill(false);
     ready_ = false;
+    retiring_ = true;
+    valid_ = false;
     return;
   }
   if (!allowed()) return;

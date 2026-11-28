@@ -297,6 +297,7 @@ TEST_F(SeriesQueueTest, OwnerChangeRetiresQueueWithoutApplyingLateResult) {
   q.tick({7, 2});
   run(q);
   EXPECT_FALSE(q.ready());
+  EXPECT_FALSE(q.recover());
   EXPECT_FALSE(q.read(id, view));
   EXPECT_EQ(links, 0u);
 }

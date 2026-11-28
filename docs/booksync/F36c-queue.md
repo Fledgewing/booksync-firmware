@@ -36,7 +36,7 @@ One fixed record workspace (under 16 KiB) belongs to the optional worker object;
 its service owner allocates once outside paint and reuses it, rather than keeping
 four descriptor arrays or putting a record on a 4 KiB task stack. Public view
 storage is caller-owned. The store streams a versioned little-endian format with
-scope, exact lengths, normalized string padding and a checksum. Codec scratch is
+scope, exact lengths, normalized string padding and a checksum. Ambiguous publication acknowledgement additionally compares every intended byte through the same bounded codec; a matching checksum alone never acknowledges a mutation. Codec scratch is
 128 bytes. Host compiler frame checks cover queue, store and codec functions;
 hardware compiler gates independently enforce 256-byte frames. The host fault
 card uses exceptions only to simulate cuts; production remains exception-free.

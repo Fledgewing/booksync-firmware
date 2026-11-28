@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstdio>
 #include <cstring>
+#include <unordered_map>
 
 #include "booksync/storage/SeriesQueueStore.h"
 using namespace booksync;
@@ -57,6 +60,7 @@ TEST_F(QueueStoreTest, RoundTripsExactSelectionAndWireLengths) {
 }
 TEST_F(QueueStoreTest, SupportsAllTenAndEveryRetainedSlot) {
   record.count = 10;
+  record.request.count = 10;
   for (unsigned i = 3; i < 10; ++i) record.books[i] = record.books[0];
   for (unsigned slot = 0; slot < 4; ++slot) {
     record.id = slot + 1;
@@ -189,5 +193,45 @@ TEST_F(QueueStoreTest, FullCardDoesNotStartPublication) {
   card.full = true;
   EXPECT_FALSE(store.save(0, record));
   EXPECT_TRUE(card.files.empty());
+}
+TEST_F(QueueStoreTest, MatchingChecksumNeverAcknowledgesAnotherValidRecord) {
+  ASSERT_TRUE(store.save(0, record));
+  const auto original = card.files["/series.0"];
+  constexpr size_t TitleOffset = 292 + 762 + 28;
+  uint32_t prefix = 2166136261u;
+  for (size_t i = 0; i < TitleOffset; ++i) prefix = (prefix ^ static_cast<uint8_t>(original[i])) * 16777619u;
+  std::unordered_map<uint32_t, uint32_t> seen;
+  seen.reserve(200000);
+  uint32_t first = 0, second = 0;
+  bool found = false;
+  for (uint32_t i = 0; i < 1000000 && !found; ++i) {
+    char text[9];
+    std::snprintf(text, sizeof(text), "%08x", unsigned(i));
+    uint32_t hash = prefix;
+    for (unsigned j = 0; j < 8; ++j) hash = (hash ^ static_cast<uint8_t>(text[j])) * 16777619u;
+    const auto inserted = seen.emplace(hash, i);
+    if (!inserted.second) {
+      first = inserted.first->second;
+      second = i;
+      found = true;
+    }
+  }
+  ASSERT_TRUE(found);
+  std::snprintf(record.books[0].title.data(), 96, "%08x", unsigned(first));
+  ASSERT_TRUE(store.save(0, record));
+  const auto baseline = card;
+  const auto old = card.files["/series.0"];
+  std::snprintf(record.books[0].title.data(), 96, "%08x", unsigned(second));
+  card.events.clear();
+  ASSERT_TRUE(store.save(0, record));
+  ASSERT_EQ(old.substr(old.size() - 4), card.files["/series.0"].substr(old.size() - 4));
+  ASSERT_NE(old, card.files["/series.0"]);
+  const auto fault = std::find(card.events.begin(), card.events.end(), "file-sync:before") - card.events.begin();
+  ASSERT_LT(size_t(fault), card.events.size());
+  card = baseline;
+  card.events.clear();
+  card.fail = fault;
+  EXPECT_FALSE(store.save(0, record));
+  EXPECT_EQ(card.files["/series.0"], old);
 }
 }  // namespace
