@@ -85,7 +85,11 @@ bool Download::open(const DownloadSpec& spec, uint64_t offset, const char* valid
   reply = {};
   received_ = 0;
   error_ = DownloadError::Unavailable;
-  if (!transport_.resolve(spec, target_)) return false;
+  const bool resolved = transport_.resolve(spec, target_);
+  // Metadata resolution can own a client even on failure. Release it before
+  // opening the body; close never clears the captured account credentials.
+  transport_.close();
+  if (!resolved) return false;
   if (target_.identity.book != spec.identity.book || target_.identity.edition != spec.identity.edition ||
       (hasRevision(target_.identity.revision) && hasRevision(spec.identity.revision) &&
        target_.identity.revision != spec.identity.revision) ||

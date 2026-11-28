@@ -454,7 +454,7 @@ struct HttpDownloadTest : DownloadTest {
   struct Transport : booksync::server::DownloadTransport {
     booksync::server::DownloadHeaders headers{};
     unsigned closes = 0, opens = 0;
-    bool finishOk = true, changedVersion = false, changedProof = false;
+    bool finishOk = true, changedVersion = false, changedProof = false, resolveOk = true;
     uint64_t position = 0;
     bool resolve(const DownloadSpec& spec, booksync::server::DownloadTarget& out) override {
       out.identity = spec.identity;
@@ -463,7 +463,7 @@ struct HttpDownloadTest : DownloadTest {
       if (changedVersion) std::strcpy(out.version.data(), "other-version");
       if (changedProof) std::strcpy(out.proof.data(), "00000000000000000000000000000000");
       std::strcpy(out.path.data(), "/selected/acquisition");
-      return true;
+      return resolveOk;
     }
     bool open(const char*, uint64_t offset, const char*, booksync::server::DownloadHeaders& out) override {
       position = offset;
@@ -664,6 +664,17 @@ TEST_F(HttpDownloadTest, UnknownCanonicalRevisionRequiresAnAdapterVerifier) {
   EXPECT_EQ(j.status(owner).error, DownloadError::Digest);
   EXPECT_EQ(links, 0u);
   EXPECT_FALSE(Storage.exists(spec.path.data()));
+}
+
+TEST_F(HttpDownloadTest, FailedMetadataResolutionReleasesItsClient) {
+  booksync::server::Download source(transport);
+  DownloadReply reply;
+  transport.resolveOk = false;
+  EXPECT_FALSE(source.open(spec, 0, "", reply));
+  EXPECT_EQ(transport.opens, 0u);
+  EXPECT_EQ(transport.closes, 1u);
+  source.close();
+  EXPECT_EQ(transport.closes, 1u);
 }
 
 }  // namespace
