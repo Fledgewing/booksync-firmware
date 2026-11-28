@@ -303,15 +303,21 @@ struct ReadingLinkInput {
   booksync::ListsWidgetValues* listsWidgetOut = nullptr;
   const booksync::CollectionAllowance* collectionAllowance = nullptr;
 };
-}  // namespace
-extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
+// Keep the link-only selector/stats calls in their original bounded frame.
+// No runtime caller or additional workspace is introduced.
+__attribute__((noinline)) bool selectLinkedReading(ReadingLinkInput& input) {
   const auto scope = input.source.scope;
   input.source = input.pages.freeze(scope, input.source.since, input.source.through, input.source.complete);
   input.stats.begin(input.source, input.now, 0, input.watermark);
   input.stats.combine(input.remote, scope, true, input.day, input.out);
   input.personal.begin(input.kind, input.day, input.pick, scope);
   input.personal.card({}, scope, input.card);
-  const bool personal = input.stats.tick() && input.personal.tick();
+  return input.stats.tick() && input.personal.tick();
+}
+}  // namespace
+extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
+  const auto scope = input.source.scope;
+  const bool personal = selectLinkedReading(input);
   bool collections = true;
   if (input.libraryWidget && input.libraryWidgetOut && input.collectionAllowance)
     collections &= booksync::projectLibraryWidget(*input.libraryWidget, scope, *input.collectionAllowance,
