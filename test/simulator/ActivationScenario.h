@@ -42,7 +42,12 @@ inline void runActivationScenario() {
       check(!account.signedIn);  // Legacy sync login is never a web session.
     }
     if (std::strcmp(mode, "remove") == 0) {
+      const auto oldView = offlineLibrary().accountView();
+      check(oldView.syncReady && !oldView.signedIn);
       check(removeRetainedLogin(0) == AuthError::None);
+      const auto newView = offlineLibrary().accountView();
+      check(!newView.syncReady && newView.ticket.epoch > oldView.ticket.epoch);
+      check(offlineLibrary().selectService({oldView.ticket, oldView.service}) == CommandStatus::Unavailable);
       check(!retainedLoginSnapshot(0).syncReady);
       check(retainedLoginSnapshot(1).syncReady && retainedLoginSnapshot(2).acquisitionReady);
     }
