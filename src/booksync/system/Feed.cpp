@@ -122,9 +122,11 @@ void Feed::sOnKey(void* ctx, const char* key, size_t len) {
       if (self->depth == self->releaseDepth()) {
         if (len == 8 && memcmp(key, "tag_name", 8) == 0)
           self->lastKey = LastKey::TAG_NAME;
-        else if (len == 16 && memcmp(key, "booksync_version", 16) == 0)
+        else if (len == 16 && memcmp(key, "booksync_version", 16) == 0) {
+          if (self->current.booksyncVersionFound) self->invalid = true;
+          self->current.booksyncVersionFound = true;
           self->lastKey = LastKey::BOOKSYNC_ID;
-        else if (len == 10 && memcmp(key, "prerelease", 10) == 0)
+        } else if (len == 10 && memcmp(key, "prerelease", 10) == 0)
           self->lastKey = LastKey::PRERELEASE;
         else if (len == 5 && memcmp(key, "draft", 5) == 0)
           self->lastKey = LastKey::DRAFT;
@@ -169,7 +171,7 @@ void Feed::sOnString(void* ctx, const char* value, size_t len) {
       }
       break;
     case LastKey::BOOKSYNC_ID:
-      if (len >= sizeof(self->current.booksyncVersion))
+      if (!len || len >= sizeof(self->current.booksyncVersion) || memchr(value, 0, len))
         self->invalid = true;
       else
         safeCopy(self->current.booksyncVersion, sizeof(self->current.booksyncVersion), value, len);
@@ -207,6 +209,7 @@ void Feed::sOnString(void* ctx, const char* value, size_t len) {
 
 void Feed::sOnNumber(void* ctx, const char* value, size_t len) {
   auto* self = static_cast<Feed*>(ctx);
+  if (self->lastKey == LastKey::BOOKSYNC_ID) self->invalid = true;
 
   if (self->lastKey == LastKey::ASSET_SIZE && self->position == Position::IN_ASSET_OBJECT && self->assetDepth == 1) {
     size_t size = 0;
@@ -225,15 +228,21 @@ void Feed::sOnNumber(void* ctx, const char* value, size_t len) {
 
 void Feed::sOnBool(void* ctx, bool value) {
   auto* self = static_cast<Feed*>(ctx);
+  if (self->lastKey == LastKey::BOOKSYNC_ID) self->invalid = true;
   if (self->lastKey == LastKey::PRERELEASE) self->current.prerelease = value;
   if (self->lastKey == LastKey::DRAFT) self->current.draft = value;
   self->lastKey = LastKey::NONE;
 }
 
-void Feed::sOnNull(void* ctx) { static_cast<Feed*>(ctx)->lastKey = LastKey::NONE; }
+void Feed::sOnNull(void* ctx) {
+  auto* self = static_cast<Feed*>(ctx);
+  if (self->lastKey == LastKey::BOOKSYNC_ID) self->invalid = true;
+  self->lastKey = LastKey::NONE;
+}
 
 void Feed::sOnObjectStart(void* ctx) {
   auto* self = static_cast<Feed*>(ctx);
+  if (self->lastKey == LastKey::BOOKSYNC_ID) self->invalid = true;
 
   switch (self->position) {
     case Position::TOP_LEVEL:
@@ -284,6 +293,7 @@ void Feed::sOnObjectEnd(void* ctx) {
 
 void Feed::sOnArrayStart(void* ctx) {
   auto* self = static_cast<Feed*>(ctx);
+  if (self->lastKey == LastKey::BOOKSYNC_ID) self->invalid = true;
 
   switch (self->position) {
     case Position::TOP_LEVEL:

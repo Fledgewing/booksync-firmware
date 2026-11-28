@@ -13,6 +13,7 @@
 #include "../../test/simulator/DeviceIndexScenario.h"
 #include "../../test/simulator/LayoutScenario.h"
 #include "../../test/simulator/UpdateScenario.h"
+#include "../../test/simulator/VersionScenario.h"
 #include "../../test/simulator/WidgetScenario.h"
 
 #include <Epub.h>
@@ -12178,6 +12179,7 @@ void prepareSimulatorSmokeState() {
   runCredentialsScenario();
   runDeviceIndexScenario();
   runLayoutScenario();
+  runVersionScenario();
   runUpdateScenario();
   // Smoke tests and scripted-input harnesses (scripts/test_*.py) expect to drive Home directly.
   const bool harness = std::getenv("CROSSINK_SIMULATOR_SMOKE_TEST") || std::getenv("CROSSPOINT_SIM_INPUT_SCRIPT");
