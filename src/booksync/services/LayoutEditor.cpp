@@ -349,6 +349,8 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
                            : edit.widget == WidgetKind::Shelf    ? "booklist"
                            : edit.widget == WidgetKind::Library ? "library"
                            : edit.widget == WidgetKind::Lists ? "lists"
+                           : edit.widget == WidgetKind::Discover ? "discover"
+                           : edit.widget == WidgetKind::Recommended ? "recommended"
                            : edit.widget == WidgetKind::Browse   ? "library"
                            : edit.widget == WidgetKind::Week     ? "this-week"
                            : edit.widget == WidgetKind::Streak   ? "reading-streak"
@@ -363,13 +365,18 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
                                                                  : nullptr;
       if (!widget) return LayoutEditStatus::Invalid;
       const bool collectionWidget = edit.widget == WidgetKind::Library || edit.widget == WidgetKind::Lists;
-      const bool newX4Only = isStatsWidget(edit.widget) || collectionWidget;
+      const bool personalWidget = edit.widget == WidgetKind::Discover || edit.widget == WidgetKind::Recommended;
+      const bool newX4Only = isStatsWidget(edit.widget) || collectionWidget || personalWidget;
       if (!std::strcmp(device, "x3") && newX4Only) return LayoutEditStatus::Invalid;
-      const uint8_t h = edit.widget == WidgetKind::Browse || isStatsWidget(edit.widget) || collectionWidget ? 1 : 2;
-      const uint8_t w = collectionWidget || (isStatsWidget(edit.widget) && edit.widget != WidgetKind::Year &&
-                                edit.widget != WidgetKind::Monthly && edit.widget != WidgetKind::Records)
+      const uint8_t h = edit.widget == WidgetKind::Browse || isStatsWidget(edit.widget) || collectionWidget ||
+                                edit.widget == WidgetKind::Recommended
                             ? 1
                             : 2;
+      const uint8_t w =
+          (edit.widget == WidgetKind::Recommended || collectionWidget ||
+           (isStatsWidget(edit.widget) && edit.widget != WidgetKind::Year && edit.widget != WidgetKind::Monthly && edit.widget != WidgetKind::Records))
+              ? 1
+              : 2;
       uint8_t xs[3]{}, ys[3]{};
       static constexpr const char* classes[] = {"android-tablet", "x4", "x3"};
       for (unsigned i = 0; i < 3; ++i) {

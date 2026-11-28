@@ -14720,7 +14720,9 @@
         "../../test/simulator/NativeApplicationScenario.h",
         "../../test/simulator/NativeEvidenceScenario.h",
         "../../test/simulator/NativePersonalScenario.h",
+        "../../test/simulator/PersonalCardsScenario.h",
         "../../test/simulator/PersonalReadingScenario.h",
+        "../../test/simulator/PersonalWidgetsScenario.h",
         "../../test/simulator/PositionPolicyScenario.h",
         "../../test/simulator/QueriesScenario.h",
         "../../test/simulator/ReaderCaptureScenario.h",
@@ -16426,6 +16428,30 @@
     "src/booksync/ui/widgets/Lists.h": {
       "role": "ui",
       "rationale": "F40w Library/Lists compact main and optional drawing over the single immutable Library publication; neutral identities, no source selection, acquisition or allocation during paint."
+    },
+    "src/booksync/services/widgets/PersonalWidgets.h": {
+      "role": "services",
+      "rationale": "F40w explicit four-row Discover projection and one-row Recommended projection over a frozen F39 capture. Caller-owned bounded values, cooperative worker steps, no UI, transport, allocation or writer."
+    },
+    "src/booksync/services/widgets/PersonalWidgets.cpp": {
+      "role": "services",
+      "rationale": "F40w explicit four-row Discover projection and one-row Recommended projection over a frozen F39 capture. Caller-owned bounded values, cooperative worker steps, no UI, transport, allocation or writer."
+    },
+    "src/booksync/ui/widgets/Discover.h": {
+      "role": "ui",
+      "rationale": "F40w approved compact personal widget renderer; bounded caller-owned commands and public Library values only, no I/O, allocation or source selection."
+    },
+    "src/booksync/ui/widgets/Discover.cpp": {
+      "role": "ui",
+      "rationale": "F40w approved compact personal widget renderer; bounded caller-owned commands and public Library values only, no I/O, allocation or source selection."
+    },
+    "src/booksync/ui/widgets/Recommended.h": {
+      "role": "ui",
+      "rationale": "F40w approved compact personal widget renderer; bounded caller-owned commands and public Library values only, no I/O, allocation or source selection."
+    },
+    "src/booksync/ui/widgets/Recommended.cpp": {
+      "role": "ui",
+      "rationale": "F40w approved compact personal widget renderer; bounded caller-owned commands and public Library values only, no I/O, allocation or source selection."
     }
   }
 }

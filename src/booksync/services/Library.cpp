@@ -52,6 +52,7 @@ struct LocalState {
   ServerAdapter* savedStatsSource = nullptr;  // Borrowed Home-lifetime provider; Bootstrap owns it.
   std::unique_ptr<PersonalWorker> personal;
   bool personalPending = false;
+  PersonalHomeSources homePersonal{};
   bool queryChanged = false;
   uint64_t queryRequestId = 0;
   bool requested = false, rescan = false, resolveOpen = false, openReady = false;
@@ -196,7 +197,7 @@ class OfflineLibrary final : public Library {
     for (uint8_t i = 0; i < batch.count; ++i) {
       const auto source = batch.windows[i].source;
       if (batch.windows[i].presentation != WindowPresentation::Preview || source == WindowSource::Random ||
-          source == WindowSource::Continue || source == WindowSource::Unknown)
+          source == WindowSource::Recommended || source == WindowSource::Continue || source == WindowSource::Unknown)
         continue;
       if (!local->bookListScratch) {
         local->bookListScratch = makeUniqueNoThrow<BookListProjection>();
@@ -293,6 +294,16 @@ class OfflineLibrary final : public Library {
     return accepted;
   }
   WindowSource requestedSource = WindowSource::Unknown;
+  CommandStatus anotherDiscover() override {
+    if (!local || !local->homePersonal.another) return CommandStatus::Unavailable;
+    const auto scope = local->homePersonal.scope;
+    if (scope.owner &&
+        (scope.owner != accountPresentation.ticket.owner || scope.epoch != accountPresentation.ticket.epoch))
+      return CommandStatus::Unavailable;
+    const auto result = local->homePersonal.another(local->homePersonal.context, scope);
+    if (result == CommandStatus::Accepted) local->requested = true;
+    return result;
+  }
   CommandStatus browseSource(WindowSource source) override {
     if (source == WindowSource::Continue || source == WindowSource::Unknown) return CommandStatus::Unsupported;
     if (local) {
@@ -421,6 +432,15 @@ bool bindHomeCollectionSources(const LibraryWidgetInput* summary, ListsWidgetSou
   local->requested = true;
   return true;
 }
+bool bindHomePersonalSources(PersonalHomeSources source) {
+  if (!local || (source.scope.owner && (source.scope.owner != accountPresentation.ticket.owner ||
+                                        source.scope.epoch != accountPresentation.ticket.epoch)))
+    return false;
+  local->homePersonal = source;
+  local->model.setPersonalWidgetSources(source.discover, source.recommended, source.scope, source.discoverList);
+  local->requested = true;
+  return true;
+}
 bool bindHomeBookListSource(BookListSource source, ReadingScope scope, uint16_t year) {
   if (!local || (scope.owner &&
                  (scope.owner != accountPresentation.ticket.owner || scope.epoch != accountPresentation.ticket.epoch)))
@@ -435,6 +455,7 @@ void publishAccountView(AccountView value) {
   if (local && (value.ticket.owner != accountPresentation.ticket.owner ||
                 value.ticket.epoch != accountPresentation.ticket.epoch)) {
     local->model.invalidate(Invalidation::Account);
+    local->homePersonal = {};
     local->openReady = local->resolveOpen = false;
     local->openKey = {};
     local->requested = true;

@@ -2,6 +2,8 @@ add_executable(BookSyncBookListRendererTest BookListRendererTest.cpp ArtworkCach
   ${REPO_ROOT}/src/booksync/ui/WidgetHost.cpp
   ${REPO_ROOT}/src/booksync/ui/widgets/Library.cpp
   ${REPO_ROOT}/src/booksync/ui/widgets/Lists.cpp
+  ${REPO_ROOT}/src/booksync/ui/widgets/Discover.cpp
+  ${REPO_ROOT}/src/booksync/ui/widgets/Recommended.cpp
   ${REPO_ROOT}/src/booksync/ui/widgets/Continue.cpp
   ${REPO_ROOT}/src/booksync/ui/widgets/Browse.cpp
   ${REPO_ROOT}/src/booksync/ui/widgets/Shelf.cpp)

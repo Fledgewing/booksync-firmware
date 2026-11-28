@@ -608,6 +608,10 @@ bool Layout::installedKind(std::string_view id, bool textOnly, WidgetKind& kind)
     kind = WidgetKind::Shelf;
   else if (id == "library")
     kind = textOnly ? WidgetKind::Browse : WidgetKind::Library;
+  else if (!textOnly && id == "discover")
+    kind = WidgetKind::Discover;
+  else if (!textOnly && id == "recommended")
+    kind = WidgetKind::Recommended;
   else if (!textOnly && id == "lists")
     kind = WidgetKind::Lists;
   else if (!textOnly && id == "this-week")

@@ -95,6 +95,7 @@ class Library {
   }
   virtual CommandStatus browseCatalog(CatalogRoute) { return CommandStatus::Unavailable; }
   virtual bool requestListBooks(const QueryRequest&, ListKey) { return false; }
+  virtual CommandStatus anotherDiscover() { return CommandStatus::Unavailable; }
   virtual CommandStatus browseSource(WindowSource) { return CommandStatus::Unavailable; }
   virtual void retireOpen(BookKey) {}
   virtual CommandStatus showBook(BookKey key) { return open(key); }

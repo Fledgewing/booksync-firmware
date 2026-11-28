@@ -4,6 +4,7 @@
 
 #include "booksync/interface/Commands.h"
 #include "booksync/interface/Models.h"
+#include "booksync/interface/PersonalWidgets.h"
 #include "booksync/services/widgets/BookList.h"
 #include "booksync/services/widgets/Collections.h"
 namespace booksync {
@@ -29,6 +30,15 @@ class ServerAdapter;
 void enterLocalLibrary(ServerAdapter* savedStatsSource = nullptr);
 // Main-loop composition seam. Borrowed frozen data must outlive Home; clear it
 // before owner retirement. Only the existing capture/sync owner registers it.
+struct PersonalHomeSources {
+  const PersonalWidgetValues* discover = nullptr;
+  const PersonalWidgetValues* recommended = nullptr;
+  ReadingScope scope{};
+  BookListSource discoverList{};  // Same frozen ranking as the four-book projection.
+  void* context = nullptr;
+  CommandStatus (*another)(void*, ReadingScope) = nullptr;
+};
+bool bindHomePersonalSources(PersonalHomeSources);
 bool bindHomeBookListSource(BookListSource, ReadingScope, uint16_t year);
 void leaveLocalLibrary();
 void workLocalLibrary();

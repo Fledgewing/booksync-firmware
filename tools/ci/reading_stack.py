@@ -16,6 +16,7 @@ env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Continue.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/BookList.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Library.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Lists.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/PersonalWidgets.cpp")
 
 # F20 keeps payloads in borrowed worker storage; retain exact hardware frame
 # measurements separately from F39's stricter pure-projection gate.

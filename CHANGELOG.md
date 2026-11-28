@@ -20,6 +20,8 @@
 
 - BookSync Home adds compact When you read and Reading records widgets on X4 Pro and Classic, with local-hour history and explicit per-record source availability.
 - BookSync can publish daily native saved highlights through Library without changing original clipping files; incomplete, scoped and oversized captures stay explicit.
+- BookSync Home adds approved Discover and Recommended for you cards with independent saved-source states, Another, and source-scoped All navigation on X4 Pro and Classic. New cards remain off on X3.
+
 - BookSync Home adds approved compact Library and Lists cards on X4 Pro and Classic, with main/optional sizes, explicit saved-data states and approved Library navigation.
 
 - BookSync Book list uses the approved compact nine-preset previews and top-right All counts on X4; the saved-source list keeps paging, Back and unavailable actions offline. X3 retains its text Home.

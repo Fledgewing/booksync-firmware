@@ -155,6 +155,11 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
       }
       continue;
     }
+    if (span.request.presentation == WindowPresentation::Preview &&
+        (span.request.source == WindowSource::Random || span.request.source == WindowSource::Recommended)) {
+      if (!materializePersonal(span)) ok = false;
+      continue;
+    }
     if (bookListSource_.peek || span.request.source == WindowSource::Random ||
         span.request.presentation == WindowPresentation::Preview) {
       if (!materializeList(span)) ok = false;
@@ -186,14 +191,80 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
   publishChanged();
   return ok;
 }
+bool ReadModel::materializePersonal(WindowSpan& span) {
+  const uint8_t required = span.request.source == WindowSource::Random ? 4 : 1;
+  span.total = 0;
+  span.availability = Availability::NotSaved;
+  if (span.request.limit < required) {
+    LOG_ERR("BSPW", "Personal widget row allowance too small");
+    span.bytes = span.request.bytes + 1;
+    span.availability = Availability::Unavailable;
+    return false;
+  }
+  const auto* prepared = required == 4 ? discoverInput_ : recommendedInput_;
+  if (!prepared) return true;
+  if (prepared->state != PersonalWidgetState::Ready && prepared->state != PersonalWidgetState::Empty) {
+    span.availability = prepared->state == PersonalWidgetState::Off           ? Availability::Off
+                        : prepared->state == PersonalWidgetState::Unsupported ? Availability::Unsupported
+                        : prepared->state == PersonalWidgetState::NotSaved    ? Availability::NotSaved
+                                                                              : Availability::Unavailable;
+    if (prepared->state == PersonalWidgetState::Oversize) span.bytes = span.request.bytes + 1;
+    return span.availability != Availability::Unavailable;
+  }
+  if (prepared->bytes > span.request.bytes ||
+      sizeof(WindowSpan) + prepared->count * sizeof(BookRow) > span.request.bytes) {
+    LOG_ERR("BSPW", "Personal widget byte allowance exceeded");
+    span.bytes = span.request.bytes + 1;
+    span.availability = Availability::Unavailable;
+    return false;
+  }
+  if (prepared->count > required || prepared->count != prepared->rows || prepared->count > prepared->total ||
+      (prepared->state == PersonalWidgetState::Ready && !prepared->count) ||
+      (prepared->state == PersonalWidgetState::Empty && (prepared->count || prepared->total))) {
+    LOG_ERR("BSPW", "Personal widget metadata invalid");
+    span.availability = Availability::Unavailable;
+    return false;
+  }
+  for (uint8_t i = 0; i < prepared->count; ++i) {
+    const auto& book = prepared->books[i];
+    if (!book.title[0] || book.title.back() ||
+        (book.key.provenance.owner && (book.key.provenance.owner != personalScope_.owner ||
+                                       book.key.provenance.accountEpoch != personalScope_.epoch))) {
+      LOG_ERR("BSPW", "Personal widget row invalid");
+      span.availability = Availability::Unavailable;
+      return false;
+    }
+    for (uint8_t previous = 0; previous < i; ++previous)
+      if (prepared->books[previous].key == book.key) {
+        LOG_ERR("BSPW", "Personal widget duplicate key");
+        span.availability = Availability::Unavailable;
+        return false;
+      }
+  }
+  for (uint8_t i = 0; i < prepared->count; ++i) {
+    window_.rows[window_.count++] = prepared->books[i];
+    ++span.count;
+    span.bytes += sizeof(BookRow);
+    window_.bytes += sizeof(BookRow);
+  }
+  span.total = prepared->total;
+  span.stale = prepared->stale;
+  span.ageKnown = prepared->ageKnown;
+  span.ageDays = prepared->ageKnown ? prepared->ageDays : 0;
+  span.availability = Availability::Ready;
+  return true;
+}
 bool ReadModel::materializeList(WindowSpan& span) {
-  const bool registered = bookListSource_.peek != nullptr && span.request.source != WindowSource::OnDevice;
+  const bool discoverPage = span.request.source == WindowSource::Random;
+  const auto savedSource = discoverPage ? discoverListSource_ : bookListSource_;
+  const bool registered = savedSource.peek != nullptr && span.request.source != WindowSource::OnDevice;
   const auto provenance = index_.provenance();
-  const auto source = registered ? bookListSource_
+  const auto source = registered ? savedSource
                       : span.request.source == WindowSource::OnDevice
                           ? BookListSource{&index_, nativeListMeta, nativeListRow, nativeListFile}
                           : BookListSource{};
-  const auto scope = registered ? bookListScope_ : ReadingScope{provenance.owner, provenance.accountEpoch};
+  const auto scope = registered ? (discoverPage ? personalScope_ : bookListScope_)
+                                : ReadingScope{provenance.owner, provenance.accountEpoch};
   span.total = 0;
   if (span.request.presentation == WindowPresentation::Preview) {
     if (!bookListScratch_) {
@@ -304,6 +375,9 @@ void ReadModel::invalidate(Invalidation reason) {
   historyBusy_ = false;
   window_.stale = true;
   if (reason == Invalidation::Account) {
+    discoverInput_ = recommendedInput_ = nullptr;
+    personalScope_ = {};
+    discoverListSource_ = {};
     bookListSource_ = {};
     bookListScope_ = {};
     bookListYear_ = 0;

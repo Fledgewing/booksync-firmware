@@ -769,6 +769,74 @@ TEST_F(IndexTest, FailedPreviewWorkspaceLeavesContinueSiblingUsable) {
   EXPECT_EQ(result.windows[1].count, 0);
 }
 
+TEST_F(IndexTest, PersonalWidgetBatchKeepsOversizeSiblingAndOwnerRetirementIndependent) {
+  publish(2);
+  ReadModel model{index};
+  PersonalWidgetValues discover, recommended;
+  discover.state = recommended.state = PersonalWidgetState::Ready;
+  discover.total = discover.count = discover.rows = 4;
+  recommended.total = recommended.count = recommended.rows = 1;
+  for (uint8_t i = 0; i < 4; ++i) {
+    discover.books[i].key = {{8, 4, 17, 0}, i};
+    discover.books[i].title[0] = 'D';
+  }
+  recommended.books[0] = discover.books[0];
+  model.setPersonalWidgetSources(&discover, &recommended, {17, 4});
+  WindowBatchRequest batch;
+  batch.count = 2;
+  batch.windows[0] = {0, 4, LibraryBytes, WindowSource::Random, WindowPresentation::Preview};
+  batch.windows[1] = {0, 1, LibraryBytes, WindowSource::Recommended, WindowPresentation::Preview};
+  ASSERT_TRUE(model.materializeBatch(batch));
+  ASSERT_EQ(model.window().count, 5);
+  discover.bytes = LibraryBytes + 1;
+  EXPECT_FALSE(model.materializeBatch(batch));
+  EXPECT_EQ(model.window().windows[0].availability, Availability::Unavailable);
+  EXPECT_EQ(model.window().windows[0].count, 0);
+  EXPECT_EQ(model.window().windows[1].availability, Availability::Ready);
+  EXPECT_EQ(model.window().windows[1].count, 1);
+  model.invalidate(Invalidation::Account);
+  ASSERT_TRUE(model.materializeBatch(batch));
+  EXPECT_EQ(model.window().count, 0);
+  EXPECT_EQ(model.window().windows[1].availability, Availability::NotSaved);
+}
+TEST_F(IndexTest, DiscoverAllUsesItsFrozenSourceAndNeverNativeOrAnotherPresetMembership) {
+  publish(2);
+  ReadModel model{index};
+  SavedSelection saved;
+  model.setBookListSource(saved.source(), {17, 4}, 2026);
+  ASSERT_TRUE(model.materialize({0, 5, LibraryBytes, WindowSource::Random}));
+  EXPECT_EQ(model.window().windows[0].availability, Availability::NotSaved);
+  model.setPersonalWidgetSources(nullptr, nullptr, {17, 4}, saved.source());
+  ASSERT_TRUE(model.materialize({12, 5, LibraryBytes, WindowSource::Random}));
+  EXPECT_EQ(model.window().count, 3);
+  EXPECT_EQ(model.window().total, 37u);
+  EXPECT_EQ(model.window().provenance, saved.meta.provenance);
+  EXPECT_EQ(model.window().rows[0].key.ordinal, 12u);
+  model.invalidate(Invalidation::Account);
+  ASSERT_TRUE(model.materialize({0, 5, LibraryBytes, WindowSource::Random}));
+  EXPECT_EQ(model.window().count, 0);
+  EXPECT_EQ(model.window().windows[0].availability, Availability::NotSaved);
+}
+TEST_F(IndexTest, PersonalWidgetRejectsForeignAndDuplicatePreparedRows) {
+  publish(2);
+  ReadModel model{index};
+  PersonalWidgetValues value;
+  value.state = PersonalWidgetState::Ready;
+  value.count = value.rows = value.total = 4;
+  for (uint8_t i = 0; i < 4; ++i) {
+    value.books[i].key = {{8, 4, 17, 0}, i};
+    value.books[i].title[0] = 'D';
+  }
+  model.setPersonalWidgetSources(&value, nullptr, {17, 4});
+  value.books[3].key = value.books[0].key;
+  EXPECT_FALSE(model.materialize({0, 4, LibraryBytes, WindowSource::Random, WindowPresentation::Preview}));
+  EXPECT_EQ(model.window().count, 0);
+  value.books[3].key.ordinal = 3;
+  value.books[3].key.provenance.accountEpoch = 3;
+  EXPECT_FALSE(model.materialize({0, 4, LibraryBytes, WindowSource::Random, WindowPresentation::Preview}));
+  EXPECT_EQ(model.window().count, 0);
+}
+
 TEST_F(IndexTest, SavedListMembershipCannotQueryAnUnrelatedIndexAccount) {
   publish(2);
   ReadModel model{index};

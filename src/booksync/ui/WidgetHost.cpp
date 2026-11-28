@@ -3,8 +3,10 @@
 
 #include "booksync/ui/widgets/Browse.h"
 #include "booksync/ui/widgets/Continue.h"
+#include "booksync/ui/widgets/Discover.h"
 #include "booksync/ui/widgets/Library.h"
 #include "booksync/ui/widgets/Lists.h"
+#include "booksync/ui/widgets/Recommended.h"
 #include "booksync/ui/widgets/Shelf.h"
 namespace booksync {
 void WidgetHost::enter(uint8_t page) {
@@ -48,9 +50,11 @@ bool WidgetHost::pollWidgets() {
         batch_.windows[i] = {0, 1, LibraryBytes, WindowSource::Unknown};
         continue;
       }
-      batch_.windows[i] = p.kind == WidgetKind::Continue ? widgets::Continue::request()
-                          : p.kind == WidgetKind::Shelf  ? widgets::Shelf::request(p.source, page_.textOnly)
-                                                         : widgets::Browse::request();
+      batch_.windows[i] = p.kind == WidgetKind::Discover      ? widgets::Discover::request()
+                          : p.kind == WidgetKind::Recommended ? widgets::Recommended::request()
+                          : p.kind == WidgetKind::Continue    ? widgets::Continue::request()
+                          : p.kind == WidgetKind::Shelf       ? widgets::Shelf::request(p.source, page_.textOnly)
+                                                              : widgets::Browse::request();
       if (p.kind == WidgetKind::Library) batch_.windows[i] = {0, 2, LibraryBytes, WindowSource::LibrarySummary};
       if (p.kind == WidgetKind::Lists)
         batch_.windows[i] = {0, static_cast<uint16_t>(p.w >= 2 && p.h >= 2 ? 3 : 1), LibraryBytes,
@@ -231,7 +235,9 @@ const StatsCard* WidgetHost::statsCard(uint8_t widget) const {
   return &stats_.cards[unsigned(id)];
 }
 bool WidgetHost::widgetCell(uint8_t widget, WidgetBox itemBox, uint8_t itemIndex, WidgetCell& itemCell) const {
-  if (widget >= page_.count || (page_.widgets[widget].kind != WidgetKind::Shelf)) return false;
+  if (widget >= page_.count ||
+      (page_.widgets[widget].kind != WidgetKind::Shelf && page_.widgets[widget].kind != WidgetKind::Discover))
+    return false;
   itemBox.textOnly = page_.textOnly;
   return widgets::Shelf::shelfCell(view(widget), page_.widgets[widget].style, itemBox, itemIndex, itemCell);
 }
@@ -246,29 +252,33 @@ uint8_t WidgetHost::widgetRows(uint8_t widget, WidgetBox itemBox) const {
     return viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty
                ? 1 + listsValues(widget).count
                : 1;
-  if (page_.widgets[widget].kind != WidgetKind::Shelf) return 1;
+  if (page_.widgets[widget].kind != WidgetKind::Shelf && page_.widgets[widget].kind != WidgetKind::Discover) return 1;
   if (!page_.textOnly && viewValue.viewState == WidgetState::Empty) return 1;
   if (viewValue.viewState != WidgetState::Known) return 1;
   WidgetCell itemCell;
   uint8_t rows = 0;
   while (rows < viewValue.count && widgetCell(widget, itemBox, rows, itemCell)) ++rows;
-  return rows + (page_.textOnly ? 0 : 1);
+  return rows + (page_.textOnly ? 0 : page_.widgets[widget].kind == WidgetKind::Discover ? 2 : 1);
 }
 uint8_t WidgetHost::hitWidgetRow(uint8_t widget, WidgetBox itemBox, int x, int y) const {
   if (widget >= page_.count) return 255;
   if (page_.widgets[widget].kind == WidgetKind::Library) return widgets::LibraryCard{}.hitLibrary(itemBox, x, y);
   if (page_.widgets[widget].kind == WidgetKind::Lists) return widgets::ListsCard{}.hitLists(itemBox, x, y);
-  if (page_.widgets[widget].kind != WidgetKind::Shelf) return 0;
+  if (page_.widgets[widget].kind != WidgetKind::Shelf && page_.widgets[widget].kind != WidgetKind::Discover) return 0;
   const auto viewValue = view(widget);
   const auto all = widgets::allHeaderBox(itemBox.width);
   if (!page_.textOnly && (viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty) &&
       x >= all.x && x < all.x + all.w && y >= all.y && y < all.y + all.h)
     return 0;
+  const auto another = widgets::anotherHeaderBox(itemBox.width);
+  if (page_.widgets[widget].kind == WidgetKind::Discover && viewValue.viewState == WidgetState::Known &&
+      x >= another.x && x < another.x + another.w && y >= another.y && y < another.y + another.h)
+    return 1;
   WidgetCell itemCell;
   for (uint8_t itemIndex = 0; itemIndex < viewValue.count && widgetCell(widget, itemBox, itemIndex, itemCell);
        ++itemIndex)
     if (x >= itemCell.x && x < itemCell.x + itemCell.width && y >= itemCell.y && y < itemCell.y + itemCell.height)
-      return itemIndex + (page_.textOnly ? 0 : 1);
+      return itemIndex + (page_.textOnly ? 0 : page_.widgets[widget].kind == WidgetKind::Discover ? 2 : 1);
   return 255;
 }
 bool WidgetHost::retryWidget(uint8_t widget) {
@@ -299,6 +309,12 @@ CommandStatus WidgetHost::dispatchWidget(uint8_t widget, uint8_t itemIndex) {
   }
   if (kind == WidgetKind::Browse && saved)
     return page_.textOnly ? library_.submit(Intent::BrowseOnDevice) : library_.browseSource(WindowSource::OnDevice);
+  if (kind == WidgetKind::Discover && !page_.textOnly && saved) {
+    if (!itemIndex) return library_.browseSource(WindowSource::Random);
+    if (itemIndex == 1)
+      return viewValue.viewState == WidgetState::Known ? library_.anotherDiscover() : CommandStatus::Unavailable;
+    itemIndex -= 2;
+  }
   if (kind == WidgetKind::Shelf && !page_.textOnly && saved) {
     if (!itemIndex) return library_.browseSource(page_.widgets[widget].source);
     --itemIndex;
@@ -306,7 +322,8 @@ CommandStatus WidgetHost::dispatchWidget(uint8_t widget, uint8_t itemIndex) {
   }
   if (viewValue.viewState != WidgetState::Known || itemIndex >= viewValue.count) return CommandStatus::Unavailable;
   if (page_.widgets[widget].kind == WidgetKind::Continue) return library_.submit(Intent::OpenLastBook);
-  if (kind == WidgetKind::Shelf) return library_.open(viewValue.rows[itemIndex].key);
+  if (kind == WidgetKind::Shelf || kind == WidgetKind::Discover || kind == WidgetKind::Recommended)
+    return library_.open(viewValue.rows[itemIndex].key);
   return library_.submit(Intent::BrowseLibrary);
 }
 }  // namespace booksync

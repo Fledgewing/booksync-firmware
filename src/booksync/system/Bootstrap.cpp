@@ -41,12 +41,14 @@
 #include "booksync/ui/Home.h"
 #include "booksync/ui/WidgetHost.h"
 #include "booksync/ui/widgets/Continue.h"
+#include "booksync/ui/widgets/Discover.h"
 #include "booksync/ui/widgets/Forecast.h"
 #include "booksync/ui/widgets/Goal.h"
 #include "booksync/ui/widgets/Library.h"
 #include "booksync/ui/widgets/Lists.h"
 #include "booksync/ui/widgets/Monthly.h"
 #include "booksync/ui/widgets/Pages.h"
+#include "booksync/ui/widgets/Recommended.h"
 #include "booksync/ui/widgets/Records.h"
 #include "booksync/ui/widgets/Shelf.h"
 #include "booksync/ui/widgets/Streak.h"
@@ -289,7 +291,7 @@ class ShellActivity final : public Activity {
       case WindowSource::Unopened:
         return widgets && !widgets->page().textOnly ? tr(STR_HOME_UNOPENED_WIDGET) : tr(STR_HOME_UNOPENED);
       case WindowSource::Random:
-        return tr(STR_HOME_RANDOM);
+        return widgets && !widgets->page().textOnly ? tr(STR_HOME_DISCOVER) : tr(STR_HOME_RANDOM);
       case WindowSource::FinishedYear:
         return tr(STR_HOME_FINISHED_YEAR);
       case WindowSource::PickBackUp:
@@ -305,6 +307,8 @@ class ShellActivity final : public Activity {
     if (kind == WidgetKind::Forecast) return tr(STR_HOME_STATS_FORECAST);
     if (kind == WidgetKind::When) return tr(STR_HOME_STATS_WHEN);
     if (kind == WidgetKind::Records) return tr(STR_HOME_STATS_RECORDS);
+    if (kind == WidgetKind::Discover) return tr(STR_HOME_DISCOVER);
+    if (kind == WidgetKind::Recommended) return tr(STR_HOME_RECOMMENDED);
     if (kind == WidgetKind::Today) return tr(STR_HOME_STATS_TODAY);
     if (kind == WidgetKind::Pages) return tr(STR_HOME_STATS_PAGES);
     if (kind == WidgetKind::Year) return tr(STR_HOME_YEAR_IN_READING);
@@ -358,6 +362,8 @@ class ShellActivity final : public Activity {
   widgets::Shelf shelfRenderer;
   widgets::LibraryCard libraryRenderer;
   widgets::ListsCard listsRenderer;
+  widgets::Discover discoverRenderer;
+  widgets::Recommended recommendedRenderer;
   ArtworkCache artworkCache;
   mutable bool continuePainted = false;
   void pollContinueArtwork() {
@@ -506,6 +512,27 @@ class ShellActivity final : public Activity {
                               x + segment[2] * b.w / 24 + stroke, y + segment[3] * b.h / 24, black);
         continue;
       }
+      if (command.kind == widgets::Drawing::StarIcon) {
+        static constexpr int8_t points[10][2] = {{10, 1},  {13, 7}, {20, 8}, {15, 13}, {16, 20},
+                                                 {10, 17}, {4, 20}, {5, 13}, {0, 8},   {7, 7}};
+        for (uint8_t i = 0; i < 10; ++i) {
+          const auto next = (i + 1) % 10;
+          renderer.drawLine(x + points[i][0], y + points[i][1], x + points[next][0], y + points[next][1], black);
+        }
+        continue;
+      }
+      if (command.kind == widgets::Drawing::ShuffleIcon) {
+        // Approved shuffle path in a centered 21-pixel icon; the target stays 50 pixels.
+        static constexpr int8_t paths[][4] = {{3, 6, 6, 6},     {6, 6, 9, 8},     {9, 8, 12, 12},   {12, 12, 15, 16},
+                                              {15, 16, 18, 18}, {18, 18, 22, 18}, {3, 18, 6, 18},   {6, 18, 9, 16},
+                                              {9, 16, 12, 12},  {12, 12, 15, 8},  {15, 8, 18, 6},   {18, 6, 22, 6},
+                                              {19, 3, 22, 6},   {22, 6, 19, 9},   {19, 15, 22, 18}, {22, 18, 19, 21}};
+        for (const auto& segment : paths)
+          for (int stroke = 0; stroke < 2; ++stroke)
+            renderer.drawLine(x + 14 + segment[0] * 21 / 24 + stroke, y + 14 + segment[1] * 21 / 24,
+                              x + 14 + segment[2] * 21 / 24 + stroke, y + 14 + segment[3] * 21 / 24, black);
+        continue;
+      }
       if (command.kind == widgets::Drawing::Title || command.kind == widgets::Drawing::SerifTitle) {
         const int face = command.kind == widgets::Drawing::SerifTitle ? BITTER_10_FONT_ID
                          : command.bold                               ? UI_10_FONT_ID
@@ -621,6 +648,21 @@ class ShellActivity final : public Activity {
 
         case widgets::Label::Reading:
           value = tr(STR_HOME_HERO_READING);
+          break;
+        case widgets::Label::DiscoverTitle:
+          value = tr(STR_HOME_DISCOVER);
+          break;
+        case widgets::Label::RecommendedTitle:
+          value = tr(STR_HOME_RECOMMENDED);
+          break;
+        case widgets::Label::EmptyDiscover:
+          value = tr(STR_HOME_DISCOVER_EMPTY);
+          break;
+        case widgets::Label::EmptyRecommended:
+          value = tr(STR_HOME_RECOMMENDED_EMPTY);
+          break;
+        case widgets::Label::ReadingHistory:
+          value = tr(STR_HOME_READING_HISTORY);
           break;
         case widgets::Label::ShelfTitle:
           if (static_cast<WindowSource>(command.first) == WindowSource::FinishedYear && command.second &&
@@ -784,6 +826,9 @@ class ShellActivity final : public Activity {
             renderer.getTextWidth(font, value, command.bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
         if (measured > 0 && measured * scale / 256 > b.w) scale = b.w * 256 / measured;
       }
+      if (command.label == widgets::Label::DiscoverTitle || command.label == widgets::Label::RecommendedTitle)
+        scale = 192;
+      if (command.label == widgets::Label::ReadingHistory) scale = 160;
       if (command.label == widgets::Label::AuthorsLink || command.label == widgets::Label::SeriesLink ||
           command.label == widgets::Label::CollectionsLink || command.label == widgets::Label::Resume) {
         const int measured = renderer.getTextWidth(font, value, EpdFontFamily::BOLD) * scale / 256;
@@ -1358,10 +1403,15 @@ class ShellActivity final : public Activity {
       paintContinueCommands(r);
       return;
     }
-    if (!textOnly && (p.kind == WidgetKind::Continue || p.kind == WidgetKind::Shelf)) {
+    if (!textOnly && (p.kind == WidgetKind::Continue || p.kind == WidgetKind::Shelf || p.kind == WidgetKind::Discover ||
+                      p.kind == WidgetKind::Recommended)) {
       continueDrawing.clear();
       if (p.kind == WidgetKind::Continue)
         continueRenderer.paint(continueDrawing, view, widgets->continueValues(), widgetBox(index), selected);
+      else if (p.kind == WidgetKind::Discover)
+        discoverRenderer.paint(continueDrawing, view, widgetBox(index), selected ? focusRow : 255);
+      else if (p.kind == WidgetKind::Recommended)
+        recommendedRenderer.paint(continueDrawing, view, widgetBox(index), selected);
       else
         shelfRenderer.paint(continueDrawing, view, p.source, p.style, widgetBox(index), selected ? focusRow : 255);
       paintContinueCommands(r);
