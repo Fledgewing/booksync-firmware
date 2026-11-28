@@ -13,6 +13,7 @@
 
 - BookSync publishes timezone-aware clock and date values only after live or retained clock provenance is known; a persisted expiry floor cannot produce a Home clock.
 - BookSync adds compact Series pages and exact next-1–10 download review on X4 Pro touch, X4 Classic buttons and X3, with offline/Back behavior, frozen file choices and restart-safe account-scoped queues through Library.
+- BookSync Home adds compact Today and Pages read summaries on X4 Pro and Classic, keeping native/account time separate and counting timed page visits rather than unique printed pages. X3 remains unchanged.
 - BookSync Home adds Year in reading and Monthly reading on X4 Pro and Classic, including the optional larger year heatmap and explicit unknown dates. X3 remains unchanged.
 - BookSync Home adds compact This week and Reading streak summaries on X4 Pro and Classic, with explicit missing/off/stale/error states and unchanged X3 availability.
 

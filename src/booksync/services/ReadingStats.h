@@ -68,16 +68,16 @@ struct LocalReadingStats {
   std::array<ReadingValue, RemoteReadingStats::Days> days{};
   ReadingCoverage coverage{};
   ReadingValue today{}, pendingToday{}, recordedPages{}, longestSession{}, streak{}, bestStreak{};
-  ReadingValue includedThrough{};
+  ReadingValue includedThrough{}, todayPages{}, bestDayPages{};
   int64_t firstDay = 0;
 };
 enum class TodayMerge : uint8_t { LocalOnly, Separate, Watermarked };
 struct StatsSnapshot {
   std::array<ReadingValue, RemoteReadingStats::Days> days{};
   ReadingValue today{}, localToday{}, streak{}, bestStreak{}, target{}, year{}, finished{}, includedThrough{};
-  ReadingValue recordedPages{}, longestSession{};
+  ReadingValue recordedPages{}, longestSession{}, nativeToday{}, accountToday{}, todayPages{}, bestDayPages{};
   ReadingCoverage daysCoverage{}, streakCoverage{}, goalCoverage{}, finishedCoverage{}, recordsCoverage{},
-      localTodayCoverage{};
+      localTodayCoverage{}, nativeTodayCoverage{}, accountTodayCoverage{};
   int64_t firstDay = 0;
   TodayMerge todayMerge = TodayMerge::LocalOnly;
   bool offline = false;
@@ -98,7 +98,8 @@ class ReadingStats {
   StatsCalendar calendar_{};
   storage::PageEvent event_{};
   uint64_t now_ = 0, lastStart_ = 0, unionEnd_ = 0, sessionEnd_ = 0, sessionSeconds_ = 0;
-  uint64_t pendingEnd_ = 0;
+  uint64_t pendingEnd_ = 0, pageRunCount_ = 0;
+  int64_t pageRunDay_ = INT64_MIN;
   int64_t lastReadDay_ = INT64_MIN, runStartDay_ = 0, sinceDay_ = 0;
   uint64_t readRun_ = 0;
   bool sinceMidnight_ = false;

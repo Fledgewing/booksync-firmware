@@ -290,3 +290,92 @@ TEST(ReadingStats, StreakUsesWholeCapturedHistoryBeyondCalendarWindow) {
   EXPECT_EQ(stats.local().streak.value, 400);
   EXPECT_EQ(stats.local().bestStreak.value, 400);
 }
+
+TEST(ReadingStats, PageVisitsUseStartDayAndDoNotDeduplicateRereads) {
+  Visits visits;
+  visits.add(200 * 86400 - 10, 20);
+  visits.add(Now - 100, 80);
+  visits.add(Now - 80, 80);
+  ReadingStats stats;
+  ASSERT_TRUE(stats.begin(visits.source(), Now, 0, {}));
+  finish(stats);
+  EXPECT_EQ(stats.local().recordedPages.value, 3);
+  EXPECT_EQ(stats.local().todayPages.value, 2);
+  EXPECT_EQ(stats.local().bestDayPages.value, 2);
+  EXPECT_TRUE(stats.local().todayPages.known);
+}
+TEST(ReadingStats, NativeAndAccountTodaySurviveIndependentPrecedence) {
+  Visits visits;
+  visits.add(Now - 100, 50);
+  ReadingStats stats;
+  ASSERT_TRUE(stats.begin(visits.source(), Now, 0, {}));
+  finish(stats);
+  RemoteReadingStats remote;
+  remote.scope = {7, 2};
+  remote.daysAvailable = true;
+  remote.firstDay = 200;
+  remote.dayCount = 1;
+  remote.days[0] = {0, true};
+  StatsSnapshot out;
+  stats.combine(&remote, {7, 2}, true, 200, out);
+  EXPECT_EQ(out.nativeToday.value, 50);
+  EXPECT_TRUE(out.nativeToday.known);
+  EXPECT_EQ(out.accountToday.value, 0);
+  EXPECT_TRUE(out.accountToday.known);
+  EXPECT_EQ(out.nativeTodayCoverage.origin, ReadingOrigin::ThisReader);
+  EXPECT_EQ(out.accountTodayCoverage.origin, ReadingOrigin::Account);
+  stats.combine(&remote, {9, 3}, true, 200, out);
+  EXPECT_FALSE(out.nativeToday.known);
+  EXPECT_FALSE(out.accountToday.known);
+  EXPECT_FALSE(out.todayPages.known);
+}
+TEST(ReadingStats, OvernightTimeDoesNotInventKnownZeroPageStartsToday) {
+  Visits visits;
+  visits.add(200 * 86400 - 10, 20);
+  auto source = visits.source();
+  source.complete = false;
+  ReadingStats stats;
+  ASSERT_TRUE(stats.begin(source, Now, 0, {}));
+  finish(stats);
+  EXPECT_TRUE(stats.local().today.known);
+  EXPECT_FALSE(stats.local().todayPages.known);
+  EXPECT_EQ(stats.local().todayPages.value, 0);
+  EXPECT_EQ(stats.local().recordedPages.value, 1);
+}
+TEST(ReadingStats, UnboundNativeTodaySurvivesAccountRetirement) {
+  Visits visits;
+  visits.add(Now - 100, 50);
+  auto source = visits.source();
+  source.scope = {};
+  ReadingStats stats;
+  ASSERT_TRUE(stats.begin(source, Now, 0, {}));
+  finish(stats);
+  RemoteReadingStats remote;
+  remote.scope = {7, 2};
+  remote.daysAvailable = true;
+  remote.firstDay = 200;
+  remote.dayCount = 1;
+  remote.days[0] = {720, true};
+  StatsSnapshot out;
+  stats.combine(&remote, {7, 2}, true, 200, out);
+  EXPECT_EQ(out.nativeToday.value, 50);
+  EXPECT_EQ(out.accountToday.value, 720);
+  stats.combine(&remote, {9, 3}, true, 200, out);
+  EXPECT_TRUE(out.nativeToday.known);
+  EXPECT_EQ(out.nativeToday.value, 50);
+  EXPECT_FALSE(out.accountToday.known);
+  EXPECT_EQ(out.todayPages.value, 1);
+}
+
+TEST(ReadingStats, RequestedDayNeverReusesPriorDayPageVisits) {
+  Visits visits;
+  visits.add(Now - 100, 50);
+  ReadingStats stats;
+  ASSERT_TRUE(stats.begin(visits.source(), Now, 0, {}));
+  finish(stats);
+  StatsSnapshot out;
+  stats.combine(nullptr, {7, 2}, true, 201, out);
+  EXPECT_FALSE(out.todayPages.known);
+  EXPECT_FALSE(out.nativeToday.known);
+  EXPECT_EQ(out.recordedPages.value, 1);
+}

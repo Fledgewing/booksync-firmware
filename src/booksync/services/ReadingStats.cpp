@@ -52,6 +52,7 @@ bool ReadingStats::begin(StatsSource source, uint64_t now, int16_t offset, Readi
                        source.complete && source.since > 0 && source.since <= now && source.through >= now};
   pending_.includedThrough = watermark;
   pending_.recordedPages = {0, true};
+  pending_.bestDayPages = {0, true};
   pending_.longestSession = {0, true};
   pending_.bestStreak = {0, true};
   sinceMidnight_ = false;
@@ -72,6 +73,9 @@ bool ReadingStats::begin(StatsSource source, uint64_t now, int16_t offset, Readi
       pending_.days[i].known = day > start.day || (day == start.day && (sinceMidnight_ || day == today.day));
     }
   }
+  pending_.todayPages = {0, pending_.days.back().known};
+  pageRunCount_ = 0;
+  pageRunDay_ = INT64_MIN;
   lastStart_ = unionEnd_ = sessionEnd_ = sessionSeconds_ = pendingEnd_ = readRun_ = 0;
   lastReadDay_ = INT64_MIN;
   busy_ = true;
@@ -80,6 +84,7 @@ bool ReadingStats::begin(StatsSource source, uint64_t now, int16_t offset, Readi
 void ReadingStats::markIncomplete() {
   pending_.coverage.complete = false;
   pending_.pendingToday.known = false;
+  if (!pending_.todayPages.value) pending_.todayPages.known = false;
   // A gap revokes the evidence behind empty buckets; observed partial time
   // remains usable with incomplete coverage, but absence cannot become zero.
   for (auto& day : pending_.days)
@@ -128,6 +133,24 @@ bool ReadingStats::tick(uint16_t allowance) {
     sessionEnd_ = std::max(sessionEnd_, end);
     pending_.longestSession.value = std::max(pending_.longestSession.value, sessionSeconds_);
     ++pending_.recordedPages.value;
+    // A timed visit belongs to its START day, even when time spans midnight.
+    // Revisited/overlapping pages remain visits; only elapsed time is unioned.
+    StatsDaySlice visitDay;
+    if (!split(e.start, visitDay)) {
+      LOG_ERR("BSRS", "Page visit date unavailable; partial result discarded");
+      busy_ = false;
+      return false;
+    }
+    if (visitDay.day != pageRunDay_) {
+      pageRunDay_ = visitDay.day;
+      pageRunCount_ = 0;
+    }
+    ++pageRunCount_;
+    pending_.bestDayPages.value = std::max(pending_.bestDayPages.value, pageRunCount_);
+    if (visitDay.day == pending_.firstDay + Days - 1) {
+      ++pending_.todayPages.value;
+      pending_.todayPages.known = true;
+    }
     // Union timed visits, excluding idle gaps; neither native cumulative totals
     // nor session summaries can enter this sum a second time.
     uint64_t t = std::max(e.start, unionEnd_);
@@ -184,9 +207,10 @@ void ReadingStats::combine(const RemoteReadingStats* remote, ReadingScope curren
   // compiler. Reset bounded members directly; output is caller-owned storage.
   out.days.fill({});
   out.today = out.localToday = out.streak = out.bestStreak = out.target = out.year = out.finished =
-      out.includedThrough = out.recordedPages = out.longestSession = {};
+      out.includedThrough = out.recordedPages = out.longestSession = out.nativeToday = out.accountToday =
+          out.todayPages = out.bestDayPages = {};
   out.daysCoverage = out.streakCoverage = out.goalCoverage = out.finishedCoverage = out.recordsCoverage =
-      out.localTodayCoverage = {};
+      out.localTodayCoverage = out.nativeTodayCoverage = out.accountTodayCoverage = {};
   out.todayMerge = TodayMerge::LocalOnly;
   out.offline = offline;
   out.firstDay = today - Days + 1;
@@ -197,7 +221,10 @@ void ReadingStats::combine(const RemoteReadingStats* remote, ReadingScope curren
       const auto n = published_.firstDay + i - out.firstDay;
       if (n >= 0 && n < Days) out.days[size_t(n)] = published_.days[i];
     }
-    out.today = out.days.back();
+    out.today = out.nativeToday = out.days.back();
+    out.nativeTodayCoverage = published_.coverage;
+    out.todayPages = published_.firstDay + Days - 1 == today ? published_.todayPages : ReadingValue{};
+    out.bestDayPages = published_.bestDayPages;
     out.daysCoverage = out.recordsCoverage = published_.coverage;
     out.recordedPages = published_.recordedPages;
     out.longestSession = published_.longestSession;
@@ -215,7 +242,8 @@ void ReadingStats::combine(const RemoteReadingStats* remote, ReadingScope curren
       const auto n = remote->firstDay + i - out.firstDay;
       if (n >= 0 && n < Days) out.days[size_t(n)] = remote->days[i];
     }
-    out.today = out.days.back();
+    out.today = out.accountToday = out.days.back();
+    out.accountTodayCoverage = account;
     out.daysCoverage = account;
     const bool reconciled =
         localAllowed && published_.firstDay + Days - 1 == today && published_.coverage.scope == current &&

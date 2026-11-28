@@ -18,6 +18,8 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/services/widgets/StatsWorker.cpp
   ${REPO_ROOT}/src/booksync/services/widgets/Year.cpp
   ${REPO_ROOT}/src/booksync/services/widgets/Monthly.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Today.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Pages.cpp
   ${REPO_ROOT}/src/booksync/services/widgets/Week.cpp
   ${REPO_ROOT}/src/booksync/services/widgets/Streak.cpp
   ${REPO_ROOT}/src/booksync/services/ReadingStats.cpp

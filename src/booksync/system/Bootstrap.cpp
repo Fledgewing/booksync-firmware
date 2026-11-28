@@ -31,7 +31,9 @@
 #include "booksync/ui/Home.h"
 #include "booksync/ui/WidgetHost.h"
 #include "booksync/ui/widgets/Monthly.h"
+#include "booksync/ui/widgets/Pages.h"
 #include "booksync/ui/widgets/Streak.h"
+#include "booksync/ui/widgets/Today.h"
 #include "booksync/ui/widgets/Week.h"
 #include "booksync/ui/widgets/Year.h"
 #include "components/UITheme.h"
@@ -189,6 +191,8 @@ class ShellActivity final : public Activity {
     }
   }
   const char* widgetTitle(WidgetKind kind) const {
+    if (kind == WidgetKind::Today) return tr(STR_HOME_STATS_TODAY);
+    if (kind == WidgetKind::Pages) return tr(STR_HOME_STATS_PAGES);
     if (kind == WidgetKind::Year) return tr(STR_HOME_YEAR_IN_READING);
     if (kind == WidgetKind::Monthly) return tr(STR_HOME_MONTHLY_READING);
     if (kind == WidgetKind::Week) return tr(STR_HOME_THIS_WEEK);
@@ -362,7 +366,23 @@ class ShellActivity final : public Activity {
     auto stroke = [&](int x1, int y1, int x2, int y2) {
       renderer.drawLine(left + x1 * edge / 24, top + y1 * edge / 24, left + x2 * edge / 24, top + y2 * edge / 24);
     };
-    if (widgets->page().widgets[index].kind == WidgetKind::Year) {
+    if (widgets->page().widgets[index].kind == WidgetKind::Today) {
+      renderer.drawRoundedRect(left + 2, top + 2, edge - 4, edge - 4, 1, (edge - 4) / 2, true);
+      stroke(12, 6, 12, 12);
+      stroke(12, 12, 16, 15);
+    } else if (widgets->page().widgets[index].kind == WidgetKind::Pages) {
+      stroke(4, 4, 10, 4);
+      stroke(10, 4, 12, 6);
+      stroke(12, 6, 14, 4);
+      stroke(14, 4, 20, 4);
+      stroke(20, 4, 20, 19);
+      stroke(20, 19, 14, 19);
+      stroke(14, 19, 12, 21);
+      stroke(12, 21, 10, 19);
+      stroke(10, 19, 4, 19);
+      stroke(4, 19, 4, 4);
+      stroke(12, 6, 12, 21);
+    } else if (widgets->page().widgets[index].kind == WidgetKind::Year) {
       stroke(3, 5, 21, 5);
       stroke(21, 5, 21, 21);
       stroke(21, 21, 3, 21);
@@ -386,6 +406,76 @@ class ShellActivity final : public Activity {
       stroke(18, 17, 18, 12);
     }
   }
+  static void formatStatsCount(uint64_t value, char (&out)[32]) {
+    char reversed[27];
+    unsigned n = 0, digits = 0;
+    do {
+      if (digits && digits % 3 == 0) reversed[n++] = ',';
+      reversed[n++] = char('0' + value % 10);
+      value /= 10;
+      ++digits;
+    } while (value);
+    for (unsigned i = 0; i < n; ++i) out[i] = reversed[n - i - 1];
+    out[n] = 0;
+  }
+  void paintDailyStats(uint8_t index, const StatsCard& statsValue, int line, int scale) const {
+    const auto r = tileRect(index);
+    const bool todayTile = widgets->page().widgets[index].kind == WidgetKind::Today;
+    widgets::StatsSummary positions;
+    widgets::Today todayRenderer;
+    widgets::Pages pagesRenderer;
+    auto box = widgetBox(index);
+    box.line = line;
+    if (!(todayTile ? todayRenderer.summaryPositions(statsValue, box, positions)
+                    : pagesRenderer.summaryPositions(statsValue, box, positions)))
+      return;
+    char text[64], number[32];
+    if (statsValue.value.known)
+      formatStatsCount(statsValue.value.value, number);
+    else
+      std::snprintf(number, sizeof(number), "?");
+    const int unit = std::min(r.height, 108), numberScale = 256 * unit / 108;
+    const int metadataScale = scale * 5 / 7;
+    const int numberWidth = std::min(r.width * 2 / 3, renderer.getTextWidth(BITTER_14_FONT_ID, number) * unit / 108);
+    paintStatText(BITTER_14_FONT_ID, r.x + 10, r.y + positions.numberY, number, r.width * 2 / 3, numberScale);
+    paintStatText(UI_10_FONT_ID, r.x + 16 + numberWidth, r.y + positions.numberY + 10 * unit / 108,
+                  todayTile ? tr(STR_HOME_STATS_MIN) : tr(STR_HOME_STATS_TODAY_LABEL), r.width - numberWidth - 26,
+                  scale);
+    if (todayTile) {
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + positions.captionY,
+                    statsValue.source == StatsCardSource::Account ? tr(STR_HOME_STATS_ACCOUNT_TIME)
+                                                                  : tr(STR_HOME_STATS_ON_READER),
+                    r.width - 20, metadataScale);
+      const bool native = statsValue.source != StatsCardSource::Account;
+      const auto other = native ? statsValue.account : statsValue.reader;
+      if (other.known)
+        std::snprintf(text, sizeof(text),
+                      native ? tr(STR_HOME_STATS_ACCOUNT_MINUTES_FORMAT) : tr(STR_HOME_STATS_READER_MINUTES_FORMAT),
+                      (unsigned long long)other.value);
+      else
+        std::snprintf(text, sizeof(text), "%s",
+                      native ? tr(STR_HOME_STATS_ACCOUNT_UNKNOWN) : tr(STR_HOME_STATS_READER_UNKNOWN));
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + positions.sourceY, text, r.width - 20, metadataScale);
+    } else {
+      if (statsValue.best.known)
+        formatStatsCount(statsValue.best.value, number);
+      else
+        std::snprintf(number, sizeof(number), "?");
+      const int historyScale = (statsValue.stale ? 160 : 224) * unit / 108;
+      const int historyWidth =
+          std::min(r.width / 2, renderer.getTextWidth(UI_10_FONT_ID, number) * historyScale / 256 + 4);
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + positions.captionY, number, r.width / 2, historyScale);
+      paintStatText(UI_10_FONT_ID, r.x + 14 + historyWidth,
+                    r.y + positions.captionY + (statsValue.stale ? 0 : 4 * unit / 108),
+                    tr(STR_HOME_STATS_SAVED_HISTORY), r.width - historyWidth - 24, metadataScale);
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + positions.sourceY, tr(STR_HOME_STATS_PAGE_VISITS_READER),
+                    r.width - 20, metadataScale);
+    }
+    if (statsValue.stale) {
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_SAVED_AGE_FORMAT), (unsigned long long)statsValue.ageDays);
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + positions.footerY, text, r.width - 20, metadataScale);
+    }
+  }
   void paintStatsWidget(uint8_t index) const {
     const auto r = tileRect(index);
     const auto kind = widgets->page().widgets[index].kind;
@@ -405,7 +495,9 @@ class ShellActivity final : public Activity {
     paintStatsHeaderIcon(index);
     if (view.viewState != WidgetState::Known || !card) {
       const char* message = view.viewState == WidgetState::Empty
-                                ? (kind == WidgetKind::Year      ? tr(STR_HOME_STATS_YEAR_EMPTY)
+                                ? (kind == WidgetKind::Today     ? tr(STR_HOME_STATS_TODAY_EMPTY)
+                                   : kind == WidgetKind::Pages   ? tr(STR_HOME_STATS_PAGES_EMPTY)
+                                   : kind == WidgetKind::Year    ? tr(STR_HOME_STATS_YEAR_EMPTY)
                                    : kind == WidgetKind::Monthly ? tr(STR_HOME_STATS_MONTHLY_EMPTY)
                                    : kind == WidgetKind::Week    ? tr(STR_HOME_STATS_WEEK_EMPTY)
                                                                  : tr(STR_HOME_STATS_STREAK_EMPTY))
@@ -420,6 +512,8 @@ class ShellActivity final : public Activity {
       }
       if (view.viewState == WidgetState::Oversize || view.viewState == WidgetState::Error)
         renderer.drawText(font, r.x + 10, r.y + r.height - line - 6, tr(STR_RETRY));
+    } else if (kind == WidgetKind::Today || kind == WidgetKind::Pages) {
+      paintDailyStats(index, *card, line, smallScale);
     } else if (kind == WidgetKind::Year || kind == WidgetKind::Monthly) {
       paintCalendarStats(index, *card, line);
     } else {

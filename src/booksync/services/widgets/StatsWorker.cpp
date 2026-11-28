@@ -65,6 +65,16 @@ void StatsWorker::publish() {
     statsFreshness(options_, snapshot_.daysCoverage, now > 0 ? uint64_t(now) : 0);
     projectWeek(snapshot_, options_, published_.cards[unsigned(StatsWidget::Week)]);
   }
+  if (published_.requested & statsWidgetBit(StatsWidget::Today)) {
+    statsFreshness(options_,
+                   snapshot_.nativeToday.known ? snapshot_.nativeTodayCoverage : snapshot_.accountTodayCoverage,
+                   now > 0 ? uint64_t(now) : 0);
+    projectToday(snapshot_, options_, published_.cards[unsigned(StatsWidget::Today)]);
+  }
+  if (published_.requested & statsWidgetBit(StatsWidget::Pages)) {
+    statsFreshness(options_, snapshot_.recordsCoverage, now > 0 ? uint64_t(now) : 0);
+    projectPages(snapshot_, options_, published_.cards[unsigned(StatsWidget::Pages)]);
+  }
   if (published_.requested & statsWidgetBit(StatsWidget::Year)) {
     statsFreshness(options_, snapshot_.daysCoverage, now > 0 ? uint64_t(now) : 0);
     projectYear(snapshot_, options_, published_.cards[unsigned(StatsWidget::Year)], published_.year);

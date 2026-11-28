@@ -46,3 +46,6 @@ env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Streak.cpp")
 
 env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Year.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Monthly.cpp")
+
+env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Today.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Pages.cpp")
