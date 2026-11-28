@@ -52,6 +52,13 @@ bool CatalogSurface::pushCatalogLocation() {
   return true;
 }
 void CatalogSurface::requestCatalogPage() {
+  // A new foreground window retires only presentation ownership. Durable jobs
+  // stay with Library; a late completion cannot label or open the new page.
+  autoOpen_ = connecting_ = preparing_ = availabilityUnknown_ = false;
+  selected_ = {};
+  job_ = {};
+  expectedDownload_ = 0;
+  choices_.count = 0;
   pending_ = true;
   queryAccepted_ = false;
   state_ = State::Loading;
@@ -208,8 +215,9 @@ uint8_t CatalogSurface::catalogControls() const {
   if (panel_ == Panel::Dashboard) return 14;  // Shelf headers/books and four compact tiles.
   if (panel_ == Panel::Browse) return catalogBrowseCount();
   if (panel_ == Panel::Groups) return catalogVisibleRows() * 2 + 4;
-  if (panel_ == Panel::Sources && state_ == State::Unsupported) return 0;
-  if (state_ == State::Error || state_ == State::NotSaved || inlineError_ == DownloadError::NoSpace)
+  if (panel_ == Panel::Sources && (state_ == State::Unsupported || state_ == State::Empty)) return 0;
+  if (state_ == State::Error || state_ == State::NotSaved || state_ == State::Empty ||
+      inlineError_ == DownloadError::NoSpace)
     return catalogVisibleRows() + 4;
   return catalogVisibleRows() + (catalogHasMore() ? 3
                                  : current_.offset
@@ -219,6 +227,7 @@ uint8_t CatalogSurface::catalogControls() const {
 bool CatalogSurface::catalogControlEnabled(uint8_t index) const {
   if (index >= catalogControls()) return false;
   if (dialog_ != Dialog::None) return true;
+  if (panel_ == Panel::Sources && index == catalogVisibleRows()) return false;
   if (panel_ == Panel::Dashboard && index > 0 && index < 10 && index != 5) {
     const uint8_t shelf = index > 5 ? 1 : 0;
     const uint8_t item = shelf ? index - 6 : index - 1;
@@ -647,7 +656,7 @@ CommandStatus CatalogSurface::catalogDialogAction(uint8_t action) {
              : library_.cancelDownload(job_.id);
 }
 CommandStatus CatalogSurface::activateCatalog() {
-  if (!catalogLive()) return CommandStatus::Unavailable;
+  if (!catalogLive() || !catalogControlEnabled(focus_)) return CommandStatus::Unavailable;
   if (dialog_ != Dialog::None) return catalogDialogAction(focus_);
   if (panel_ == Panel::Dashboard) {
     if (focus_ == 0 || focus_ == 5) {
@@ -685,6 +694,7 @@ CommandStatus CatalogSurface::activateCatalog() {
     return panel_ == Panel::Groups ? activateCatalogGroupBook(focus_) : activateCatalogRow(focus_);
   if (focus_ == catalogVisibleRows()) return catalogFilter();
   if (panel_ != Panel::Groups && focus_ == catalogVisibleRows() + 3) {
+    if (state_ == State::Empty) return catalogFilter();
     if (inlineError_ == DownloadError::NoSpace) return selectCatalogBook(selected_, QueryTruth::No);
     requestCatalogPage();
     return CommandStatus::Accepted;

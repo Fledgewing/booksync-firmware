@@ -19,7 +19,8 @@ def overlaps(a, b):
     return min(x+w, p+r) > max(x, p) and min(y+h, q+s) > max(y, q)
 
 
-def violations(data, screen=(0, 0, 480, 800)):
+def violations(data, screen=None):
+    screen = screen or data.get("screen", (0, 0, 100, 100))
     errors = []
     if data.get('capacity_exhausted'):
         errors.append('production trace capacity exhausted')
@@ -44,6 +45,8 @@ def check(directory):
     boxes = 0
     for path in paths:
         data = json.loads(path.read_text())
+        if 'screen' not in data:
+            errors.append(path.stem + ': missing renderer framebuffer dimensions')
         boxes += len(data['texts'])
         errors += [path.stem + ': ' + value for value in violations(data)]
     (Path(directory) / 'geometry-result.json').write_text(json.dumps({
@@ -66,6 +69,13 @@ class GuardTests(unittest.TestCase):
         self.assertTrue(violations(dict(texts=[self.value((0, 0, 50, 20), slot=(0, 0, 49, 20))])))
     def test_accepts_touching_edges_and_separate_modal_layer(self):
         self.assertFalse(violations(dict(texts=[self.value((0, 0, 25, 20)), self.value((25, 0, 30, 20)), self.value((0, 0, 25, 20), layer=1)])))
+    def test_rejects_zero_advance_missing_glyphs(self):
+        self.assertTrue(violations(dict(texts=[self.value((20, 10, 0, 20))])))
+    def test_uses_runtime_x3_dimensions(self):
+        value = self.value((480, 760, 20, 19), slot=(0, 0, 528, 792))
+        value['container'] = (3, 9, 522, 780)
+        self.assertFalse(violations(dict(screen=(0, 0, 528, 792), texts=[value])))
+        self.assertTrue(violations(dict(screen=(0, 0, 480, 800), texts=[value])))
     def test_rejects_missing_and_truncated_traces(self):
         self.assertTrue(violations(dict(texts=[])))
         self.assertTrue(violations(dict(texts=[self.value((0, 0, 10, 10))], capacity_exhausted=True)))

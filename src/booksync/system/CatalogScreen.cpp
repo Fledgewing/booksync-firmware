@@ -31,6 +31,7 @@ struct CatalogTextGeometry {
 // Host-only diagnostic storage. It is absent from every device build.
 std::array<CatalogTextGeometry, 256> catalogGeometry{};
 unsigned catalogGeometryCount = 0;
+int catalogGeometryWidth = 0, catalogGeometryHeight = 0;
 uint8_t geometryLayer = 0;
 void recordCatalogText(Rect ink, Rect slot, Rect container, const char* label, uint8_t layer) {
   if (catalogGeometryCount >= catalogGeometry.size()) return;
@@ -112,7 +113,7 @@ class CatalogActivity final : public Activity {
   // Reused paint scratch in the existing fallible Activity allocation (304 B).
   // Keeping it off the C3 render-task stack avoids large nested formatting frames.
   mutable char label_[160]{}, detail_[96]{}, count_[24]{}, total_[24]{};
-  bool ownsLocal_ = false, textOnly_ = true, longConfirmHandled_ = false;
+  bool ownsLocal_ = false, textOnly_ = true, longConfirmHandled_ = false, inputFocus_ = false;
   Rect safe() const { return UITheme::getInstance().getScreenSafeArea(renderer, false, false); }
   int catalogPixels(int value) const {
     const auto bounds = safe();
@@ -148,7 +149,16 @@ class CatalogActivity final : public Activity {
     return advance;
   }
   int headerBottom() const { return catalogRect(0, 54, 0, 0).y; }
-  bool catalogFocused(uint8_t index) const { return !mappedInput.hasTouch() && catalog_->catalogFocus() == index; }
+  bool catalogFocused(uint8_t index) const {
+    if (mappedInput.hasTouch() || catalog_->catalogFocus() != index) return false;
+    const auto panel = catalog_->catalogPanel();
+    return inputFocus_ || catalog_->catalogVisibleRows() || catalog_->catalogDialog() != CatalogSurface::Dialog::None ||
+           panel == CatalogSurface::Panel::Dashboard || panel == CatalogSurface::Panel::Browse;
+  }
+  void paintCatalogFocus(Rect r) const {
+    const int inset = catalogPixels(textOnly_ ? 4 : 5);
+    renderer.drawRect(r.x - inset, r.y - inset, r.width + inset * 2, r.height + inset * 2, textOnly_ ? 2 : 3, true);
+  }
   void text(Rect r, const char* label, int size = 18, bool bold = false, int align = 0) const {
     if (!label || !*label || r.width <= 0 || r.height <= 0) return;
     const auto style = bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
@@ -210,11 +220,12 @@ class CatalogActivity final : public Activity {
   void hit(Rect r, uint8_t index, uint8_t action = 0) const {
     if (hitCount_ < hits_.size()) hits_[hitCount_++] = {r, index, action};
   }
-  void button(Rect r, const char* label, uint8_t index, uint8_t action = 0) const {
-    renderer.drawRect(r.x, r.y, r.width, r.height, catalogFocused(index) && !action ? 3 : 1, true);
+  void button(Rect r, const char* label, uint8_t index, uint8_t action = 0, int size = 16, bool centered = true) const {
+    renderer.drawRect(r.x, r.y, r.width, r.height, 1, true);
+    if (catalogFocused(index) && !action) paintCatalogFocus(r);
     text(Rect{r.x + catalogPixels(12), r.y + catalogPixels(14), r.width - catalogPixels(24),
               r.height - catalogPixels(18)},
-         label, 16, false, 1);
+         label, size, false, centered ? 1 : 0);
     hit(r, index, action);
   }
   void formatCatalogCount(char* value, size_t capacity, uint32_t number, bool commas = false) const {
@@ -360,14 +371,14 @@ class CatalogActivity final : public Activity {
       const uint8_t control = n ? 5 : 0;
       const auto all = catalogRect(307, top + 9, 115, 50);
       hit(all, control);
-      if (catalogFocused(control)) renderer.drawRect(all.x, all.y, all.width, all.height, 2, true);
+      if (catalogFocused(control)) paintCatalogFocus(all);
       if (!span || span->availability != Availability::Ready) {
         text(catalogRect(27, top + 76, 420, 28),
              span ? stateTitle(CatalogSurface::catalogAvailabilityState(span->availability, span->count))
                   : stateTitle(catalog_->catalogState()),
              18);
-        text(catalogRect(27, top + 119, 200, 24), tr(STR_RETRY), 16, true);
-        hit(catalogRect(25, top + 110, 180, 50), control);
+        text(catalogRect(27, top + 112, 200, 24), tr(STR_RETRY), 16, true);
+        hit(catalogRect(25, top + 105, 180, 50), control);
         continue;
       }
       for (uint8_t i = 0; i < span->count && i < 4 && span->first + i < window.count; ++i) {
@@ -395,18 +406,18 @@ class CatalogActivity final : public Activity {
         renderer.drawRect(tile.x, tile.y, tile.width, tile.height);
       else
         renderer.drawRoundedRect(tile.x, tile.y, tile.width, tile.height, 1, catalogPixels(12), true);
-      if (catalogFocused(n + 10)) renderer.drawRect(tile.x - 3, tile.y - 3, tile.width + 6, tile.height + 6, 2, true);
+      if (catalogFocused(n + 10)) paintCatalogFocus(tile);
       text(catalogRect(x + 11, y + 7, 164, 26), I18n::getInstance().get(titles[n]), 20, true);
       icon(tile, n);
       number(catalogRect(x + 11, y + 34, 190, 36), counts[n]);
-      const char* subtitle = tr(STR_HOME_BROWSE);
+      const char* subtitle = n == 0 || n == 3 ? tr(STR_CATALOG_BOOKS_UNIT) : tr(STR_HOME_BROWSE);
       if (!n) {
         std::snprintf(
             label, sizeof(label),
             summary.collections.value == 1 ? tr(STR_CATALOG_COLLECTION_ONE_FORMAT) : tr(STR_CATALOG_COLLECTIONS_FORMAT),
             unsigned(summary.collections.value));
         subtitle = label;
-      } else if (n == 3) {
+      } else if (n == 3 && summary.linked.availability == Availability::Ready && summary.sourceLabel[0]) {
         std::snprintf(label, sizeof(label), tr(STR_CATALOG_SOURCE_FORMAT), unsigned(summary.linked.value),
                       summary.sourceLabel.data());
         subtitle = label;
@@ -455,7 +466,7 @@ class CatalogActivity final : public Activity {
         const auto tile = catalogRect(x, y, 218, 91);
         textContainer_ = tile;
         renderer.drawRoundedRect(tile.x, tile.y, tile.width, tile.height, 1, catalogPixels(8), true);
-        if (catalogFocused(i)) renderer.drawRect(tile.x - 3, tile.y - 3, tile.width + 6, tile.height + 6, 2, true);
+        if (catalogFocused(i)) paintCatalogFocus(tile);
         const auto root = catalog_->catalogBrowseRootAt(i);
         text(catalogRect(x + 13, y + 13, 192, 25), rootTitle(root), 17);
         const auto value = catalog_->catalogRootCount(root);
@@ -464,7 +475,7 @@ class CatalogActivity final : public Activity {
         else
           std::snprintf(numberValue, sizeof(numberValue), "—");
         std::snprintf(label, sizeof(label), "%s ›", numberValue);
-        text(catalogRect(x + 13, y + 50, 192, 23), label, 15);
+        text(catalogRect(x + 13, y + 59, 192, 23), label, 15);
         hit(tile, i);
       }
       textContainer_ = safe();
@@ -473,13 +484,15 @@ class CatalogActivity final : public Activity {
     const bool groups = panel == Panel::Groups, sources = panel == Panel::Sources;
     if (!sources) {
       const auto filter = catalogRect(16, 68, groups ? 75 : 61, 48);
-      renderer.drawRect(filter.x, filter.y, filter.width, filter.height, catalogFocused(count) ? 3 : 1, true);
+      renderer.drawRect(filter.x, filter.y, filter.width, filter.height, 1, true);
+      if (catalogFocused(count)) paintCatalogFocus(filter);
       text(catalogRect(28, 83, groups ? 62 : 45, 22), groups ? tr(STR_CATALOG_FILTER_ACTIVE) : tr(STR_CATALOG_FILTER),
            15);
       hit(filter, count, 5);
       if (groups) {
         const auto chip = catalogRect(101, 68, 122, 48);
-        renderer.drawRect(chip.x, chip.y, chip.width, chip.height, catalogFocused(count * 2 + 3) ? 3 : 1, true);
+        renderer.drawRect(chip.x, chip.y, chip.width, chip.height, 1, true);
+        if (catalogFocused(count * 2 + 3)) paintCatalogFocus(chip);
         text(catalogRect(113, 83, 104, 22),
              catalog_->catalogRoot() == CatalogRoot::Authors ? tr(STR_CATALOG_BY_AUTHOR_REMOVE)
                                                              : tr(STR_CATALOG_BY_SERIES_REMOVE),
@@ -496,6 +509,8 @@ class CatalogActivity final : public Activity {
       std::snprintf(label, sizeof(label), "%s", tr(STR_CATALOG_LIST_ERROR));
     else if (state == State::Unsupported)
       std::snprintf(label, sizeof(label), "%s", tr(STR_CATALOG_UNAVAILABLE_SOURCE));
+    else if (state == State::Loading)
+      std::snprintf(label, sizeof(label), "%s", tr(STR_HOME_LOADING));
     else if (inlineSelection)
       std::snprintf(label, sizeof(label), "%s", catalog_->catalogSelectedBook().title.data());
     else if (completed)
@@ -521,18 +536,20 @@ class CatalogActivity final : public Activity {
       const char* message = state == State::NotSaved      ? tr(STR_CATALOG_LIST_NOT_SAVED)
                             : state == State::Error       ? tr(STR_CATALOG_LIST_ERROR_HELP)
                             : state == State::Unsupported ? tr(STR_CATALOG_LISTS_UNSUPPORTED_HELP)
+                            : sources                     ? tr(STR_CATALOG_NO_LISTS)
                                                           : tr(STR_CATALOG_EMPTY);
-      text(catalogRect(16, sources ? 110 : 190, 448, 60), message, 20);
-      if (state != State::Unsupported)
-        button(catalogRect(16, 270, 120, 50), state == State::Empty ? tr(STR_CATALOG_FILTER) : tr(STR_RETRY),
-               state == State::Empty ? count : count + 3);
+      text(catalogRect(16, sources ? 104 : 176, 448, 60), message, sources ? 18 : 20);
+      if (state != State::Unsupported && !(sources && state == State::Empty))
+        button(catalogRect(16, 237, state == State::Empty ? 66 : 70, 50),
+               state == State::Empty ? tr(STR_CATALOG_FILTER) : tr(STR_RETRY), count + 3, 0, 18, false);
     }
     for (uint8_t i = 0; i < count && (catalog_->catalogDialog() == CatalogSurface::Dialog::None || i < 3); ++i) {
       if (sources) {
         const int y = 106 + i * 72;
         const auto row = catalogRect(16, y, 448, 60);
         textContainer_ = row;
-        renderer.drawRect(row.x, row.y, row.width, row.height, catalogFocused(i) ? 3 : 1, true);
+        renderer.drawRect(row.x, row.y, row.width, row.height, 1, true);
+        if (catalogFocused(i)) paintCatalogFocus(row);
         const auto& source = catalog_->catalogSourcesValue().rows[i];
         text(catalogRect(29, y + 20, 255, 24), source.title.data(), 18);
         if (source.books.availability == Availability::Ready)
@@ -544,7 +561,7 @@ class CatalogActivity final : public Activity {
         continue;
       }
       const auto& entry = catalog_->catalogResult().entries[i];
-      const int y = 160 + i * (groups ? 159 : textOnly_ ? 83 : 91);
+      const int y = 160 + i * (groups ? (textOnly_ ? 154 : 159) : textOnly_ ? 83 : 91);
       if (groups) {
         const auto group = catalogRect(16, y, 448, 146);
         textContainer_ = group;
@@ -567,16 +584,14 @@ class CatalogActivity final : public Activity {
         if (entry.books > 1 && catalog_->catalogResult().membershipComplete) {
           const auto all = catalogRect(308, y, 156, 42);
           hit(all, i, 4);
-          if (catalogFocused(count + 3 + i)) renderer.drawRect(all.x, all.y, all.width, all.height, 2, true);
+          if (catalogFocused(count + 3 + i)) paintCatalogFocus(all);
         }
         if (catalog_->catalogRoot() == CatalogRoot::Series && !entry.missing) hit(catalogRect(16, y, 290, 42), i, 2);
       }
-      const int rowY = y + (groups ? 64 : 0), rowH = groups ? 80 : textOnly_ ? 75 : 83;
+      const int rowY = y + (groups ? 64 : 0), rowH = textOnly_ ? 75 : groups ? 80 : 83;
       const auto row = catalogRect(16, rowY, 448, rowH);
       textContainer_ = row;
-      if (catalogFocused(i))
-        renderer.drawRect(row.x - catalogPixels(3), row.y - catalogPixels(3), row.width + catalogPixels(6),
-                          row.height + catalogPixels(6), textOnly_ ? 2 : 3, true);
+      if (catalogFocused(i)) paintCatalogFocus(row);
       hit(row, i);
       const int inset = textOnly_ ? 4 + (catalogFocused(i) ? 22 : 0) : 59;
       if (!textOnly_) {
@@ -584,7 +599,7 @@ class CatalogActivity final : public Activity {
         paintCatalogCover(cover, entry.book, i, groups ? 1 : unsigned(i + 1));
       } else if (catalogFocused(i))
         text(catalogRect(20, rowY + 25, 16, 25), ">", 19, true);
-      const int titleInset = groups ? 15 : textOnly_ ? 13 : 17;
+      const int titleInset = textOnly_ ? 13 : groups ? 15 : 17;
       text(catalogRect(16 + inset, rowY + titleInset, 448 - inset - 44, 28), entry.book.title.data(), 19, true);
       const bool selected =
           entry.book.key == catalog_->catalogSelectedBook().key && catalog_->catalogSelectedBook().title[0];
@@ -614,7 +629,7 @@ class CatalogActivity final : public Activity {
     }
     textContainer_ = safe();
     if (catalog_->catalogInlineError() == DownloadError::NoSpace)
-      button(catalogRect(16, 650, 110, 50), tr(STR_RETRY), count + 3);
+      button(catalogRect(16, textOnly_ ? 582 : 622, 70, 50), tr(STR_RETRY), count + 3, 0, 18, false);
   }
   void formatCatalogBytes(char* out, size_t capacity, uint64_t value) const {
     if (value >= 1000000)
@@ -684,7 +699,8 @@ class CatalogActivity final : public Activity {
       for (uint8_t i = 0; i < catalog_->catalogChoices().count; ++i) {
         const int y = top + 148 + i * 64;
         const auto action = catalogRect(46, y, 388, 52);
-        renderer.drawRect(action.x, action.y, action.width, action.height, catalogFocused(i) ? 3 : 1, true);
+        renderer.drawRect(action.x, action.y, action.width, action.height, 1, true);
+        if (catalogFocused(i)) paintCatalogFocus(action);
         text(catalogRect(59, y + 16, 255, 24), catalog_->catalogChoices().rows[i].label.data(), 16, true);
         const auto& choice = catalog_->catalogChoices().rows[i];
         if (choice.bytesKnown)
@@ -720,7 +736,9 @@ class CatalogActivity final : public Activity {
     std::snprintf(label, sizeof(label), "%s", tr(STR_CATALOG_SAVED_VIEW));
     if (panel == CatalogSurface::Panel::Dashboard)
       std::snprintf(label, sizeof(label), "‹ %s ›", tr(STR_CATALOG_TITLE));
-    else if (catalog_->catalogDialog() == CatalogSurface::Dialog::None &&
+    else if (catalog_->catalogDialog() == CatalogSurface::Dialog::None && !catalog_->catalogPreparing() &&
+             !catalog_->catalogAvailabilityUnknown() && catalog_->catalogInlineError() == DownloadError::None &&
+             catalog_->catalogTransferValue().state != DownloadState::Complete &&
              (catalog_->catalogHasMore() || catalog_->catalogOffset()) &&
              catalog_->catalogResult().membershipComplete) {
       const auto total =
@@ -823,12 +841,15 @@ class CatalogActivity final : public Activity {
         catalog_->backCatalog();
         update = true;
       } else if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Down))) {
+        inputFocus_ = true;
         catalog_->stepCatalog(1);
         update = true;
       } else if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Up))) {
+        inputFocus_ = true;
         catalog_->stepCatalog(-1);
         update = true;
       } else if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+        inputFocus_ = true;
         catalog_->activateCatalog();
         update = true;
       } else if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
@@ -893,6 +914,8 @@ class CatalogActivity final : public Activity {
     textContainer_ = s;
 #ifdef SIMULATOR
     catalogGeometryCount = 0;
+    catalogGeometryWidth = renderer.getScreenWidth();
+    catalogGeometryHeight = renderer.getScreenHeight();
     geometryLayer = 0;
 #endif
     text(catalogRect(16, 15, 54, 26), tr(STR_BACK), 15);
@@ -927,8 +950,8 @@ uint32_t catalogScenePaints() { return paints; }
 bool writeCatalogGeometry(const char* path) {
   FILE* file = std::fopen(path, "w");
   if (!file) return false;
-  std::fprintf(file, "{\"capacity_exhausted\":%s,\"texts\":[",
-               catalogGeometryCount >= catalogGeometry.size() ? "true" : "false");
+  std::fprintf(file, "{\"screen\":[0,0,%d,%d],\"capacity_exhausted\":%s,\"texts\":[", catalogGeometryWidth,
+               catalogGeometryHeight, catalogGeometryCount >= catalogGeometry.size() ? "true" : "false");
   for (unsigned n = 0; n < catalogGeometryCount; ++n) {
     const auto& value = catalogGeometry[n];
     std::fprintf(file, "%s{\"label\":\"", n ? "," : "");

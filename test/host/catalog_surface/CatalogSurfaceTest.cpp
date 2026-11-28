@@ -669,3 +669,32 @@ TEST(CatalogStateMachine, CompleteSixSourcePublicationStillPagesAllThreeRowWindo
   ASSERT_TRUE(ui.pageCatalog(1));
   EXPECT_EQ(ui.catalogOffset(), 3u);
 }
+
+TEST(CatalogStateMachine, SavedSourceFocusSkipsTheAbsentRefineControl) {
+  catalogFixture::SceneLibrary f;
+  CatalogSurface ui(f);
+  ui.enterCatalog();
+  ui.browseCatalog(CatalogRoot::Lists);
+  ui.pollCatalog();
+  ui.selectCatalogControl(2);
+  ui.stepCatalog(1);
+  EXPECT_EQ(ui.catalogFocus(), ui.catalogVisibleRows() + 2);
+  ASSERT_EQ(ui.activateCatalog(), CommandStatus::Accepted);
+  EXPECT_EQ(ui.catalogOffset(), 3u);
+}
+
+TEST(CatalogStateMachine, PagingRetiresInlinePresentationWithoutCancelingDurableWork) {
+  catalogFixture::SceneLibrary f;
+  f.configureScene(20);
+  CatalogSurface ui(f);
+  ui.enterCatalog();
+  catalogFixture::arrange(ui, f);
+  ASSERT_TRUE(ui.catalogPreparing());
+  ASSERT_TRUE(ui.pageCatalog(1));
+  EXPECT_FALSE(ui.catalogPreparing());
+  EXPECT_EQ(ui.catalogSelectedBook().title[0], 0);
+  EXPECT_EQ(f.cancelCalls, 0u);
+  ui.pollCatalog();
+  EXPECT_EQ(f.connects, 0u);
+  EXPECT_EQ(f.opens, 0u);
+}
