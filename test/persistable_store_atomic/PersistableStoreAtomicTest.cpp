@@ -193,3 +193,27 @@ TEST_F(PersistableStoreAtomicTest, OrphanMustContainOneCompleteStoreDocument) {
   ASSERT_TRUE(PersistableStoreBase::readDocFromFile(STORE_PATH, loaded));
   EXPECT_TRUE(loaded.is<JsonArray>());
 }
+
+TEST_F(PersistableStoreAtomicTest, CurrentOnlyCredentialReadNeverPromotesRetiredBackupOrTemporary) {
+  const std::string backup = std::string(STORE_PATH) + ".bak";
+  const std::string temporary = std::string(STORE_PATH) + ".tmp";
+  Storage.put(backup, R"({"books":[{"path":"/forgotten.epub"}]})");
+  Storage.put(temporary, R"({"books":[{"path":"/uncommitted.epub"}]})");
+  JsonDocument loaded;
+  EXPECT_FALSE(PersistableStoreBase::readCurrentDocFromFile(STORE_PATH, loaded, 8192));
+  EXPECT_FALSE(Storage.exists(STORE_PATH));
+  EXPECT_TRUE(Storage.exists(backup.c_str()));
+  EXPECT_TRUE(Storage.exists(temporary.c_str()));
+  Storage.put(STORE_PATH, "torn");
+  EXPECT_FALSE(PersistableStoreBase::readCurrentDocFromFile(STORE_PATH, loaded, 8192));
+  EXPECT_EQ(Storage.readFile(STORE_PATH), "torn");
+}
+TEST_F(PersistableStoreAtomicTest, CurrentOnlyCredentialReadUsesItsOwnBound) {
+  Storage.put(STORE_PATH, R"({"books":[]})");
+  JsonDocument loaded;
+  EXPECT_TRUE(PersistableStoreBase::readCurrentDocFromFile(STORE_PATH, loaded, 8192));
+  EXPECT_EQ(Storage.lastReadCap, 8192u);
+  std::string large(8193, ' ');
+  Storage.put(STORE_PATH, large);
+  EXPECT_FALSE(PersistableStoreBase::readCurrentDocFromFile(STORE_PATH, loaded, 8192));
+}

@@ -325,7 +325,7 @@ ImportResult Credentials::stage(CredentialFamily family, const char* source, sto
   put32(header + 12, crc(work_->raw, work_->bytes));
   storage::FilePublish writer(paths, validateSnapshot, this);
   if (!writer.begin(HeaderBytes + work_->bytes) || !writer.write(header, sizeof(header)) ||
-      !writer.write(work_->raw, work_->bytes) || !writer.finish())
+      !writer.write(work_->raw, work_->bytes) || !writer.finishNew())
     return importFailure(ImportResult::IoError);
   return ImportResult::Imported;
 }
@@ -371,6 +371,52 @@ ImportResult Credentials::restore(CredentialFamily family, storage::PublishPaths
   }
   const auto error = account.restoreLogin(work_->capture, account.snapshot().ticket, authorization);
   return error == AuthError::None ? ImportResult::Restored : importFailure(ImportResult::Unresolved);
+}
+bool Credentials::proof(CredentialFamily family, storage::PublishPaths paths, uint32_t& value) {
+  if (!work_) return false;
+  family_ = family;
+  const bool valid = loadSnapshot(paths);
+  if (valid) value = crc(work_->raw, work_->bytes) ^ (static_cast<uint32_t>(family) << 28);
+  work_->clear();
+  return valid;
+}
+size_t Credentials::loginCount(storage::PublishPaths paths) {
+  if (!work_) return 0;
+  family_ = CredentialFamily::Acquisition;
+  const size_t count = loadSnapshot(paths) ? work_->doc["servers"].size() : 0;
+  work_->clear();
+  return count;
+}
+bool Credentials::activateWifi(storage::PublishPaths paths) {
+  if (!work_) return false;
+  family_ = CredentialFamily::Wifi;
+  constexpr storage::PublishPaths active{"/.booksync/wifi.json", "/.booksync/wifi.json.tmp",
+                                         "/.booksync/wifi.json.bak"};
+  auto validate = [](FsFile& file, void* context) {
+    auto& importer = *static_cast<Credentials*>(context);
+    auto& w = *importer.work_;
+#if SIZE_MAX < UINT64_MAX
+    const auto bytes = file.fileSize64();
+#else
+    const auto bytes = file.fileSize();
+#endif
+    if (!bytes || bytes > MaxBytes) return false;
+    w.bytes = static_cast<size_t>(bytes);
+    return file.read(w.raw, w.bytes) == static_cast<int>(w.bytes) && importer.parse();
+  };
+  const auto selected = storage::FilePublish::select(active, validate, this);
+  if (selected != storage::PublishedFile::Missing) {
+    work_->clear();
+    return selected == storage::PublishedFile::Current;
+  }
+  if (!loadSnapshot(paths)) {
+    work_->clear();
+    return false;
+  }
+  storage::FilePublish writer(active, validate, this);
+  const bool ok = writer.begin(work_->bytes) && writer.write(work_->raw, work_->bytes) && writer.finishNew();
+  work_->clear();
+  return ok;
 }
 ImportResult Credentials::restoreWifi(storage::PublishPaths paths, WifiTarget& target) {
   if (!work_) return importFailure(ImportResult::IoError);

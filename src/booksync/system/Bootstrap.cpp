@@ -6,9 +6,17 @@
 #include <Memory.h>
 #include <ScalableBuiltins.h>
 
+#include <atomic>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #include "CrossPointState.h"
+#include "booksync/import/Activation.h"
+#include "booksync/services/ServerAdapter.h"
+#ifndef SIMULATOR
+#include <esp_mac.h>
+#endif
 #include "NetworkPhase.h"
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
@@ -25,6 +33,16 @@ namespace {
 #ifdef SIMULATOR
 uint32_t scenePaints = 0;  // Read only while holding RenderLock in the scenario harness.
 #endif
+legacy::Activation upgrade;
+// Independent connector scopes: two sync logins and up to eight acquisition
+// accounts. No secrets or network clients are retained in these small values.
+Account syncAccount(defaultServerAdapter()), nativeAccount(defaultServerAdapter());
+Account acquisitionAccounts[8] = {Account(defaultServerAdapter()), Account(defaultServerAdapter()),
+                                  Account(defaultServerAdapter()), Account(defaultServerAdapter()),
+                                  Account(defaultServerAdapter()), Account(defaultServerAdapter()),
+                                  Account(defaultServerAdapter()), Account(defaultServerAdapter())};
+std::atomic<bool> identityAdmitted{false}, upgradeAdmitted{false};
+bool noticePending = false, recoveryRequired = false, priorReaderState = false;
 class ShellActivity final : public Activity {
   Library& library;
   Home home;
@@ -565,6 +583,78 @@ class ShellActivity final : public Activity {
   }
 };
 }  // namespace
+void prepareUpgradeDetection() { priorReaderState = legacy::Activation::readerStatePresent(); }
+void initializeUpgrade() {
+  uint8_t hardwareKey[6]{};
+#ifdef SIMULATOR
+  hardwareKey[0] = 2;
+  hardwareKey[5] = 1;  // Public synthetic fixture identity only.
+  import::IdentityAudit identity;
+  identity.status = import::IdentityStatus::Absent;
+  if (std::getenv("BOOKSYNC_ACTIVATION_IDENTITY")) {
+    identity.status = import::IdentityStatus::RetainedInPlace;
+    identity.identityBlobs = 6;
+    identity.joined = true;
+    identity.fingerprint.fill(7);
+    if (std::strcmp(std::getenv("BOOKSYNC_ACTIVATION_IDENTITY"), "changed") == 0) identity.fingerprint[0] ^= 1;
+    if (std::strcmp(std::getenv("BOOKSYNC_ACTIVATION_IDENTITY"), "unreadable") == 0)
+      identity.status = import::IdentityStatus::ReadError;
+  }
+#else
+  if (esp_efuse_mac_get_default(hardwareKey) != ESP_OK) {
+    LOG_ERR("BSA", "Hardware credential key unavailable; no import attempted");
+    recoveryRequired = true;
+    publishUpgradeState(false, true, dismissUpgradeNotice);
+    return;
+  }
+  const auto identity = import::auditIdentity();
+#endif
+  // One reusable fallible <=20 KiB workspace only during boot, before Home or
+  // reader allocations. Its destructor erases decoded credentials and the key.
+  legacy::Credentials credentials(hardwareKey);
+  eraseSecret(hardwareKey, sizeof(hardwareKey));
+  bool restoreUnresolved = false;
+  if (upgrade.boot(credentials, identity, priorReaderState) == legacy::ActivationResult::Active) {
+    auto restore = [&](legacy::CredentialFamily family, Account& account, size_t index = 0) {
+      if (upgrade.hasLogin(family, index) &&
+          upgrade.restore(credentials, family, account, index) != legacy::ImportResult::Restored)
+        restoreUnresolved = true;
+    };
+    restore(legacy::CredentialFamily::LibrarySync, syncAccount);
+    restore(legacy::CredentialFamily::NativeSync, nativeAccount);
+    for (size_t i = 0; i < upgrade.acquisitionCount(); ++i)
+      restore(legacy::CredentialFamily::Acquisition, acquisitionAccounts[i], i);
+  }
+  upgradeAdmitted.store(upgrade.ready(), std::memory_order_release);
+  identityAdmitted.store(upgrade.identityReady(), std::memory_order_release);
+  noticePending = upgrade.noticePending();
+  recoveryRequired = upgrade.recoveryRequired() || restoreUnresolved;
+  publishUpgradeState(noticePending, recoveryRequired, dismissUpgradeNotice);
+}
+AccountSnapshot retainedLoginSnapshot(unsigned scope) {
+  if (scope == 0) return syncAccount.snapshot();
+  if (scope == 1) return nativeAccount.snapshot();
+  return scope < 10 ? acquisitionAccounts[scope - 2].snapshot() : AccountSnapshot{};
+}
+AuthError removeRetainedLogin(unsigned scope) {
+  if (scope >= 10) return AuthError::Invalid;
+  auto& account = scope == 0 ? syncAccount : scope == 1 ? nativeAccount : acquisitionAccounts[scope - 2];
+  const auto family = scope == 0   ? legacy::CredentialFamily::LibrarySync
+                      : scope == 1 ? legacy::CredentialFamily::NativeSync
+                                   : legacy::CredentialFamily::Acquisition;
+  if (!upgrade.remove(family, scope < 2 ? 0 : scope - 2)) return AuthError::Unavailable;
+  return account.removeLogin(scope < 2 ? LoginKind::Sync : LoginKind::Acquisition, account.snapshot().ticket);
+}
+bool retainedUpgradeReady() { return upgradeAdmitted.load(std::memory_order_acquire); }
+bool retainedIdentityReady() { return identityAdmitted.load(std::memory_order_acquire); }
+bool upgradeNoticePending() { return noticePending; }
+bool upgradeRecoveryRequired() { return recoveryRequired; }
+bool dismissUpgradeNotice() {
+  const bool committed = upgrade.dismissNotice();
+  noticePending = noticePending && upgrade.noticePending();
+  publishUpgradeState(noticePending, recoveryRequired, dismissUpgradeNotice);
+  return committed;
+}
 Library& homeLibrary() { return offlineLibrary(); }
 void showHome(GfxRenderer& renderer, MappedInputManager& input, HalDisplay::RefreshMode refresh) {
   // Activity lifetime must outlive this call and is owned by ActivityManager.

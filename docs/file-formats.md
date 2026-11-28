@@ -2637,3 +2637,53 @@ u64 at 24; nested F18a byte count u32 at 32. The complete unmodified `BSM1`
 checkpoint follows at 36. A partial batch leaves the F07 Stats attempt set;
 only final Stats acknowledgment advances the phase. Unknown versions remain
 pending. Native/EPUB cache formats and partition maps do not change.
+
+
+## BookSync retained upgrade activation (BSA1 / BSR1 / BSL1)
+
+F29 activates only credential/Wi-Fi snapshots and in-place Tailnet identity.
+All files below `/.booksync/import/` are private and excluded from diagnostics
+and external file/plugin access. Integers are little-endian. No reader/cache
+layout changes and no legacy source deletion follow from activation.
+
+The immutable 64-byte `activation` record contains: `BSA1` at 0; upgrade-notice
+eligibility (0/1) at 4; activated-family bitmask at 5; unresolved-family bitmask
+at 6; F26c IdentityStatus at 7; the private 32-byte identity fingerprint at 8;
+four u32 snapshot proofs at 40 (CRC32 of exact JSON bytes XOR family shifted 28);
+acquisition scope count (0–8) at 56; three zero reserved bytes at 57; and FNV-1a/u32
+over bytes 0–59 at 60. Family order is library sync, native sync, acquisition,
+Wi-Fi, matching BSI1. Checksums detect corruption; they are not authentication
+or canonical book/account identities. Complete snapshots must validate and match
+before boot admits their local restoration.
+
+Permanent `removed-0`/`removed-1` markers retire the independent sync scopes;
+`removed-2` through `removed-9` retire acquisition indexes 0–7. `notice-done`
+marks upgrade-notice dismissal. Each is eight bytes: `BSR1` then FNV-1a/u32 over
+those four magic bytes. They are immutable, scoped by their filename, and never
+reused as a new login. Any existing current/staging/backup marker conservatively
+denies import restoration or notice presentation, even if unreadable. Only a
+fully published marker plus a durable Retired BSL1 current record acknowledge
+successful removal/dismissal.
+
+FilePublish uses `.tmp`/`.bak` siblings and volume/directory barriers. Incomplete
+activation staging is never authority. Unknown/corrupt complete activation/proofs
+remain in place and block automatic cutover. Once activated, ordinary boots never
+read legacy sources. The separately mutable owned `/.booksync/wifi.json` retains
+the native JSON shape; its credential loader reads only the current file with an
+8 KiB bound and never recovers forgotten credentials from old backups or imports.
+
+Each activated connector also has a current-only `state-<scope>` lifetime record.
+`state-10` is reserved for the upgrade notice. A BSL1 record is twelve bytes:
+magic `BSL1` at 0, scope/u8 at 4, state/u8 at 5 (0 Retired, 1 Live), zero reserved
+bytes at 6–7, and FNV-1a/u32 over bytes 0–7 at 8. Scope must match the requested
+filename. Missing, unknown, torn or unreadable current state never falls back to
+an older Live backup. Initial Live records commit before BSA1 and cannot replace
+existing current/backup authority. Removal/dismissal acknowledges only after both
+the permanent marker and the Retired current state are durable. Marker loss
+therefore cannot revive closed state. Recovery tools must preserve these files;
+a new explicit login is separate from reopening an imported slot.
+
+A complete validated BSR1 removal/dismissal receipt can resume a missing/torn
+current BSL1 record only by publishing Retired. It never authorizes Live, and
+an uncommitted staging receipt is never selected as data. Read-only/full-card
+failure keeps that scope unavailable and preserves every original/backup.

@@ -96,6 +96,7 @@ inline esp_sleep_wakeup_cause_t esp_sleep_get_wakeup_cause() { return ESP_SLEEP_
 #include "AppVersion.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "booksync/system/Bootstrap.h"
 #include "DeviceCapabilities.h"
 #include "FilenameFontSystem.h"
 #include "GlobalActions.h"
@@ -1576,7 +1577,12 @@ void setup() {
     activityManager.goToFullScreenMessage(StrId::STR_SD_START_ERROR, description);
     return;
   }
+  booksync::prepareUpgradeDetection();
   if (!FilePublication::recoverAtBoot()) LOG_ERR("MAIN", "Interrupted SD transfer needs recovery");
+  booksync::initializeUpgrade();
+#ifdef SIMULATOR
+  runSimulatorUpgradeBootScenario();
+#endif
   logBootHeap("storage ready");
   display.startBegin();
 

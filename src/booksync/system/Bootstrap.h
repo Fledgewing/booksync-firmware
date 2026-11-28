@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Upgrade.h"
 #include "activities/ActivityManager.h"
 #include "booksync/interface/Library.h"
 

@@ -45,3 +45,8 @@ Hardware acceptance is maintainer-only: on X4 Pro, X4 Classic and C3, upgrade a
 paired reader, reconnect without re-pairing, verify route choice and private-name
 lookup, then open/read/close a book through Wi-Fi loss/reconnect. Pairing identity
 must remain unchanged and reading must never park, navigate or restart. C3 admission must retain its prepainted panel until teardown and framebuffer restoration complete. No EPUB cache reset is needed.
+
+F29 additionally gates identity admission and replaces implicit key generation with
+hash-checked, read-only reuse in the build input. The pinned source is unchanged.
+Arduino NVS initialization cannot authorize a format; absent or unresolved identity
+stays unavailable. See `docs/booksync/F29.md` for recovery and cut coverage.

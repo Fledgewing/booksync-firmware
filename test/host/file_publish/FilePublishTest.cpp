@@ -187,3 +187,21 @@ TEST(FilePublish, CutsEveryPayloadByteWithinEachWrite) {
     }
   }
 }
+TEST(FilePublish, InitialAuthorityCannotReplaceCurrentOrBackup) {
+  for (bool backupOnly : {false, true}) {
+    seed(backupOnly);
+    const auto previous = card.files;
+    FilePublish writer(paths, valid);
+    ASSERT_TRUE(writer.begin(12));
+    ASSERT_TRUE(writer.write(newBytes, 12));
+    EXPECT_FALSE(writer.finishNew());
+    EXPECT_EQ(card.files.at(paths.current), previous.at(paths.current));
+    EXPECT_EQ(card.files.at(paths.backup), previous.at(paths.backup));
+  }
+}
+TEST(FilePublish, CurrentAuthorityCannotFallBackToCompleteBackup) {
+  seed(true);
+  EXPECT_FALSE(FilePublish::validateCurrent(paths, valid));
+  EXPECT_EQ(FilePublish::select(paths, valid), PublishedFile::Backup);
+  EXPECT_EQ(card.files.at(paths.current), "torn");
+}

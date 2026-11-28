@@ -112,11 +112,12 @@ bool canProceedAfterOrphanRecovery(const OrphanTemporaryStatus status) {
 }
 }  // namespace
 
-bool PersistableStoreBase::readDocFromFile(const char* path, JsonDocument& doc) {
+namespace {
+bool readDocument(const char* path, JsonDocument& doc, bool recover, size_t maxBytes) {
   const std::string temporaryPath = std::string(path) + ".tmp";
   std::string recoveryPath;
   const char* readPath = path;
-  if (!Storage.exists(path)) {
+  if (recover && !Storage.exists(path)) {
     recoveryPath = std::string(path) + ".bak";
     if (Storage.exists(recoveryPath.c_str())) {
       if (Storage.rename(recoveryPath.c_str(), path)) {
@@ -139,9 +140,8 @@ bool PersistableStoreBase::readDocFromFile(const char* path, JsonDocument& doc) 
   // instead of parsing a truncated prefix. The HAL sizes once and reads in bulk,
   // avoiding one String append and SD call per byte. This cold-path buffer is
   // bounded; a stack buffer of this size is unsafe on device tasks.
-  constexpr size_t MAX_STORE_BYTES = 50000;
   std::string json;
-  if (!Storage.readFileToString("PERSIST", readPath, MAX_STORE_BYTES, json) || json.empty()) {
+  if (!Storage.readFileToString("PERSIST", readPath, maxBytes, json) || json.empty()) {
     LOG_ERR("PERSIST", "Failed to read %s (empty or incomplete)", path);
     return false;
   }
@@ -151,6 +151,13 @@ bool PersistableStoreBase::readDocFromFile(const char* path, JsonDocument& doc) 
     return false;
   }
   return true;
+}
+}  // namespace
+bool PersistableStoreBase::readDocFromFile(const char* path, JsonDocument& doc) {
+  return readDocument(path, doc, true, 50000);
+}
+bool PersistableStoreBase::readCurrentDocFromFile(const char* path, JsonDocument& doc, size_t maxBytes) {
+  return readDocument(path, doc, false, maxBytes);
 }
 
 bool PersistableStoreBase::hasStoreFile(const char* path) {

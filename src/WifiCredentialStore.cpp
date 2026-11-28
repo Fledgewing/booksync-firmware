@@ -9,6 +9,8 @@
 #include <cstring>
 #include <utility>
 
+#include "booksync/system/Upgrade.h"
+
 namespace {
 constexpr uint8_t WIFI_FILE_VERSION = 2;
 constexpr char WIFI_FILE_BIN[] = "/.crosspoint/wifi.bin";
@@ -92,6 +94,10 @@ bool WifiCredentialStore::fromJson(JsonVariantConst doc) {
 }
 
 bool WifiCredentialStore::loadFromFile() {
+  if (!booksync::retainedUpgradeReady()) {
+    LOG_ERR("WCS", "Owned Wi-Fi activation unavailable; no legacy fallback");
+    return false;
+  }
   LOG_INF("WCS", "load start");
   {
     std::lock_guard<std::mutex> lock(credentialMutex);
@@ -99,29 +105,24 @@ bool WifiCredentialStore::loadFromFile() {
     lastConnectedSsid.clear();
   }
 
-  if (PersistableStore<WifiCredentialStore>::loadFromFile()) {
-    LOG_INF("WCS", "load JSON complete");
-    return true;
+  {
+    std::lock_guard<std::mutex> lock(storeMutex);
+    JsonDocument doc;
+    // The immutable F29 snapshot is not a current Wi-Fi store. A lost current
+    // file must never recover forgotten networks from a backup or legacy source.
+    if (readCurrentDocFromFile(getFilePath(), doc, 8192) && fromJson(doc.as<JsonVariantConst>())) {
+      resaveRequested = false;
+      LOG_INF("WCS", "load JSON complete");
+      return true;
+    }
   }
   if (hasStoreFile(getFilePath())) {
     LOG_INF("WCS", "load JSON present but unreadable");
     return false;
   }
 
-  if (Storage.exists(WIFI_FILE_BIN)) {
-    LOG_INF("WCS", "load legacy migration attempted");
-    if (!loadFromBinaryFile()) {
-      LOG_INF("WCS", "load legacy migration failed: read");
-      return false;
-    }
-    if (saveToFile()) {
-      Storage.rename(WIFI_FILE_BIN, WIFI_FILE_BAK);
-      LOG_INF("WCS", "load legacy migration complete");
-      return true;
-    }
-    LOG_INF("WCS", "load legacy migration failed: save");
-    return false;
-  }
+  // F29 owns retained import. Never migrate, rename or repair a legacy source
+  // from a runtime loader; a missing owned store stays unavailable.
 
   LOG_INF("WCS", "load no store");
   return false;

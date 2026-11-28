@@ -3,9 +3,29 @@
 
 namespace booksync {
 namespace {
-class OfflineAuthTransport final : public server::AuthTransport {
+class RetainedAuthTransport final : public server::AuthTransport {
  public:
-  AuthCapabilities capabilities() const override { return {}; }
+  uint32_t nextOwner = 1;
+  AuthCapabilities capabilities() const override { return {false, true, true, true}; }
+  // Only local, validated captures enter this seam. Durable source activation
+  // and retirement remain with the worker; do not create a web-account session
+  // or make an authentication request while restoring an independent login.
+  server::AuthReply restoreLogin(LoginKind kind, std::string_view origin, std::string_view user,
+                                 std::string_view secret, bool derived) override {
+    if (kind == LoginKind::Account || origin.empty() || user.empty() || secret.empty() || !nextOwner ||
+        (kind == LoginKind::Sync && (!derived || secret.size() != 32)))
+      return {};
+    return {200, false, nextOwner++};
+  }
+  server::AuthReply restoreAuthorizedLogin(LoginKind kind, std::string_view origin, std::string_view user,
+                                           std::string_view secret, bool derived, std::string_view identity,
+                                           std::string_view authorization) override {
+    if (identity.empty() || authorization.empty()) return {};
+    return restoreLogin(kind, origin, user, secret, derived);
+  }
+  AuthError removeLogin(LoginKind kind) override {
+    return kind == LoginKind::Account ? AuthError::Invalid : AuthError::None;
+  }
   server::AuthReply authenticate(LoginKind, std::string_view, std::string_view, std::string_view, bool) override {
     return {};
   }
@@ -13,7 +33,7 @@ class OfflineAuthTransport final : public server::AuthTransport {
   void clearAuth() override {}
 };
 class OfflineAdapter final : public ServerAdapter {
-  OfflineAuthTransport transport;
+  RetainedAuthTransport transport;
   server::Auth auth{transport};
 
  public:

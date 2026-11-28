@@ -65,6 +65,9 @@ class PersistableStoreBase {
   // Reads path and parses it into doc. Returns false silently when the file
   // does not exist (expected on first boot); logs on read/parse failure.
   static bool readDocFromFile(const char* path, JsonDocument& doc);
+  // Credential stores may require monotonic removal: never promote a backup or
+  // temporary after losing the current file. Missing/damaged data stays offline.
+  static bool readCurrentDocFromFile(const char* path, JsonDocument& doc, size_t maxBytes);
 };
 
 /**
