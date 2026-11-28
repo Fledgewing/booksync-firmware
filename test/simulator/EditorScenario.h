@@ -87,6 +87,22 @@ inline void capture(const char* directory, const char* name) {
     for (int x = 0; x < renderer.getScreenWidth(); ++x) std::fputc(renderer.isPixelBlack(x, y) ? 0 : 255, file);
   std::fclose(file);
 }
+// Home now exposes the bounded Settings menu. Select its real Home widgets
+// row before exercising the retained editor against the originating Library.
+inline void enterSettingsEditor(unsigned frame, bool textOnly) {
+  if (frame != 12 || textOnly) return;
+  if (!activityManager.isCurrentActivityNamed("Settings")) std::_Exit(50);
+#if CROSSINK_APP_CAP_TOUCH
+  if (mappedInputManager.hasTouch()) {
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const int y = header.y + header.height + renderer.getLineHeight(UI_10_FONT_ID) + 48;
+    mappedInputManager.simulatorInjectTouchDown(safe.x + 50, y);
+    mappedInputManager.simulatorInjectTouchRelease(safe.x + 50, y);
+  } else
+#endif
+    mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
+}
 inline bool geometryTick() {
   const char* directory = std::getenv("BOOKSYNC_GEOMETRY_CAPTURES");
   if (!directory) return false;
@@ -94,6 +110,7 @@ inline bool geometryTick() {
   static Fixture fixture;
   static unsigned frame = 0;
   const auto f = frame++;
+  enterSettingsEditor(f, fixture.page.textOnly);
   if (f == 0) {
     fixture.store.load();
     if (!fixture.store.project(0, fixture.page)) std::_Exit(30);
@@ -218,6 +235,7 @@ inline bool pagesTick() {
   static Fixture fixture;
   static unsigned frame = 0;
   const auto f = frame++;
+  enterSettingsEditor(f, fixture.page.textOnly);
   if (f == 0) {
     fixture.store.load();
     if (!fixture.store.project(0, fixture.page)) std::_Exit(40);
@@ -361,6 +379,7 @@ inline bool tick() {
   static Fixture fixture;
   static unsigned frame = 0, idlePaints = 0;
   const auto f = frame++;
+  enterSettingsEditor(f, fixture.page.textOnly);
   if (f == 0) {
     fixture.store.load();
     if (!fixture.store.project(0, fixture.page)) std::_Exit(14);

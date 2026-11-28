@@ -137,6 +137,20 @@ inline bool tick() {
   if (scene == 11 && !fixture.page.textOnly) {
     if (frame == 10)
       mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Right));
+    if (frame == 12) {
+      // Select the real Settings -> Home widgets row before the retained Add flow.
+      if (!activityManager.isCurrentActivityNamed("Settings")) std::_Exit(9);
+#if CROSSINK_APP_CAP_TOUCH
+      if (mappedInputManager.hasTouch()) {
+        const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+        const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+        const int y = header.y + header.height + renderer.getLineHeight(UI_10_FONT_ID) + 48;
+        mappedInputManager.simulatorInjectTouchDown(safe.x + 50, y);
+        mappedInputManager.simulatorInjectTouchRelease(safe.x + 50, y);
+      } else
+#endif
+        mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
+    }
     if (frame == 14 || frame == 16)
       mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Down));
     if (frame >= 22 && frame < 22 + 2 * uint8_t(WidgetKind::Records) && frame % 2 == 0) {

@@ -109,3 +109,8 @@ The native bounded sleep drain pauses reminder activity before reader capture an
 network teardown. Expiry, a fresh Power cancellation and a returning simulator
 sleep restore visibility according to Quick Lock; they never resume an obsolete
 sheet. F42 capture-before-drain and its ownership deadline remain authoritative.
+
+The approved profiles expose Settings → Reminders from BookSync's bounded Home
+Settings entry, alongside the retained Home widgets editor. The native Pro
+recovery Settings registry also has a Reminders entry. Button profiles do not
+root that full native registry; the existing linked-symbol guard remains intact.

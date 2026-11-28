@@ -65,8 +65,8 @@ def main():
     reminder_frames = []
     for area, name in (('services', 'Reminders'), ('services', 'RemindersFacade'),
                        ('storage', 'RemindersStore'), ('system', 'RemindersRuntime'),
-                       ('services', 'RemindersFormat'), ('system', 'ReminderPresenter'),
-                       ('ui/reminders', 'DueSheet')):
+                       ('services', 'RemindersFormat'), ('system', 'ReminderPresenter'), ('system', 'ReminderText'),
+                       ('system', 'ReminderSettingsScreen'), ('ui/reminders', 'Settings'), ('ui/reminders', 'DueSheet')):
         paths = list((build / 'src/booksync' / area).glob(name + '*.su'))
         if not paths:
             raise SystemExit(f'missing reminder stack evidence: {name}')

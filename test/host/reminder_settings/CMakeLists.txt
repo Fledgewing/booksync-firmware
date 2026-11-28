@@ -1,0 +1,4 @@
+add_executable(BookSyncReminderSettingsTest ReminderSettingsTest.cpp ${REPO_ROOT}/src/booksync/ui/reminders/Settings.cpp)
+target_include_directories(BookSyncReminderSettingsTest PRIVATE ${REPO_ROOT}/src)
+target_link_libraries(BookSyncReminderSettingsTest PRIVATE crosspoint_test_common GTest::gtest_main)
+gtest_discover_tests(BookSyncReminderSettingsTest)

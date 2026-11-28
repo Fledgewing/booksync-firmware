@@ -1,4 +1,5 @@
 #pragma once
+#include <AppCapabilities.h>
 #include <FreeInkApp.h>
 #include <FreeInkUIGfxRenderer.h>
 #include <I18n.h>
@@ -316,7 +317,8 @@ class SettingsActivity final : public Activity {
   MenuNavigationNote menuNavigationNote;
 
   static constexpr int categoryCount = 4;
-  static const StrId categoryNames[categoryCount];
+  static constexpr int categoryMenuCount = categoryCount + CROSSINK_APP_CAP_REMINDERS;
+  static const StrId categoryNames[categoryMenuCount];
 
   // FreeInkApp hosts the tab bar + settings list (themed, touch-routed); the
   // header stays on GUI.drawHeader for the battery, OptionPopup stays legacy.
@@ -370,6 +372,7 @@ class SettingsActivity final : public Activity {
                             bool returnToParentOnClose = false, View view = View::Root);
   bool allowGlobalHomeSwipeGesture() const override { return !dismissOnUpSwipe && !optionPopup.isActive(); }
   bool handleHomeGesture() override;
+  bool allowsReminderOverlay() const override { return !optionPopup.isActive(); }
   // Opens System > Device with the Download Languages popup once the activity enters.
   void openLanguageDownloadsOnEnter() { openLanguageDownloadsPending = true; }
   void enableTouchscreenRecovery() { touchscreenRecovery = true; }
@@ -377,6 +380,7 @@ class SettingsActivity final : public Activity {
   void simulatorOpenFrontButtons();
   int simulatorCategoryIndex() const { return selectedCategoryIndex; }
   int simulatorSelectedIndex() const { return selectedSettingIndex; }
+
   bool simulatorOptionPopupActive() const { return optionPopup.isActive(); }
 #if CROSSINK_SCALABLE_FONTS
   const std::vector<FilenameFontSystem::Family>& simulatorFilenameFontNames() const { return filenameFontNames; }

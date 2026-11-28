@@ -28,6 +28,7 @@
 #include <WiFi.h>
 #endif
 #include "ReadingGate.h"
+#include "ReminderSettingsScreen.h"
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
 #include "booksync/services/LocalLibrary.h"
@@ -82,36 +83,86 @@ void publishRetainedAccountView() {
 }
 std::atomic<bool> identityAdmitted{false}, upgradeAdmitted{false};
 bool noticePending = false, recoveryRequired = false, priorReaderState = false;
-#if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
-// The approved X3 Settings entry owns only the available Home widgets action.
+#if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS || CROSSINK_APP_CAP_REMINDERS
+// The bounded BookSync Settings entry owns only approved available actions.
 // Do not route through the retired native Settings registry/action graph.
+class HomeSettingsActivity;
+#ifdef SIMULATOR
+HomeSettingsActivity* homeSettingsScene = nullptr;
+#endif
 class HomeSettingsActivity final : public Activity {
+  uint8_t focus = 0;
+  const bool returnEditor;
+  void leaveSettings() {
+    if (returnEditor) finish();
+    else activityManager.goHome();
+  }
  public:
-  HomeSettingsActivity(GfxRenderer& renderer, MappedInputManager& input) : Activity("Settings", renderer, input) {}
+  HomeSettingsActivity(GfxRenderer& renderer, MappedInputManager& input, bool returnEditor = false)
+      : Activity("Settings", renderer, input), returnEditor(returnEditor) {}
+  void selectRemindersEntry() { showReminderSettings(renderer, mappedInput); }
   void onEnter() override {
     Activity::onEnter();
+#ifdef SIMULATOR
+    homeSettingsScene = this;
+#endif
     requestUpdate();
+  }
+  void onExit() override {
+#ifdef SIMULATOR
+    if (homeSettingsScene == this) homeSettingsScene = nullptr;
+#endif
+    Activity::onExit();
   }
   void loop() override {
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-      activityManager.goHome();
-    } else if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-      auto editor = createHomeEditor(renderer, mappedInput);
-      if (editor) startActivityForResult(std::move(editor), [](const ActivityResult&) {});
+      leaveSettings();
+    } else {
+      if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Down)) ||
+          mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Up))) { focus ^= 1; requestUpdate(); }
+      int x = 0, y = 0;
+      bool activate = mappedInput.wasReleased(MappedInputManager::Button::Confirm);
+      if (mappedInput.wasScreenTapped(x, y)) {
+        const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+        const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+        const int top = header.y + header.height + renderer.getLineHeight(UI_10_FONT_ID) + 32;
+        if (x < safe.x + 100 && y < safe.y + 40) { leaveSettings(); return; }
+        if (x >= safe.x + 24 && x < safe.x + safe.width - 24 && y >= top && y < top + 112) {
+          focus = (y - top) / 56; activate = true;
+        }
+      }
+      if (activate) {
+        if (focus == 1) selectRemindersEntry();
+        else if (returnEditor) {
+          setResult(OptionSelectionResult{0});
+          finish();
+        } else {
+          auto editor = createHomeEditor(renderer, mappedInput);
+          if (editor) startActivityForResult(std::move(editor), [](const ActivityResult&) {});
+        }
+      }
     }
   }
+  bool allowsReminderOverlay() const override { return true; }
   void render(RenderLock&&) override {
     // Static navigation only: no Library reads, work, scans or native settings.
     renderer.clearScreen();
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
     const int line = renderer.getLineHeight(UI_10_FONT_ID);
-    renderer.drawText(BITTER_14_FONT_ID, header.x + 12, header.y + 4, tr(STR_SETTINGS_TITLE));
-    renderer.drawText(UI_10_FONT_ID, safe.x + 24, header.y + header.height + 16, tr(STR_CAT_DISPLAY));
+    renderer.drawText(UI_10_FONT_ID, safe.x + 12, safe.y + 8, tr(STR_BACK));
+    renderer.drawText(BITTER_14_FONT_ID, header.x + 12, header.y + 32, tr(STR_SETTINGS_TITLE));
     const int top = header.y + header.height + line + 32;
-    renderer.fillRect(safe.x + 24, top, safe.width - 48, line + 18);
-    renderer.drawText(UI_10_FONT_ID, safe.x + 36, top + 8, tr(STR_HOME_WIDGETS), false);
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
+    for (unsigned i = 0; i < 2; ++i) {
+      renderer.drawRect(safe.x + 24, top + i * 56, safe.width - 48, line + 18, focus == i ? 3 : 1);
+      const char* label = i ? tr(STR_REMINDERS) : tr(STR_HOME_WIDGETS);
+      if constexpr (CROSSINK_APP_REMINDER_TEXT_LAYOUT) {
+        char numbered[96]{};
+        std::snprintf(numbered, sizeof(numbered), tr(STR_REMINDER_NUMBERED_FORMAT), i + 1, label);
+        renderer.drawText(UI_10_FONT_ID, safe.x + 36, top + i * 56 + 8, numbered);
+      } else renderer.drawText(UI_10_FONT_ID, safe.x + 36, top + i * 56 + 8, label);
+    }
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_HOME_PREV), tr(STR_HOME_NEXT));
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     renderer.displayBuffer(HalDisplay::FAST_REFRESH);
   }
@@ -168,6 +219,14 @@ class ShellActivity final : public Activity {
     }
 #endif
     return true;
+  }
+  int homeSettingsActionWidth() const {
+#if CROSSINK_APP_CAP_REMINDERS
+    return std::min(renderer.getScreenWidth() / 2,
+                    std::max(80, renderer.getTextWidth(UI_10_FONT_ID, tr(STR_SETTINGS_TITLE)) + 24));
+#else
+    return 80;
+#endif
   }
   Rect tileRect(uint8_t index) const {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
@@ -1371,13 +1430,29 @@ class ShellActivity final : public Activity {
       const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
       const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
       if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Right)) ||
-          (tapped && x >= header.x + header.width - 80 && y >= header.y && y < header.y + header.height)) {
+          (tapped && x >= header.x + header.width - homeSettingsActionWidth() && y >= header.y && y < header.y + header.height)) {
+#if CROSSINK_APP_CAP_REMINDERS || CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
         if (widgets->page().textOnly) {
-#if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
           showHomeSettings(renderer, mappedInput);
+        } else {
+          // Keep this Home and its Library owned by the activity stack. The
+          // menu returns an action; it never substitutes the default Library.
+          auto settings = makeUniqueNoThrow<HomeSettingsActivity>(renderer, mappedInput, true);
+          if (!settings) {
+            LOG_ERR("BSH", "Cannot allocate Home settings");
+            return true;
+          }
+          startActivityForResult(std::move(settings), [this](const ActivityResult& result) {
+            const auto* selected = std::get_if<OptionSelectionResult>(&result.data);
+            if (!result.isCancelled && selected && selected->index == 0) {
+              editor.enter();
+              requestUpdate();
+            }
+          });
+        }
+#else
+        editor.enter();
 #endif
-        } else
-          editor.enter();
         requestUpdate();
         return true;
       }
@@ -1736,7 +1811,7 @@ class ShellActivity final : public Activity {
 #endif
     int titleWidth = header.width - 24;
 #if CROSSINK_APP_CAP_HOME_EDITOR
-    if (canEdit()) titleWidth -= 80;
+    if (canEdit()) titleWidth -= editing ? 80 : homeSettingsActionWidth();
 #endif
     renderer.beginTextClip(header.x + 12, header.y, titleWidth, header.height);
     const bool compact = widgets && !widgets->page().textOnly && widgets->page().rows == 6;
@@ -1774,8 +1849,10 @@ class ShellActivity final : public Activity {
     }
 #if CROSSINK_APP_CAP_HOME_EDITOR
     if (canEdit() && !editing) {
-      paintFittedText(UI_10_FONT_ID, header.x + header.width - 72, header.y + 4,
-                      widgets->page().textOnly ? tr(STR_SETTINGS_TITLE) : tr(STR_EDIT), 68);
+      const int actionWidth = homeSettingsActionWidth();
+      paintFittedText(UI_10_FONT_ID, header.x + header.width - actionWidth + 8, header.y + 4,
+                      CROSSINK_APP_CAP_REMINDERS || widgets->page().textOnly ? tr(STR_SETTINGS_TITLE) : tr(STR_EDIT),
+                      actionWidth - 12);
     } else if (editing && editor.panel() != EditorAddRemove::Panel::Select &&
                editor.panel() != EditorAddRemove::Panel::Selected) {
       paintFittedText(UI_10_FONT_ID, header.x + header.width - 72, header.y + 4, tr(STR_BACK), 68);
@@ -1867,7 +1944,7 @@ bool dismissUpgradeNotice() {
 }
 Library& homeLibrary() { return offlineLibrary(); }
 void showHomeSettings(GfxRenderer& renderer, MappedInputManager& input) {
-#if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
+#if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS || CROSSINK_APP_CAP_REMINDERS
   // One fallible <=512-byte activity allocation: ActivityManager owns it across
   // frames, so it cannot be stack-local. No task, payload buffer or framebuffer.
   auto settings = makeUniqueNoThrow<HomeSettingsActivity>(renderer, input);
@@ -1881,6 +1958,17 @@ void showHomeSettings(GfxRenderer& renderer, MappedInputManager& input) {
   (void)input;
 #endif
 }
+#ifdef SIMULATOR
+bool selectHomeReminderEntryScene() {
+#if CROSSINK_APP_CAP_REMINDERS || CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
+  if (!homeSettingsScene) return false;
+  homeSettingsScene->selectRemindersEntry();
+  return true;
+#else
+  return false;
+#endif
+}
+#endif
 std::unique_ptr<Activity> createHomeEditor(GfxRenderer& renderer, MappedInputManager& input) {
 #if CROSSINK_APP_CAP_HOME_EDITOR
   auto shell = makeUniqueNoThrow<ShellActivity>(renderer, input, HalDisplay::FULL_REFRESH, offlineLibrary(), true);

@@ -120,6 +120,7 @@
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #include "booksync/system/ReminderPresenter.h"
+#include "../../test/simulator/ReminderUiScenario.h"
 #include "activities/boot_sleep/SleepActivity.h"
 #include "activities/boot_sleep/SleepCoverAssets.h"
 #include "activities/home/AlertActivity.h"
@@ -12193,6 +12194,7 @@ SimulatorSmokeTest smokeTest;
 }  // namespace
 
 void runSimulatorSmokeTestTick() {
+  if (reminderUiScenario::tick()) return;
   if (!catalogSurfaceScenario::tick() && !seriesSurfaceScenario::tick() && !upgradeNoticeScenario::tick() &&
       !accountSurfaceScenario::tick() && !editorScenario::tick() &&
       !goalWidgetScenario::tick() && !recordsWidgetScenario::tick() && !dailyWidgetScenario::tick() && !calendarWidgetScenario::tick() && !statsWidgetScenario::tick() && !widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() &&

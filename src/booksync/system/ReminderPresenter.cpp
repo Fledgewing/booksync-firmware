@@ -15,6 +15,7 @@
 #include "GfxRenderer.h"
 #include "MappedInputManager.h"
 #include "ReminderClaimRetry.h"
+#include "ReminderText.h"
 #include "activities/Activity.h"
 #include "activities/RenderLock.h"
 #include "booksync/services/LocalLibrary.h"
@@ -113,43 +114,10 @@ uint8_t hit(GfxRenderer& renderer, const ReminderSheetView& value, int x, int y,
     if (y >= r.actionY + int(i) * 52 && y < r.actionY + int(i) * 52 + r.actionHeight) return i;
   return 255;
 }
-// One bounded line, UTF-8 boundaries preserved. Never clips a message silently.
 void paragraph(GfxRenderer& renderer, int x, int& y, int width, const char* text) {
-  char line[241]{};
-  size_t used = 0;
-  while (*text) {
-    unsigned bytes = 1;
-    const auto c = static_cast<unsigned char>(*text);
-    if (c >= 0xf0)
-      bytes = 4;
-    else if (c >= 0xe0)
-      bytes = 3;
-    else if (c >= 0xc0)
-      bytes = 2;
-    if (used + bytes >= sizeof(line)) {
-      line[used] = 0;
-      renderer.drawText(UI_10_FONT_ID, x, y, line);
-      y += renderer.getLineHeight(UI_10_FONT_ID) + 4;
-      used = 0;
-      continue;
-    }
-    for (unsigned i = 0; i < bytes && text[i]; ++i) line[used + i] = text[i];
-    line[used + bytes] = 0;
-    if (used && renderer.getTextWidth(UI_10_FONT_ID, line) > width) {
-      line[used] = 0;
-      renderer.drawText(UI_10_FONT_ID, x, y, line);
-      y += renderer.getLineHeight(UI_10_FONT_ID) + 4;
-      used = 0;
-      continue;
-    }
-    used += bytes;
-    text += bytes;
-  }
-  if (used) {
-    renderer.drawText(UI_10_FONT_ID, x, y, line);
-    y += renderer.getLineHeight(UI_10_FONT_ID) + 4;
-  }
+  paintReminderParagraph(renderer, text, x, y, width);
 }
+
 void paint(GfxRenderer& renderer, const ReminderSheetView& value) {
   const auto r = geometry(renderer, value);
   renderer.fillRect(r.x, r.y, r.width, r.height, false);
@@ -412,6 +380,8 @@ bool reminderLoop(GfxRenderer& renderer, MappedInputManager& input, bool page, b
 }
 }  // namespace booksync
 #ifdef SIMULATOR
+#include <SDL.h>
+extern HalGPIO gpio;
 namespace booksync {
 uint64_t reminderSceneInputCount() { return sceneInputCount; }
 bool reminderSceneHidden() { return presenter().hidden; }
@@ -458,35 +428,83 @@ bool inputReminderScene(GfxRenderer& renderer, MappedInputManager& input, Librar
   due.revision = 1;
   if (state == 8) due.kind = ReminderKind::Interval;
   p.sheet.enterSheet(due, {ReminderSource::Local, due.kind, 2, 1, 1, 7, 0, 0}, true);
-  input.simulatorInjectPress(B::Confirm);
+#if CROSSINK_APP_CAP_TOUCH
+  const auto opening = geometry(renderer, p.sheet.view());
+  if (input.hasTouch())
+    input.simulatorInjectTouchDown(opening.x + 24, opening.actionY + 12);
+  else
+#endif
+    input.simulatorInjectPress(B::Confirm);
   inputs(p, renderer, input);
   input.simulatorClearInputFrame();
-  input.simulatorInjectRelease(B::Confirm);
+#if CROSSINK_APP_CAP_TOUCH
+  if (input.hasTouch())
+    input.simulatorInjectTouchRelease(opening.x + 24, opening.actionY + 12);
+  else
+#endif
+    input.simulatorInjectRelease(B::Confirm);
   inputs(p, renderer, input);
   if (!p.sheet.view().open || p.sheet.draining()) {
     input.setMenuMode(menu);
     return false;
   }
-  auto key = [&](B button) {
+  // Real native HAL edges traverse MappedInputManager's configured physical
+  // front/side mapping, instead of its logical-button test injection bypass.
+  auto key = [&](SDL_Scancode scancode) {
+    for (const auto kind : {SDL_KEYDOWN, SDL_KEYUP}) {
+      input.simulatorClearInputFrame();
+      gpio.beginFrame();
+      SDL_Event event{};
+      event.type = kind;
+      event.key.keysym.scancode = scancode;
+      SDL_PushEvent(&event);
+      gpio.update();
+      inputs(p, renderer, input);
+    }
+    gpio.beginFrame();
+  };
+#if CROSSINK_APP_CAP_TOUCH
+  auto tapAction = [&](unsigned action) {
+    const auto r = geometry(renderer, p.sheet.view());
+    const int x = r.x + r.width / 2, y = r.actionY + int(action) * 52 + 12;
     input.simulatorClearInputFrame();
-    input.simulatorInjectPress(button);
+    input.simulatorInjectTouchDown(x, y);
     inputs(p, renderer, input);
     input.simulatorClearInputFrame();
-    input.simulatorInjectRelease(button);
+    input.simulatorInjectTouchRelease(x, y);
     inputs(p, renderer, input);
   };
-  if (state >= 1 && state <= 5) {
-    key(B::Right);
-    if (state != 1) key(B::Right);
+#else
+  const auto tapAction = [](unsigned) {};
+#endif
+  if (state == 9) {
+    const auto originalConfirm = SETTINGS.frontButtonConfirm;
+    SETTINGS.frontButtonConfirm = SETTINGS.frontButtonRight;
+    key(SDL_SCANCODE_RIGHT);
+    key(SDL_SCANCODE_RIGHT);
+    key(SDL_SCANCODE_RIGHT);
+    SETTINGS.frontButtonConfirm = originalConfirm;
+    if (!p.sheet.view().open) {
+      input.setMenuMode(menu);
+      return false;
+    }
+    key(SDL_SCANCODE_RETURN);
   }
-  if (state <= 2)
-    key(B::Confirm);
-  else if (state == 3)
-    key(B::PageBack);
+  if (!input.hasTouch() && state >= 1 && state <= 5) {
+    key(SDL_SCANCODE_RIGHT);
+    if (state != 1) key(SDL_SCANCODE_RIGHT);
+  }
+  if (state <= 2) {
+    if (input.hasTouch())
+      tapAction(state);
+    else
+      key(SDL_SCANCODE_RETURN);
+  } else if (state == 3)
+    key(SDL_SCANCODE_UP);
   else if (state == 4)
-    key(B::PageForward);
+    key(SDL_SCANCODE_DOWN);
   else if (state == 5)
-    key(B::Back);
+    key(SDL_SCANCODE_ESCAPE);
 #if CROSSINK_APP_CAP_TOUCH
   else if (state == 6 || state == 7) {
     const auto r = geometry(renderer, p.sheet.view());
@@ -502,10 +520,15 @@ bool inputReminderScene(GfxRenderer& renderer, MappedInputManager& input, Librar
   }
 #endif
   else if (state == 8) {
-    key(B::Right);
-    key(B::Confirm);
+    if (input.hasTouch())
+      tapAction(1);
+    else {
+      key(SDL_SCANCODE_RIGHT);
+      key(SDL_SCANCODE_RETURN);
+    }
   }
-  const bool okay = state == 7 ? p.sheet.view().open : !p.sheet.view().open;
+  // A long drag may become the native dismiss gesture; it must never sleep.
+  const bool okay = state == 7 ? !p.sheet.sleepRequested() : !p.sheet.view().open;
   p.sheet.retireSheet();
   input.simulatorClearInputFrame();
   input.setMenuMode(menu);
