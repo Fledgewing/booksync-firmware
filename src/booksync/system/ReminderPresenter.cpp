@@ -414,6 +414,7 @@ bool reminderLoop(GfxRenderer& renderer, MappedInputManager& input, bool page, b
 #ifdef SIMULATOR
 namespace booksync {
 uint64_t reminderSceneInputCount() { return sceneInputCount; }
+bool reminderSceneHidden() { return presenter().hidden; }
 void paintReminderScene(GfxRenderer& renderer, Library& library, unsigned state) {
   ReminderDueSheet sheet{library};
   ReminderPresentation value{};

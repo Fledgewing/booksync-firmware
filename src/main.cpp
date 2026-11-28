@@ -1204,6 +1204,7 @@ static bool holdSleepWhileUsbPowered(bool monochrome = false) {
 #endif
 
 void enterDeepSleep(bool fromTimeout) {
+  booksync::reminderHidden(true);
   const auto readiness = booksync::prepareSleep(static_cast<uint32_t>(millis()));
   if (readiness == booksync::SleepReadiness::Draining) {
     sleepWaitingForNetwork = true;
@@ -1212,6 +1213,7 @@ void enterDeepSleep(bool fromTimeout) {
   }
   sleepWaitingForNetwork = false;
   if (readiness == booksync::SleepReadiness::Expired) {
+    booksync::reminderHidden(buttonShortcutController.isQuickLocked());
     sleepAttemptEnded = true;
     return;
   }
@@ -1228,7 +1230,6 @@ void enterDeepSleep(bool fromTimeout) {
 
   // Commit to sleeping before goToSleep() runs the outgoing activity's onExit():
   // a WiFi activity would otherwise silentRestart() here and reboot instead.
-  booksync::reminderHidden(true);
   deepSleepInProgress = true;
   [[maybe_unused]] const bool monochromeSleepFrame = activityManager.goToSleep(fromTimeout);
   trustedtime::note();
@@ -1315,6 +1316,7 @@ void enterDeepSleep(bool fromTimeout) {
 #endif
   powerManager.startDeepSleep(gpio);
   booksync::retireSleep();  // Simulator returns; hardware starts a fresh boot.
+  booksync::reminderHidden(buttonShortcutController.isQuickLocked());
 }
 
 void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, const bool useReaderRenderStack) {
@@ -1943,6 +1945,8 @@ void loop() {
       // A fresh wake press retires only this sleep request. The existing
       // admission tick still owns draining workers and restoring C3 storage.
       booksync::retireSleep();
+      booksync::reminderHidden(buttonShortcutController.isQuickLocked());
+      booksync::reminderInput();
       sleepWaitingForNetwork = false;
       sleepAttemptEnded = true;
       powerButtonReleasedSinceWake = false;

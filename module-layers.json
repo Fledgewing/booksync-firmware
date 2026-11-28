@@ -6133,11 +6133,12 @@
     },
     "scripts/test_image_probe_framebuffer.py": {
       "role": "retained-build-input",
-      "rationale": "Retained build/generator input; inventoried and scanned alongside generated resources. Build dependency changes require review.",
+      "rationale": "Retained build/generator input; inventoried and scanned alongside generated resources. Build dependency changes require review. R1 reader-loan regression uses the production scalar frame-proof type to verify that error composition blocks reminder drawing; no runtime or I/O dependency is linked.",
       "includes": [
         "BuildScratch.h",
         "algorithm",
         "atomic",
+        "booksync/system/ReminderFrame.h",
         "cassert",
         "cstdint",
         "cstring",

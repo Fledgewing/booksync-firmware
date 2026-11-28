@@ -104,3 +104,8 @@ Settings entry logs internal free/largest heap through the existing heap-shape
 helper. Hardware compiler `.su` receipts include the presenter, formatter, sheet
 and Settings implementation under the 1 KiB worker-frame gate. Host timing and
 compiler frames do not substitute for maintainer task high-water measurements.
+
+The native bounded sleep drain pauses reminder activity before reader capture and
+network teardown. Expiry, a fresh Power cancellation and a returning simulator
+sleep restore visibility according to Quick Lock; they never resume an obsolete
+sheet. F42 capture-before-drain and its ownership deadline remain authoritative.
