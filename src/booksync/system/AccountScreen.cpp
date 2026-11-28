@@ -86,8 +86,14 @@ class ServiceChoiceActivity final : public Activity {
     // All values were captured outside paint. No Library reads or dispatch here.
     renderer.clearScreen();
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    GUI.drawHeader(renderer, UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe),
-                   tr(STR_ACCOUNT_CHOOSE_SERVICE));
+    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    // Draw the approved static header directly; the retained theme header also
+    // reads native device status, which is outside this Library presentation.
+    renderer.drawText(UI_10_FONT_ID, header.x + 12, header.y + 8, tr(STR_BACK));
+    renderer.drawLine(header.x, header.y + header.height, header.x + header.width, header.y + header.height);
+    renderer.beginTextClip(safe.x + 20, header.y + header.height + 8, safe.width - 40, 40);
+    renderer.drawText(BITTER_14_FONT_ID, safe.x + 20, header.y + header.height + 8, tr(STR_ACCOUNT_CHOOSE_SERVICE));
+    renderer.endTextClip();
     renderer.drawText(UI_10_FONT_ID, safe.x + 20, row(0).y - 60, tr(STR_ACCOUNT_SETUP_LATER));
     for (uint8_t i = 0; i < 4; ++i) {
       const auto r = row(i);
