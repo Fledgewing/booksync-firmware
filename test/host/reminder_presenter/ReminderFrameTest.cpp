@@ -67,3 +67,19 @@ TEST(ReminderFrame, HomeAndMenusBecomeVisibleAfterTheirNativeRenderOnly) {
   frame.finishRender(false);
   EXPECT_TRUE(frame.ready());
 }
+
+TEST(ReminderFrame, InlineModalRetiresProofUntilAnOrdinaryFrameReturns) {
+  ReminderFrame frame;
+  frame.beginRender();
+  frame.finishRender(false);
+  ASSERT_TRUE(frame.ready());
+  frame.beginRender();
+  frame.finishRender(false, false);
+  EXPECT_FALSE(frame.ready());
+  // Closing an inline modal changes main-loop state before its replacement
+  // paint. That state transition alone cannot prove an ordinary visible frame.
+  EXPECT_FALSE(frame.ready());
+  frame.beginRender();
+  frame.finishRender(false, true);
+  EXPECT_TRUE(frame.ready());
+}

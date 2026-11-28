@@ -13,7 +13,11 @@ class ReminderFrame {
     kind_ = Kind::Other;
     block();
   }
-  void finishRender(bool book) {
+  void finishRender(bool book, bool eligible = true) {
+    if (!eligible) {
+      block();
+      return;
+    }
     if (!book || kind_ == Kind::Reading)
       ready_.store(true, std::memory_order_release);
     else if (kind_ == Kind::Other)

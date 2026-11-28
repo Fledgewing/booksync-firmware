@@ -518,7 +518,8 @@ void ActivityManager::renderTaskLoop() {
       BatteryDiagnosticLog::beginDisplayFrame();
 #endif
       currentActivity->render(std::move(lock));
-      currentActivity->reminderFrame_.finishRender(currentActivity->isBookReaderActivity());
+      currentActivity->reminderFrame_.finishRender(currentActivity->isBookReaderActivity(),
+                                                  currentActivity->allowsReminderOverlay() && !currentActivity->blocksGlobalInput());
 #if FREEINK_DEVICE_PICCO && CROSSINK_BATTERY_DIAG_LOG
       BatteryDiagnosticLog::finishDisplayFrame();
 #endif
