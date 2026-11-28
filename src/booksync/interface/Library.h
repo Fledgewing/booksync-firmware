@@ -4,6 +4,7 @@
 #include "Commands.h"
 #include "Models.h"
 #include "booksync/interface/AccountView.h"
+#include "booksync/interface/Covers.h"
 #include "booksync/interface/Downloads.h"
 #include "booksync/interface/HomeLayout.h"
 #include "booksync/interface/LayoutEdit.h"
@@ -33,6 +34,13 @@ class Library {
   virtual void readQuery(QueryResult& out) const {
     out.clear();
     out.availability = Availability::Unsupported;
+  }
+  // Post-paint intent; cached reference/bitmap reads perform no filesystem or decode work.
+  virtual CommandStatus requestCover(BookKey) { return CommandStatus::Unavailable; }
+  virtual CoverReference coverReference(BookKey) const { return {}; }
+  virtual bool readCover(CoverReference, CoverBitmap& out) const {
+    out = {};
+    return false;
   }
   virtual CommandStatus open(BookKey) { return CommandStatus::Unavailable; }
   virtual LibraryWindow window() const { return {}; }
