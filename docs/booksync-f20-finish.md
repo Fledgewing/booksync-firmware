@@ -38,8 +38,13 @@ that attempt and all capture bytes. A later call must reconcile the same scoped
 event/operation; matching current values alone is not commit proof. A callback
 may confirm a guarded no-op for a newer remote choice, but must never overwrite
 that choice to reconcile an old finish or Undo. Confirm only durable operation
-completion, including Apply. Reusing the same resolved checkpoint throughout
-keeps the raw source identity available after restart.
+completion, including Apply. Adapters may wrap the resolved identity in a bounded opaque result checkpoint.
+Checkpointed publishes that result without acknowledging the operation; its
+attempt remains uncertain until reconciliation confirms it. Confirmed also
+publishes any resulting checkpoint with the phase acknowledgment. Preserve raw
+source identity inside those envelopes so restart and Undo never guess which
+remote choice the guard accepted. Apply must recheck the exact source/account,
+closed-book state and latest local intent before native writeback.
 
 ## Undo and retention
 
@@ -86,11 +91,11 @@ capture payloads can be 4 KiB. Such buffers do not fit a small task stack. Undo'
 128-byte document copy is needed to preserve scoped identity while reusing that
 workspace. Hardware compiler stack-use receipts record frames separately from
 simulator heap; simulator measurements do not prove ESP32 heap or task headroom.
-The Xtensa compiler reports 464 bytes for Undo, 256 for enqueue, and at most 192
-for the remaining finish operations. Undo's cold worker frame includes the
-128-byte identity copy plus bounded metadata/views; it keeps payloads out of the
-stack and avoids another persistent C3 allocation. Use a 4 KiB worker stack and
-verify the complete call-chain high-water on hardware before activation.
+Per-profile compiler receipts retain exact frame sizes. Undo's cold worker
+frame exceeds 256 bytes because it includes the 128-byte identity copy plus
+bounded metadata/views; payloads stay out of the stack, avoiding another
+persistent C3 allocation. Use a 4 KiB worker stack and verify the complete
+call-chain high-water on hardware before activation.
 
 ## Approval and verification
 

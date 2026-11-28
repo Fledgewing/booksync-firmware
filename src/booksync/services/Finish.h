@@ -61,5 +61,10 @@ struct FinishRequest {
   FinishIntent intent;
   storage::LifecyclePhase phase;  // Stats=State, Annotations=Status, State=Rating, Progress=Apply.
   bool reconcile;
+  // Adapter-owned bounded output, consumed synchronously on Confirmed or
+  // Checkpointed. Preserve resolved identity inside any opaque result envelope.
+  // Checkpointed saves a result before local Apply without acknowledging the
+  // operation; unknown/unavailable replies retain the previous durable bytes.
+  std::string_view* confirmedCheckpoint = nullptr;
 };
 }  // namespace booksync

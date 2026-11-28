@@ -340,3 +340,44 @@ TEST_F(FinishTest, UndoRestoresOnlyFieldsOwnedByTheIntentAndPreservesExplicitRat
   EXPECT_EQ(decoded.desired.rating, 2);
   drain(owner);
 }
+TEST_F(FinishTest, GuardResultIsDurableBeforeAcknowledgmentAndSurvivesRestartUntilApply) {
+  class Checkpoints : public Toy {
+   public:
+    unsigned guarded = 0;
+    bool applied = false;
+    PhaseOutcome finishPhase(const SyncWriterToken&, const FinishRequest& r) override {
+      EXPECT_NE(r.confirmedCheckpoint, nullptr);
+      if (r.phase == LifecyclePhase::Stats && r.entry.checkpoint == "resolved-identity") {
+        EXPECT_FALSE(r.reconcile);
+        ++guarded;
+        *r.confirmedCheckpoint = "resolved-identity|guard-result";
+        return PhaseOutcome::Checkpointed;
+      }
+      EXPECT_EQ(r.entry.checkpoint, "resolved-identity|guard-result");
+      if (r.phase == LifecyclePhase::Stats) EXPECT_TRUE(r.reconcile);
+      if (r.phase == LifecyclePhase::Progress) applied = true;
+      return PhaseOutcome::Confirmed;
+    }
+  } adapter;
+  enqueue();
+  {
+    SyncOwner owner(journal, adapter, "toy:grove", "scope:fern", scratch.data(), scratch.size(), nullptr, nullptr,
+                    &finish);
+    ASSERT_EQ(owner.activate(), SyncResult::Ready);
+    for (int i = 0; i < 6; ++i) ASSERT_EQ(owner.step(), i == 5 ? SyncResult::Completed : SyncResult::Advanced);
+    ASSERT_EQ(owner.step(), SyncResult::Advanced);
+    JournalEntry saved;
+    ASSERT_EQ(journal.read(intent, saved, finishScratch.data(), finishScratch.size()), JournalResult::Ok);
+    EXPECT_EQ(saved.acknowledged, 1);
+    EXPECT_EQ(saved.attempting, 2);
+    EXPECT_EQ(saved.checkpoint, "resolved-identity|guard-result");
+    EXPECT_FALSE(adapter.applied);
+  }
+  card.restart();
+  SyncOwner owner(journal, adapter, "toy:grove", "scope:fern", scratch.data(), scratch.size(), nullptr, nullptr,
+                  &finish);
+  ASSERT_EQ(owner.activate(), SyncResult::Ready);
+  drain(owner);
+  EXPECT_EQ(adapter.guarded, 1U);
+  EXPECT_TRUE(adapter.applied);
+}

@@ -243,10 +243,16 @@ SyncResult Finish::step(const SyncWriterToken& token, ServerAdapter& adapter, co
                                                                                    : SyncResult::StorageError;
   }
   if (!e.attempting && journal_.attempt(e.id, selected) != JournalResult::Ok) return SyncResult::StorageError;
-  const auto outcome = adapter.finishPhase(token, {e, v, selected, e.attempting != 0});
+  auto checkpoint = e.checkpoint;
+  const auto outcome = adapter.finishPhase(token, {e, v, selected, e.attempting != 0, &checkpoint});
   if (outcome == PhaseOutcome::Uncertain) return SyncResult::Uncertain;
+  if (outcome == PhaseOutcome::Checkpointed) {
+    if (checkpoint == e.checkpoint || journal_.checkpoint(e.id, checkpoint) != JournalResult::Ok)
+      return SyncResult::StorageError;
+    return SyncResult::Advanced;
+  }
   if (outcome != PhaseOutcome::Confirmed) return SyncResult::Unavailable;
-  if (journal_.acknowledge(e.id, selected, e.checkpoint) != JournalResult::Ok) return SyncResult::StorageError;
+  if (journal_.acknowledge(e.id, selected, checkpoint) != JournalResult::Ok) return SyncResult::StorageError;
   return SyncResult::Advanced;
 }
 }  // namespace booksync
