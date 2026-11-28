@@ -239,10 +239,10 @@ class ShellActivity final : public Activity {
   Rect homeSafeArea() const {
     // The approved footer is reserved once by tileRect, not again by native
     // button-hint metrics. Bezel-safe bounds still come from the native theme.
-    return UITheme::getInstance().getScreenSafeArea(renderer, !compactHome(), false);
+    return UITheme::getInstance().getScreenSafeArea(renderer, !compactHome() || editor.panel() != EditorAddRemove::Panel::Closed, false);
   }
   Rect homeHeader(Rect safe) const {
-    return UITheme::getHeaderRect(renderer, compactHome() ? 64 : UITheme::getInstance().getMetrics().headerHeight,
+    return UITheme::getHeaderRect(renderer, compactHome() && editor.panel() == EditorAddRemove::Panel::Closed ? 64 : UITheme::getInstance().getMetrics().headerHeight,
                                   safe);
   }
   Rect tileRect(uint8_t index) const {
