@@ -211,6 +211,14 @@ class ShellActivity final : public Activity {
 #endif
     return true;
   }
+  int homeSettingsActionWidth() const {
+#if CROSSINK_APP_CAP_REMINDERS
+    return std::min(renderer.getScreenWidth() / 2,
+                    std::max(80, renderer.getTextWidth(UI_10_FONT_ID, tr(STR_SETTINGS_TITLE)) + 24));
+#else
+    return 80;
+#endif
+  }
   Rect tileRect(uint8_t index) const {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
@@ -1413,7 +1421,7 @@ class ShellActivity final : public Activity {
       const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
       const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
       if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Right)) ||
-          (tapped && x >= header.x + header.width - 80 && y >= header.y && y < header.y + header.height)) {
+          (tapped && x >= header.x + header.width - homeSettingsActionWidth() && y >= header.y && y < header.y + header.height)) {
 #if CROSSINK_APP_CAP_REMINDERS || CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
         showHomeSettings(renderer, mappedInput);
 #else
@@ -1777,7 +1785,7 @@ class ShellActivity final : public Activity {
 #endif
     int titleWidth = header.width - 24;
 #if CROSSINK_APP_CAP_HOME_EDITOR
-    if (canEdit()) titleWidth -= 80;
+    if (canEdit()) titleWidth -= editing ? 80 : homeSettingsActionWidth();
 #endif
     renderer.beginTextClip(header.x + 12, header.y, titleWidth, header.height);
     const bool compact = widgets && !widgets->page().textOnly && widgets->page().rows == 6;
@@ -1815,8 +1823,10 @@ class ShellActivity final : public Activity {
     }
 #if CROSSINK_APP_CAP_HOME_EDITOR
     if (canEdit() && !editing) {
-      paintFittedText(UI_10_FONT_ID, header.x + header.width - 72, header.y + 4,
-                      CROSSINK_APP_CAP_REMINDERS || widgets->page().textOnly ? tr(STR_SETTINGS_TITLE) : tr(STR_EDIT), 68);
+      const int actionWidth = homeSettingsActionWidth();
+      paintFittedText(UI_10_FONT_ID, header.x + header.width - actionWidth + 8, header.y + 4,
+                      CROSSINK_APP_CAP_REMINDERS || widgets->page().textOnly ? tr(STR_SETTINGS_TITLE) : tr(STR_EDIT),
+                      actionWidth - 12);
     } else if (editing && editor.panel() != EditorAddRemove::Panel::Select &&
                editor.panel() != EditorAddRemove::Panel::Selected) {
       paintFittedText(UI_10_FONT_ID, header.x + header.width - 72, header.y + 4, tr(STR_BACK), 68);
