@@ -27,6 +27,7 @@
 #include <cstdlib>
 
 #include "booksync/system/NetworkPhase.h"
+#include "booksync/system/BatteryRuntime.h"
 #include "booksync/system/SleepRuntime.h"
 #include "booksync/system/ReminderPresenter.h"
 #include "sync/ProgressBookIterator.h"
@@ -1260,6 +1261,7 @@ void enterDeepSleep(bool fromTimeout) {
   BatteryDiagnosticLog::record(BatteryDiagnosticLog::Event::Sleep, BoardConfig::ACTIVE.name);
   std::optional<RenderLock> storageSleepLock;
   if (!RenderLock::heldByCurrentTask()) storageSleepLock.emplace();
+  booksync::captureBatterySleep();
   libraryScanSleepToken.save(!library::libraryIndexNeedsRefresh());
   // Flush and stop SDMMC before cutting rails or isolating the bus pads.
 #if FREEINK_DEVICE_PICCO && CROSSINK_BATTERY_DIAG_LOG
@@ -1933,6 +1935,7 @@ void loop() {
   // Resource cleanup must run even when Quick Lock or another input path
   // returns before the foreground activity loop.
   booksync::networkAdmissionTick();
+  booksync::workBatteryCapture();
   if (quickLockWaitingForNetwork && booksync::networkDisplayReady() && !sleepWaitingForNetwork) {
     quickLockWaitingForNetwork = false;
     quickLockBadgeBackdrop.valid = false;

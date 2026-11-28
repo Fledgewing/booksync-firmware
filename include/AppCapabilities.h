@@ -43,8 +43,8 @@
 #define CROSSINK_APP_READER_SAMPLE_PREVIEW (!CROSSINK_APP_CAP_TOUCH)
 
 // Approved spatial X4 and Settings-list X3 editor presentations.
-#if (defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO) || \
-    (defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC) || \
+#if (defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO) ||                           \
+    (defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC) ||                   \
     (defined(FREEINK_DEVICE_X3) && FREEINK_DEVICE_X3) || defined(SIMULATOR_DEVICE_X3) || \
     defined(SIMULATOR_DEVICE_X4_PRO) || defined(SIMULATOR_DEVICE_X4_CLASSIC)
 #define CROSSINK_APP_CAP_HOME_EDITOR 1
@@ -73,4 +73,14 @@
 #define CROSSINK_APP_REMINDER_TEXT_LAYOUT 1
 #else
 #define CROSSINK_APP_REMINDER_TEXT_LAYOUT 0
+#endif
+
+// Approved X4 Home measurement source; C3/X3 and unrelated profiles do not
+// retain this producer or its static workspace.
+#if (defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO) ||                                             \
+    (defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC) || defined(SIMULATOR_DEVICE_X4_PRO) || \
+    defined(SIMULATOR_DEVICE_X4_CLASSIC)
+#define CROSSINK_APP_CAP_BATTERY_HISTORY 1
+#else
+#define CROSSINK_APP_CAP_BATTERY_HISTORY 0
 #endif

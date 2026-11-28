@@ -74,3 +74,6 @@ env.AddBuildMiddleware(bounded_reminder_frame, "*/ReminderSettingsScreen.cpp")
 env.AddBuildMiddleware(bounded_reminder_frame, "*/ui/reminders/Settings.cpp")
 
 env.AddBuildMiddleware(bounded_reminder_frame, "*/ReminderText.cpp")
+# Native battery analysis/capture also runs on the constrained main-task stack.
+for battery_source in ("*/services/Battery.cpp", "*/BatteryCapture.cpp", "*/BatteryJournal.cpp", "*/BatteryRuntime.cpp"):
+    env.AddBuildMiddleware(bounded_reading_frame, battery_source)
