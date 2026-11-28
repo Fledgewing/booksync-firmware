@@ -41,6 +41,24 @@ Account acquisitionAccounts[8] = {Account(defaultServerAdapter()), Account(defau
                                   Account(defaultServerAdapter()), Account(defaultServerAdapter()),
                                   Account(defaultServerAdapter()), Account(defaultServerAdapter()),
                                   Account(defaultServerAdapter()), Account(defaultServerAdapter())};
+// Serialized boot/main-loop publication only. Future asynchronous auth must
+// hand its result to this main-loop publisher before a presentation can adopt it.
+void publishRetainedAccountView() {
+  const auto account = syncAccount.snapshot();
+  AccountView value;
+  value.ticket = account.ticket;
+  value.signedIn = account.signedIn;
+  value.accountSupported = account.capabilities.account;
+  value.syncSupported = account.capabilities.sync;
+  value.catalogSupported = account.capabilities.acquisition;
+  value.syncReady = account.syncReady;
+  value.catalogReady = account.acquisitionReady;
+  value.service = 1;
+  value.available = true;
+  const auto* label = defaultServerAdapter().serviceLabel();
+  if (label) std::snprintf(value.serviceLabel.data(), value.serviceLabel.size(), "%s", label);
+  publishAccountView(value);
+}
 std::atomic<bool> identityAdmitted{false}, upgradeAdmitted{false};
 bool noticePending = false, recoveryRequired = false, priorReaderState = false;
 class ShellActivity final : public Activity {
@@ -706,6 +724,7 @@ void initializeUpgrade() {
   noticePending = upgrade.noticePending();
   recoveryRequired = upgrade.recoveryRequired() || restoreUnresolved;
   publishUpgradeState(noticePending, recoveryRequired, dismissUpgradeNotice);
+  publishRetainedAccountView();
 }
 AccountSnapshot retainedLoginSnapshot(unsigned scope) {
   if (scope == 0) return syncAccount.snapshot();
@@ -719,7 +738,10 @@ AuthError removeRetainedLogin(unsigned scope) {
                       : scope == 1 ? legacy::CredentialFamily::NativeSync
                                    : legacy::CredentialFamily::Acquisition;
   if (!upgrade.remove(family, scope < 2 ? 0 : scope - 2)) return AuthError::Unavailable;
-  return account.removeLogin(scope < 2 ? LoginKind::Sync : LoginKind::Acquisition, account.snapshot().ticket);
+  const auto result =
+      account.removeLogin(scope < 2 ? LoginKind::Sync : LoginKind::Acquisition, account.snapshot().ticket);
+  if (scope == 0) publishRetainedAccountView();
+  return result;
 }
 bool retainedUpgradeReady() { return upgradeAdmitted.load(std::memory_order_acquire); }
 bool retainedIdentityReady() { return identityAdmitted.load(std::memory_order_acquire); }

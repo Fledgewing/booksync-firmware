@@ -43,6 +43,7 @@ class ServerAdapter : public AuthAdapter {
  public:
   virtual ~ServerAdapter() = default;
   virtual Capabilities capabilities() const = 0;
+  virtual const char* serviceLabel() const { return ""; }
   virtual Snapshot cachedSnapshot() const = 0;
   // Normalized saved account statistics; no network or fetch-time inclusion inference.
   // False leaves the caller's result absent. Publication is separate from F18b delivery.
