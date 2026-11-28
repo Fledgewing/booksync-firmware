@@ -86,6 +86,11 @@ capture payloads can be 4 KiB. Such buffers do not fit a small task stack. Undo'
 128-byte document copy is needed to preserve scoped identity while reusing that
 workspace. Hardware compiler stack-use receipts record frames separately from
 simulator heap; simulator measurements do not prove ESP32 heap or task headroom.
+The Xtensa compiler reports 464 bytes for Undo, 256 for enqueue, and at most 192
+for the remaining finish operations. Undo's cold worker frame includes the
+128-byte identity copy plus bounded metadata/views; it keeps payloads out of the
+stack and avoids another persistent C3 allocation. Use a 4 KiB worker stack and
+verify the complete call-chain high-water on hardware before activation.
 
 ## Approval and verification
 

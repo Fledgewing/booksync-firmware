@@ -46,6 +46,12 @@ class Toy final : public ServerAdapter {
     char bytes[11]{};
     if (!load(bytes) || !bytes[0] || r.entry.checkpoint != "resolved-identity" || r.entry.id > 3)
       return PhaseOutcome::Unavailable;
+    const bool undo = r.intent.undoOf != 0;
+    if (r.intent.desired.status != (undo ? ReadingStatus::Reading : ReadingStatus::Finished) ||
+        !r.intent.desired.ratingKnown || r.intent.desired.rating != (undo ? 2 : 4) ||
+        r.intent.before.status != (undo ? ReadingStatus::Finished : ReadingStatus::Reading) ||
+        !r.intent.before.ratingKnown || r.intent.before.rating != (undo ? 4 : 2))
+      return PhaseOutcome::Unavailable;
     const auto phase = unsigned(r.phase);
     const size_t slot = 1 + (r.entry.id - 2) * 5 + phase;
     if (phase == 2 && !r.intent.day.empty() && !bytes[slot - 1]) return PhaseOutcome::Unavailable;

@@ -12,6 +12,7 @@ class Toy : public ServerAdapter {
  public:
   unsigned positions = 0, writes = 0, reconciles = 0, normalStates = 0, effects = 0;
   std::array<std::array<bool, 5>, 65> committed{};
+  FinishValues lastDesired{};
   bool uncertain = false, uncertainPosition = false;
   Capabilities capabilities() const override { return {}; }
   Snapshot cachedSnapshot() const override { return {}; }
@@ -38,6 +39,7 @@ class Toy : public ServerAdapter {
       committed[r.entry.id][phase] = true;
       ++effects;
     }
+    lastDesired = r.intent.desired;
     ++writes;
     reconciles += r.reconcile;
     return uncertain ? PhaseOutcome::Uncertain : PhaseOutcome::Confirmed;
@@ -85,11 +87,15 @@ TEST_F(FinishTest, OfflineRestartDeliversPositionThenStateStatusRatingAndRetains
   EXPECT_EQ(toy.positions, 1U);
   EXPECT_EQ(toy.normalStates, 0U);
   EXPECT_EQ(toy.writes, 4U);
+  EXPECT_EQ(toy.lastDesired.status, ReadingStatus::Finished);
+  EXPECT_EQ(toy.lastDesired.rating, 4);
   EXPECT_EQ(journal.pending(), 1);
   uint64_t undo = 0;
   EXPECT_EQ(finish.undo(intent, "toy:grove", "scope:fern", undo), JournalResult::Ok);
   drain(owner);
   EXPECT_EQ(toy.writes, 7U);
+  EXPECT_EQ(toy.lastDesired.status, ReadingStatus::Reading);
+  EXPECT_EQ(toy.lastDesired.rating, 2);
   uint64_t repeat = 0;
   EXPECT_EQ(finish.undo(intent, "toy:grove", "scope:fern", repeat), JournalResult::Ok);
   EXPECT_EQ(repeat, undo);
