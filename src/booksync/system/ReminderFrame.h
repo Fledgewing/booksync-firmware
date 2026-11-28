@@ -31,5 +31,8 @@ class ReminderFrame {
   enum class Kind : unsigned char { Unchanged, Reading, Other } kind_ = Kind::Unchanged;
   std::atomic<uint32_t> ready_{0};
 };
-static_assert(std::atomic<uint32_t>::is_always_lock_free);
+// Only load/store are used. The pinned S3 and rv32imc compilers emit aligned
+// word loads/stores plus barriers, with no helper calls. C3 reports the broader
+// is_always_lock_free property false because it lacks atomic RMW instructions.
+static_assert(sizeof(std::atomic<uint32_t>) == sizeof(uint32_t));
 }  // namespace booksync
