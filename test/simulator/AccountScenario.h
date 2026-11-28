@@ -81,10 +81,33 @@ inline void runAccountScenario() {
           !account.snapshot().acquisitionReady && account.snapshot().syncReady);
     check(account.removeLogin(LoginKind::Sync, account.snapshot().ticket) == AuthError::None &&
           !account.snapshot().syncReady);
+    // F37c policy proof only: no unapproved login/confirmation is presented.
+    // Reuse the existing capture buffer; each case is a fresh worker account.
+    for (unsigned pair = 0; pair < 9; ++pair) {
+      Account candidate(adapter);
+      bool retained =
+          capture(LoginKind::Account) && candidate.signIn(input, candidate.snapshot().ticket) == AuthError::None;
+      for (const auto kind : {LoginKind::Sync, LoginKind::Acquisition}) {
+        const unsigned origin = kind == LoginKind::Sync ? pair / 3 : pair % 3;
+        if (origin == 1)
+          retained = candidate.useAccountLogin(kind, candidate.snapshot().ticket) == AuthError::None && retained;
+        else if (origin == 2)
+          retained =
+              capture(kind) && candidate.signIn(input, candidate.snapshot().ticket) == AuthError::None && retained;
+      }
+      const auto before = candidate.snapshot().ticket;
+      retained = candidate.signOut(before) == AuthError::None && retained;
+      const auto after = candidate.snapshot();
+      check(retained && !after.signedIn && after.syncReady == (pair / 3 == 2) &&
+            after.acquisitionReady == (pair % 3 == 2) &&
+            after.syncOrigin == (pair / 3 == 2 ? LoginOrigin::User : LoginOrigin::None) &&
+            after.acquisitionOrigin == (pair % 3 == 2 ? LoginOrigin::User : LoginOrigin::None) &&
+            after.ticket.epoch > before.epoch && adapter.erased() && candidate.signOut(before) == AuthError::Stale);
+    }
   });
   worker.join();
   LOG_INF("F15", "BookSync account scenario %s: %u checks; %u ready publications", ok ? "PASS" : "FAIL", checks,
           readyPublications);
   std::fflush(nullptr);
-  std::_Exit(ok && checks == 17 ? 0 : 1);
+  std::_Exit(ok && checks == 26 ? 0 : 1);
 }

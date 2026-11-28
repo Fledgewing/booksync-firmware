@@ -25,8 +25,8 @@ with tempfile.TemporaryDirectory(prefix='booksync-account-') as directory:
     if result.returncode or 'BookSync account scenario PASS' not in log:
         raise SystemExit(f'F15 failed; see reports/{profile}/account.log')
 (out / 'account.json').write_text(json.dumps({
-    'profile': profile, 'result': 'PASS', 'policy_checks': 17,
+    'profile': profile, 'result': 'PASS', 'policy_checks': 26,
     'presentation_repaints': 0,
     'runtime_memory': 'Credential capture uses a fixed job buffer below 2 KiB and no heap. Native fake-worker stack and RSS do not qualify ESP32 heap or stack.'
 }, indent=2) + '\n')
-print(f'BookSync F15 {profile}: 17 account checks PASS')
+print(f'BookSync F15 {profile}: 26 account checks PASS')

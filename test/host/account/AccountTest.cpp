@@ -349,3 +349,42 @@ TEST(AccountDelivery, StaleCompletionSettlesCanceledWithoutPublishingReady) {
   EXPECT_EQ(publication.ready, 0u);
   EXPECT_EQ(publication.canceled, 1u);
 }
+
+// Android 0.12 sign-out policy: each connector is absent, account-supplied or
+// independently entered. UI approval must not change these retention semantics.
+class AccountSignOutOrigins : public ::testing::TestWithParam<unsigned> {};
+TEST_P(AccountSignOutOrigins, RemovesOnlyAccountSuppliedLoginsAndRetiresTheEpoch) {
+  FakeAuth adapter;
+  Account account(adapter);
+  CredentialCapture input;
+  ASSERT_TRUE(capture(input));
+  ASSERT_EQ(account.signIn(input, account.snapshot().ticket), AuthError::None);
+  const unsigned sync = GetParam() / 3, acquisition = GetParam() % 3;
+  for (const auto kind : {LoginKind::Sync, LoginKind::Acquisition}) {
+    const auto origin = kind == LoginKind::Sync ? sync : acquisition;
+    if (origin == 1) {
+      ASSERT_EQ(account.useAccountLogin(kind, account.snapshot().ticket), AuthError::None);
+    } else if (origin == 2) {
+      ASSERT_TRUE(capture(input, kind));
+      ASSERT_EQ(account.signIn(input, account.snapshot().ticket), AuthError::None);
+    }
+  }
+  const auto before = account.snapshot();
+  ASSERT_EQ(account.signOut(before.ticket), AuthError::None);
+  const auto after = account.snapshot();
+  EXPECT_FALSE(after.signedIn);
+  EXPECT_EQ(after.accountOwner, 0u);
+  EXPECT_EQ(after.syncReady, sync == 2);
+  EXPECT_EQ(after.acquisitionReady, acquisition == 2);
+  EXPECT_EQ(after.syncOwner, sync == 2 ? before.syncOwner : 0u);
+  EXPECT_EQ(after.acquisitionOwner, acquisition == 2 ? before.acquisitionOwner : 0u);
+  EXPECT_EQ(after.syncOrigin, sync == 2 ? LoginOrigin::User : LoginOrigin::None);
+  EXPECT_EQ(after.acquisitionOrigin, acquisition == 2 ? LoginOrigin::User : LoginOrigin::None);
+  EXPECT_GT(after.ticket.epoch, before.ticket.epoch);
+  EXPECT_EQ(adapter.clears, 1u);
+  EXPECT_EQ(account.signOut(before.ticket), AuthError::Stale);
+  EXPECT_EQ(account.removeLogin(LoginKind::Sync, before.ticket), AuthError::Stale);
+  EXPECT_EQ(account.useAccountLogin(LoginKind::Acquisition, before.ticket), AuthError::Stale);
+  EXPECT_EQ(adapter.clears, 1u);
+}
+INSTANTIATE_TEST_SUITE_P(AllNinePairs, AccountSignOutOrigins, ::testing::Range(0u, 9u));
