@@ -127,4 +127,5 @@ subprocess.run([sys.executable, "test/simulator/catalog_surface.py", profile], c
 subprocess.run([sys.executable, "test/simulator/native_personal.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, "test/simulator/device_bridge.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/reminder_ui.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, "test/simulator/battery_source.py", profile], cwd=root, env=env, check=True)
 raise SystemExit(0)
