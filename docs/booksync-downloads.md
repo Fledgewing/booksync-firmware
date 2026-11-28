@@ -22,7 +22,8 @@ adapter resolves acquisition paths with current authorization. It rejects
 redirects, non-relative targets, weak validators and malformed/mismatched ranges.
 Final framing/authorization, exact edition/version and the adapter's frozen
 reader proof are verified first. The worker then computes/persists canonical
-whole-file SHA-256 (or compares an already known revision). F06 publication and durable identity linking all precede Ready. Full card/short write
+whole-file SHA-256 (or compares an already known revision). F06 publication and durable identity linking all precede Ready. A visible rename with a failed
+final directory barrier must be confirmed durable before linking or opening. Full card/short write
 failures keep the previous complete file and resumable staging. The adapter port
 must use bounded I/O timeouts and be drained before display ownership is returned.
 

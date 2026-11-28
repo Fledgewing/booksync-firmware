@@ -45,6 +45,10 @@ class FilePublish {
   bool finishNew();
   // Positive current-only validation: missing/read errors never select backup.
   static bool validateCurrent(PublishPaths paths, FileValidator validator, void* context = nullptr);
+  // Reconcile a visible current file after a failed final barrier or restart.
+  // Still requires the serialized writer and full validator; true confirms both
+  // current bytes and directory durability, without renaming/deleting anything.
+  bool confirm();
   static PublishedFile select(PublishPaths paths, FileValidator validator, void* context = nullptr);
 
  private:

@@ -136,6 +136,41 @@ TEST_F(DownloadTest, InvalidSelectionAndUnownedStagingDoNotPoisonRetry) {
   complete(j);
   EXPECT_EQ(j.result(id, owner), DeliveryResult::Ready);
 }
+TEST_F(DownloadTest, VisibleRenameMustConfirmDurabilityBeforeLink) {
+  {
+    DownloadJobs j(journal, admission, ports);
+    ASSERT_TRUE(j.recover(scope, owner));
+    j.start(spec, source, owner);
+    complete(j);
+  }
+  const auto last = std::find(card.events.rbegin(), card.events.rend(), "rename:after");
+  ASSERT_NE(last, card.events.rend());
+  const int renamed = static_cast<int>(card.events.size() - 1 - std::distance(card.events.rbegin(), last));
+  card = {};
+  links = 0;
+  card.readOnlyAt = renamed;
+  uint64_t id;
+  {
+    DownloadJobs j(journal, admission, ports);
+    ASSERT_TRUE(j.recover(scope, owner));
+    id = j.start(spec, source, owner);
+    complete(j);
+    EXPECT_EQ(j.result(id, owner), DeliveryResult::Unavailable);
+    EXPECT_EQ(j.status(owner).error, DownloadError::StorageFailure);
+    EXPECT_EQ(links, 0u);
+    EXPECT_EQ(card.files[spec.path.data()], "abc");
+  }
+  card.restart();
+  card.readOnly = false;
+  EXPECT_FALSE(Storage.exists(spec.path.data()));
+  DownloadJobs j(journal, admission, ports);
+  ASSERT_TRUE(j.recover(scope, owner));
+  ASSERT_TRUE(j.resume(id, source, owner));
+  complete(j);
+  EXPECT_EQ(j.result(id, owner), DeliveryResult::Ready);
+  EXPECT_EQ(links, 1u);
+  EXPECT_EQ(card.disk[spec.path.data()], "abc");
+}
 TEST_F(DownloadTest, WrongDigestNeverPublishes) {
   source.badDigest = true;
   DownloadJobs j(journal, admission, ports);

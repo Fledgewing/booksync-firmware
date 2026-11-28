@@ -13,7 +13,7 @@ struct PowerCut {};
 struct FakeCard {
   std::map<std::string, std::string> files, disk;
   std::vector<std::string> events;
-  int stop = -1, fail = -1;
+  int stop = -1, fail = -1, readOnlyAt = -1;
   int cutWrite = -1, prefix = 0, writes = 0;
   bool readOnly = false, full = false, eager = false, dead = false;
   int handles = 0, maxHandles = 0;
@@ -21,6 +21,7 @@ struct FakeCard {
   bool event(const std::string& name) {
     events.push_back(name);
     const int n = static_cast<int>(events.size()) - 1;
+    if (n == readOnlyAt) readOnly = true;
     if (n == stop) {
       dead = true;
       throw PowerCut{};
@@ -32,7 +33,7 @@ struct FakeCard {
   }
   void restart() {
     files = disk;
-    stop = fail = cutWrite = -1;
+    stop = fail = cutWrite = readOnlyAt = -1;
     dead = false;
     handles = 0;
     events.clear();

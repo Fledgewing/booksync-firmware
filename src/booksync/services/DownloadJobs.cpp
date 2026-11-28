@@ -342,6 +342,11 @@ bool DownloadJobs::begin(DownloadSource& source) {
       fail(DownloadError::Digest);
       return false;
     }
+    storage::FilePublish published({record_.spec.path.data(), staging_.data(), backup_.data()}, artifactValid, this);
+    if (!published.confirm()) {
+      fail(DownloadError::StorageFailure);
+      return false;
+    }
     status_.state = DownloadState::Linking;
     ++status_.sequence;
     return true;
@@ -535,7 +540,7 @@ void DownloadJobs::tick(DeliveryTicket current) {
   storage::FilePublish publish({record_.spec.path.data(), staging_.data(), backup_.data()}, artifactValid, this);
   if (!publish.resume(status_.received, status_.received) || !publish.finish()) {
     // F06 final barrier may report failure after the verified rename committed.
-    if (!Storage.exists(record_.spec.path.data()) || !verifyPath(record_.spec.path.data())) {
+    if (!publish.confirm()) {
       fail(DownloadError::StorageFailure);
       return;
     }
