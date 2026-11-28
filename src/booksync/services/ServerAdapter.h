@@ -16,7 +16,6 @@ struct RemoteReadingStats;
 // copying or moving; adapter writes must require the live owner's borrowed token.
 class SyncWriterToken final {
   friend class SyncOwner;
-  struct FinishRequest;
   SyncWriterToken() = default;
 
  public:

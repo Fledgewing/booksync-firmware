@@ -202,7 +202,10 @@ JournalResult Finish::positionDelivered(const JournalEntry& source) {
 }
 SyncResult Finish::step(const SyncWriterToken& token, ServerAdapter& adapter, const JournalEntry& e) {
   FinishIntent v;
-  if (!ready() || !decode(e.payload, v) || !e.acknowledged) return SyncResult::Unavailable;
+  if (!ready() || !decode(e.payload, v) || !e.acknowledged) {
+    LOG_ERR("BSF", "Finish intent or position proof unavailable; record retained");
+    return SyncResult::Unavailable;
+  }
   if (!v.undoOf && !e.attempting && e.acknowledged == 1) {
     uint64_t cursor = e.id;
     JournalResult r;
