@@ -8,6 +8,7 @@ add_executable(BookSyncPersonalWidgetsTest PersonalWidgetsTest.cpp
 target_include_directories(BookSyncPersonalWidgetsTest PRIVATE ../file_publish/stubs ${REPO_ROOT}/src)
 target_link_libraries(BookSyncPersonalWidgetsTest PRIVATE crosspoint_test_common GTest::gtest_main)
 if(NOT APPLE)
+  find_package(OpenSSL REQUIRED)
   target_link_libraries(BookSyncPersonalWidgetsTest PRIVATE OpenSSL::Crypto)
 endif()
 gtest_discover_tests(BookSyncPersonalWidgetsTest)
