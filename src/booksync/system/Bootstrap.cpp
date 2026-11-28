@@ -31,6 +31,7 @@
 #include "booksync/ui/WidgetHost.h"
 #include "booksync/ui/widgets/Clock.h"
 #include "booksync/ui/widgets/Moon.h"
+#include "booksync/ui/widgets/Glyph.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -179,6 +180,8 @@ class ShellActivity final : public Activity {
         return tr(STR_HOME_CLOCK);
       case WidgetKind::Moon:
         return tr(STR_HOME_MOON);
+      case WidgetKind::Glyph:
+        return tr(STR_HOME_GLYPH);
       case WidgetKind::Continue:
         return tr(STR_CONTINUE_READING);
       case WidgetKind::Shelf:
@@ -194,17 +197,32 @@ class ShellActivity final : public Activity {
                                       StrId::STR_HOME_MOON_LAST_QUARTER,  StrId::STR_HOME_MOON_WANING_CRESCENT};
     return I18N.get(names[phase < 8 ? phase : 0]);
   }
+  static bool glyphFace(uint32_t cp, void* context) {
+    auto& self = *static_cast<ShellActivity*>(context);
+    if (cp < 65 || cp > 90) return false;
+    const auto& fonts = self.renderer.getFontMap();
+    const auto serif = fonts.find(BITTER_16_FONT_ID);
+    if (serif == fonts.end()) return false;
+    const auto* actual = serif->second.getData(EpdFontFamily::REGULAR);
+    const auto recovery = fonts.find(UI_12_FONT_ID);
+    // S3's recovery path may bind the UI family under a reader ID. It must not
+    // be labeled as the built-in serif sample. Probe the exact glyph, too.
+    if (recovery != fonts.end() && actual == recovery->second.getData(EpdFontFamily::REGULAR)) return false;
+    const auto found = serif->second.findGlyphData(cp, EpdFontFamily::REGULAR);
+    return found.glyph && found.fontData == actual && self.renderer.getGlyphBitmap(found.fontData, found.glyph);
+  }
   void paintTimeWidget(uint8_t index, Rect rect, bool selected) const {
     const auto kind = widgets->page().widgets[index].kind;
     const auto view = widgets->view(index);
     const auto* clock = widgets->clockCard(index);
     const auto* moon = widgets->moonCard(index);
+    const auto* glyph = widgets->glyphCard(index);
     // Geometry scratch is bounded below 256 bytes; captions are reused per line
     // on the dedicated render stack. No per-paint allocation or source work.
     widgets::TimeDrawing drawing;
-    const bool laidOut = clock  ? widgets::Clock::layoutTime(*clock, widgetBox(index), drawing)
+    const bool laidOut = clock ? widgets::Clock::layoutTime(*clock, widgetBox(index), drawing)
                          : moon ? widgets::Moon::layoutTime(*moon, widgetBox(index), drawing)
-                                : false;
+                         : glyph ? widgets::Glyph::layoutTime(*glyph, widgetBox(index), drawing) : false;
     renderer.drawRoundedRect(rect.x, rect.y, rect.width, rect.height, 1, 8, true);
     if (selected) renderer.drawRect(rect.x + 3, rect.y + 3, rect.width - 6, rect.height - 6, 2, true);
     if (!laidOut) {
@@ -219,10 +237,15 @@ class ShellActivity final : public Activity {
     static constexpr int8_t moonOutline[][2] = {{12, 0}, {8, 3},  {7, 7}, {9, 11}, {13, 13}, {9, 15},
                                                 {4, 14}, {1, 10}, {0, 6}, {3, 2},  {7, 0},   {12, 0}};
     const auto* outline = clock ? clockOutline : moonOutline;
-    const unsigned outlineCount = clock ? 11 : 12;
+    const unsigned outlineCount = glyph ? 0 : clock ? 11 : 12;
     for (unsigned n = 1; n < outlineCount; ++n)
       renderer.drawLine(iconX + outline[n - 1][0], iconY + outline[n - 1][1], iconX + outline[n][0],
                         iconY + outline[n][1]);
+    if (glyph) {
+      renderer.drawLine(iconX,iconY+15,iconX+7,iconY);
+      renderer.drawLine(iconX+7,iconY,iconX+15,iconY+15);
+      renderer.drawLine(iconX+3,iconY+10,iconX+12,iconY+10);
+    }
     if (clock) {
       renderer.drawLine(iconX + 8, iconY + 3, iconX + 8, iconY + 8);
       renderer.drawLine(iconX + 8, iconY + 8, iconX + 12, iconY + 10);
@@ -241,6 +264,25 @@ class ShellActivity final : public Activity {
           renderer.drawLine(cx + edge, y, cx + half, y);
         else
           renderer.drawLine(cx - half, y, cx - edge, y);
+      }
+    }
+    if (glyph && drawing.glyph.width) {
+      const auto& cell = drawing.glyph;
+      const char sample[] = {static_cast<char>(glyph->codepoint), 0};
+      const auto ink = renderer.getTextVerticalBounds(BITTER_16_FONT_ID, sample);
+      const int height = ink.bottom - ink.top;
+      if (height > 0) {
+        int32_t advance = 0; int top = 0;
+        if (renderer.getCodepointMetrics(BITTER_16_FONT_ID, glyph->codepoint, EpdFontFamily::REGULAR, advance, top)) {
+          const int scale = std::min(44 * 256 / height, advance > 0 ? (cell.width - 4) * 16 * 256 / advance : 256);
+          const int width = static_cast<int>(int64_t(advance) * scale / (16 * 256));
+          const int baseline = rect.y + cell.y + (cell.height - height * scale / 256) / 2 +
+            (renderer.getFontAscenderSize(BITTER_16_FONT_ID) - ink.top) * scale / 256;
+          renderer.beginTextClip(rect.x + cell.x, rect.y + cell.y, cell.width, cell.height);
+          renderer.drawScaledCodepoint(BITTER_16_FONT_ID, glyph->codepoint, EpdFontFamily::REGULAR,
+            rect.x + cell.x + std::max(0,(cell.width-width)/2), baseline, scale);
+          renderer.endTextClip();
+        }
       }
     }
     for (uint8_t i = 0; i < drawing.count; ++i) {
@@ -282,6 +324,11 @@ class ShellActivity final : public Activity {
                         unsigned(date.year));
           break;
         }
+        case widgets::TimeLine::GlyphCode:
+          std::snprintf(caption,sizeof(caption),tr(STR_HOME_GLYPH_CODE_FORMAT),static_cast<unsigned long>(glyph->codepoint)); break;
+        case widgets::TimeLine::GlyphName:
+          std::snprintf(caption,sizeof(caption),tr(STR_HOME_GLYPH_NAME_FORMAT),static_cast<char>(glyph->codepoint)); break;
+        case widgets::TimeLine::GlyphSource: text = tr(STR_HOME_GLYPH_SERIF); break;
         case widgets::TimeLine::TimeSource:
           text = tr(STR_HOME_CLOCK_ESTABLISHED);
           break;
@@ -297,7 +344,7 @@ class ShellActivity final : public Activity {
           break;
         case widgets::TimeLine::Stale:
           std::snprintf(caption, sizeof(caption), tr(STR_HOME_SAVED_DAYS_FORMAT),
-                        static_cast<unsigned long>(clock ? clock->status.ageDays : moon->status.ageDays));
+                        static_cast<unsigned long>(clock ? clock->status.ageDays : moon ? moon->status.ageDays : glyph->status.ageDays));
           break;
         case widgets::TimeLine::Retry:
           text = tr(STR_RETRY);
@@ -306,9 +353,12 @@ class ShellActivity final : public Activity {
           text = view.viewState == WidgetState::Off        ? tr(STR_HOME_SOURCE_OFF)
                  : view.viewState == WidgetState::NotSaved ? tr(STR_HOME_NOT_SAVED)
                  : view.viewState == WidgetState::Unsupported
-                     ? (kind == WidgetKind::Clock ? tr(STR_HOME_CLOCK_UNSUPPORTED) : tr(STR_HOME_MOON_UNSUPPORTED))
+                     ? (kind == WidgetKind::Clock ? tr(STR_HOME_CLOCK_UNSUPPORTED)
+                     : kind == WidgetKind::Moon ? tr(STR_HOME_MOON_UNSUPPORTED)
+                     : glyph && glyph->issue == GlyphIssue::FaceUnavailable ? tr(STR_HOME_GLYPH_FACE_UNAVAILABLE)
+                     : tr(STR_HOME_MOON_UNSUPPORTED))
                  : view.viewState == WidgetState::Empty || view.viewState == WidgetState::Known
-                     ? (kind == WidgetKind::Clock ? tr(STR_HOME_CLOCK_EMPTY) : tr(STR_HOME_MOON_EMPTY))
+                     ? (kind == WidgetKind::Clock ? tr(STR_HOME_CLOCK_EMPTY) : kind == WidgetKind::Moon ? tr(STR_HOME_MOON_EMPTY) : tr(STR_HOME_GLYPH_EMPTY))
                      : stateText(view.viewState);
           break;
       }
@@ -1163,7 +1213,7 @@ class ShellActivity final : public Activity {
     }
     {
       RenderLock lock;
-      workTimeWidgets(SETTINGS.clockFormat == 1);
+      workTimeWidgets(SETTINGS.clockFormat == 1, glyphFace, this);
       if (widgets && widgets->pollWidgets()) {
         if (focus >= widgets->page().count) focus = 0;
         if (focusRow >= focusRows(focus)) focusRow = 0;

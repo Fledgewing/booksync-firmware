@@ -12,6 +12,7 @@
 #include "booksync/storage/LayoutStore.h"
 #include "widgets/Clock.h"
 #include "widgets/Moon.h"
+#include "widgets/Glyph.h"
 namespace booksync {
 namespace {
 struct LocalQueryState {
@@ -301,7 +302,7 @@ void leaveLocalLibrary() {
   local->source.close();
   local.reset();
 }
-void workTimeWidgets(bool twelveHour) {
+void workTimeWidgets(bool twelveHour, GlyphFaceProbe probe, void* context) {
   if (!local) return;
   auto& state = *local;
   if (state.time.requested &&
@@ -314,6 +315,11 @@ void workTimeWidgets(bool twelveHour) {
     if (state.time.requested & timeWidgetBit(TimeWidget::Clock))
       projectClockWidget(currentClock, {TimeCardState::Ready, 0, true, false, twelveHour}, state.time.clock);
     if (state.time.requested & timeWidgetBit(TimeWidget::Moon)) projectMoonWidget(currentClock, {}, state.time.moon);
+    if (state.time.requested & timeWidgetBit(TimeWidget::Glyph)) {
+      const auto codepoint = glyphCodepoint(currentClock);
+      const bool supported = codepoint && probe && probe(codepoint, context);
+      projectGlyphWidget(currentClock, supported, {}, state.time.glyph);
+    }
     state.model.notifyQueryPublication();
   }
 }

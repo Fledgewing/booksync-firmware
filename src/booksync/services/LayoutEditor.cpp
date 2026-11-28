@@ -11,7 +11,7 @@ namespace booksync {
 namespace {
 bool installedTimeOrStarter(std::string_view widget, bool textOnly) {
   if (widget == "continue-reading" || widget == "booklist" || widget == "library") return true;
-  return !textOnly && (widget == "clock" || widget == "moon");
+  return !textOnly && (widget == "clock" || widget == "moon" || widget == "glyph");
 }
 }  // namespace
 
@@ -354,6 +354,7 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
                            : edit.widget == WidgetKind::Browse ? "library"
                            : edit.widget == WidgetKind::Clock  ? "clock"
                            : edit.widget == WidgetKind::Moon   ? "moon"
+                           : edit.widget == WidgetKind::Glyph ? "glyph"
                                                                : nullptr;
       if (!widget || (!std::strcmp(device, "x3") && isTimeWidget(edit.widget))) return LayoutEditStatus::Invalid;
       const bool timeWidget = isTimeWidget(edit.widget);

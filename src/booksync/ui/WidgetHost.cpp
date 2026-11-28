@@ -30,7 +30,7 @@ bool WidgetHost::pollWidgets() {
       if (p.kind != WidgetKind::Continue && p.kind != WidgetKind::Shelf && p.kind != WidgetKind::Browse)
         auxiliary = true;
       if (isTimeWidget(p.kind) && !page_.textOnly) {
-        batch_.timeWidgets |= timeWidgetBit(p.kind == WidgetKind::Clock ? TimeWidget::Clock : TimeWidget::Moon);
+        batch_.timeWidgets |= timeWidgetBit(p.kind == WidgetKind::Clock ? TimeWidget::Clock : p.kind == WidgetKind::Moon ? TimeWidget::Moon : TimeWidget::Glyph);
         batch_.windows[i] = {0, 1, LibraryBytes, WindowSource::Unknown};
         continue;
       }
@@ -94,9 +94,10 @@ WidgetView WidgetHost::view(uint8_t widget) const {
   if (isTimeWidget(page_.widgets[widget].kind)) {
     const auto* clock = clockCard(widget);
     const auto* moon = moonCard(widget);
-    if (!clock && !moon) return {};
-    const auto status = clock ? clock->status : moon->status;
-    const auto state = clock ? widgets::boundedClockCard(*clock) : widgets::boundedMoonCard(*moon);
+    const auto* glyph = glyphCard(widget);
+    if (!clock && !moon && !glyph) return {};
+    const auto status = clock ? clock->status : moon ? moon->status : glyph->status;
+    const auto state = clock ? widgets::boundedClockCard(*clock) : moon ? widgets::boundedMoonCard(*moon) : widgets::boundedGlyphCard(*glyph);
     const auto mapped = state == TimeCardState::Ready         ? WidgetState::Known
                         : state == TimeCardState::Empty       ? WidgetState::Empty
                         : state == TimeCardState::Off         ? WidgetState::Off
@@ -124,6 +125,11 @@ const MoonWidget* WidgetHost::moonCard(uint8_t widget) const {
       !(time_.requested & timeWidgetBit(TimeWidget::Moon)))
     return nullptr;
   return &time_.moon;
+}
+const GlyphWidget* WidgetHost::glyphCard(uint8_t widget) const {
+  if (widget >= page_.count || page_.textOnly || page_.widgets[widget].kind != WidgetKind::Glyph ||
+      !(time_.requested & timeWidgetBit(TimeWidget::Glyph))) return nullptr;
+  return &time_.glyph;
 }
 bool WidgetHost::widgetCell(uint8_t widget, WidgetBox itemBox, uint8_t itemIndex, WidgetCell& itemCell) const {
   if (widget >= page_.count || page_.widgets[widget].kind != WidgetKind::Shelf) return false;

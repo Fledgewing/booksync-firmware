@@ -3,8 +3,8 @@
 #include "booksync/interface/Models.h"
 namespace booksync {
 constexpr uint8_t HomeWidgets = LibraryBatchRequests;
-enum class WidgetKind : uint8_t { Continue, Shelf, Browse, Clock, Moon };
-inline bool isTimeWidget(WidgetKind kind) { return kind == WidgetKind::Clock || kind == WidgetKind::Moon; }
+enum class WidgetKind : uint8_t { Continue, Shelf, Browse, Clock, Moon, Glyph };
+inline bool isTimeWidget(WidgetKind kind) { return kind == WidgetKind::Clock || kind == WidgetKind::Moon || kind == WidgetKind::Glyph; }
 struct WidgetPlacement {
   WidgetKind kind = WidgetKind::Continue;
   WindowSource source = WindowSource::Recent;

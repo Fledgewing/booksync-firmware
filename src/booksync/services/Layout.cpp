@@ -542,6 +542,8 @@ bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePa
           kind = WidgetKind::Clock;
         else if (widgetId == "moon")
           kind = WidgetKind::Moon;
+        else if (widgetId == "glyph")
+          kind = WidgetKind::Glyph;
         else
           installed = false;
         if (isTimeWidget(kind) && (output.textOnly || g.w != 1 || g.h != 1)) installed = false;

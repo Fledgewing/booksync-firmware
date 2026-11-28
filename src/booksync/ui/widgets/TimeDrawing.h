@@ -3,7 +3,7 @@
 #include "booksync/interface/TimeWidgets.h"
 #include "booksync/ui/WidgetHost.h"
 namespace booksync::widgets {
-enum class TimeLine : uint8_t { Title, Value, Date, TimeSource, TimePhase, Illumination, Next, Stale, State, Retry };
+enum class TimeLine : uint8_t { Title, Value, Date, TimeSource, TimePhase, Illumination, Next, Stale, State, Retry, GlyphCode, GlyphName, GlyphSource };
 struct TimeMark {
   WidgetCell cell{};
   TimeLine line = TimeLine::Title;
@@ -11,7 +11,7 @@ struct TimeMark {
 struct TimeDrawing {
   std::array<TimeMark, 7> marks{};
   uint8_t count = 0;
-  WidgetCell moon{};
+  WidgetCell moon{}, glyph{};
 };
 inline TimeCardState boundedTimeCard(TimeCardStatus status, uint32_t expected) {
   if (status.bytes > expected) return TimeCardState::Oversize;
@@ -35,6 +35,12 @@ inline TimeCardState boundedMoonCard(const MoonWidget& timeValue) {
       timeValue.nextPhase % 2 || timeValue.nextSeconds > 638000 || timeValue.terminator < -1000 ||
       timeValue.terminator > 1000)
     return TimeCardState::Unavailable;
+  return state;
+}
+inline TimeCardState boundedGlyphCard(const GlyphWidget& glyphValue) {
+  const auto state = boundedTimeCard(glyphValue.status, sizeof(glyphValue));
+  if (state != TimeCardState::Ready) return state;
+  if (glyphValue.codepoint < 65 || glyphValue.codepoint > 90 || glyphValue.issue != GlyphIssue::NoIssue) return TimeCardState::Unavailable;
   return state;
 }
 inline void timeLine(TimeDrawing& out, TimeLine line, int x, int y, int w, int h) {

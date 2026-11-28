@@ -11,7 +11,7 @@ bool ReadModel::accepts(const WindowBatchRequest& batch) {
       batch.bytes > LibraryBytes || batch.bytes < Metadata)
     return false;
   const uint32_t timeBytes = batch.timeWidgets ? sizeof(TimeWidgetBatch) : 0;
-  if (batch.timeWidgets > 3 || batch.bytes < Metadata + timeBytes) return false;
+  if (batch.timeWidgets > 7 || batch.bytes < Metadata + timeBytes) return false;
   uint32_t rows = 0;
   for (unsigned i = 0; i < batch.count; ++i) {
     const auto request = batch.windows[i];

@@ -8,6 +8,8 @@
 
 ### Added
 
+- BookSync Home adds the approved Glyph of the day on X4 using the actual built-in serif face and an established local date; unsupported fonts never appear as replacement samples.
+
 - BookSync Home adds compact Clock/date and approximate Moon phase widgets on X4 Pro and Classic, with independent empty, off, unsupported, stale and oversized-data presentations; X3 keeps these widgets disabled.
 
 - BookSync publishes timezone-aware clock and date values only after live or retained clock provenance is known; a persisted expiry floor cannot produce a Home clock.

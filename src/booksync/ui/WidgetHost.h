@@ -29,6 +29,7 @@ class WidgetHost {
   WidgetView view(uint8_t widget) const;
   const ClockWidget* clockCard(uint8_t widget) const;
   const MoonWidget* moonCard(uint8_t widget) const;
+  const GlyphWidget* glyphCard(uint8_t widget) const;
   auto widgetCell(uint8_t widget, WidgetBox itemBox, uint8_t itemIndex, WidgetCell& itemCell) const -> bool;
   uint8_t widgetRows(uint8_t widget, WidgetBox itemBox) const;
   uint8_t hitWidgetRow(uint8_t widget, WidgetBox itemBox, int x, int y) const;
