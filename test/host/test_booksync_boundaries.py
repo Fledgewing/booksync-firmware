@@ -102,6 +102,13 @@ class Boundaries(unittest.TestCase):
                        'bool request(const QueryRequest*&);'):
             self.assertTrue(boundary.ui_source_errors('src/booksync/interface/Probe.h', source))
 
+    def test_concrete_bitmap_copy_does_not_allow_handles(self):
+        self.assertFalse(boundary.ui_source_errors('src/booksync/interface/Probe.h',
+                                                  'bool readCover(CoverReference ref, CoverBitmap& out);'))
+        for source in ('CoverBitmap* out;', 'CoverBitmap& out;', 'CoverBitmap& out();',
+                       'struct Bad { CoverBitmap& out; };', 'bool copy(Secret& out);'):
+            self.assertTrue(boundary.ui_source_errors('src/booksync/interface/Probe.h', source))
+
     def test_build_hook_outside_script_directory_is_inventoried(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

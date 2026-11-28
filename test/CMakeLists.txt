@@ -300,3 +300,4 @@ add_subdirectory(host/copy_jobs)
 
 
 add_subdirectory(host/update_install)
+add_subdirectory(host/cover_jobs)

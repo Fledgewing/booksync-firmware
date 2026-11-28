@@ -10,6 +10,7 @@
 - BookSync adds the approved three-profile library-service picker with epoch-scoped selection and a secret-free account projection. Account/sign-in screens remain pending design approval; setup navigation integration remains deferred.
 - BookSync checkpoints reading-progress delivery and fetch through its single sync owner, retaining uncertain outcomes and raw locators across restarts; fake-server coverage leaves position decisions and reader movement to the next slice.
 - BookSync prepares verified in-place copy updates, deferring open books, retaining the old EPUB for rollback and preserving native reading, annotation and sidecar state across interrupted replacement. Live scheduling remains deferred.
+- BookSync prepares account- and artwork-revision-scoped cover references after paint, with bounded JPEG thumbnails and quiet completion for closed views; live catalog screens remain deferred.
 
 - BookSync captures bounded timestamped reading-page history and checkpoints stats batches through its sole sync owner, retaining explicit coverage gaps and reconciling uncertain uploads without counting reading time twice; live delivery remains deferred.
 - BookSync Home supports local add/remove/reset widget edits on X4 Pro and Classic, with revision checks and atomic saves. X3 provides the approved Home widgets list in Settings, with safe remove/reset choices and storage/no-space recovery.

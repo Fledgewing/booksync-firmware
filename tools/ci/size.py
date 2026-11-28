@@ -34,7 +34,11 @@ PIPELINE = ('booksync::legacy::Activation::boot(', '__wrap_nvs_flash_init', 'mic
             'booksync::server::LifecycleAnnotations::merge(',
             'booksync_copy_jobs_link_anchor', 'booksync::CopyJobs::classify(',
             'booksync::CopyJobs::start(', 'booksync::CopyJobs::recover(',
-            'booksync::storage::FilePublish::restoreBackup(')
+            'booksync::storage::FilePublish::restoreBackup(',
+            'booksync::CoverJobs::CoverJobs(', 'booksync::CoverJobs::~CoverJobs()',
+            'booksync::CoverJobs::request(', 'booksync::CoverJobs::tick(',
+            'booksync::CoverJobs::copy(', 'booksync::CoverDecode::decode(',
+            'booksync::server::Cover::open(')
 
 
 def require_pipeline(names):
