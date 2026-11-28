@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 
 #include "activities/Activity.h"
@@ -51,6 +52,14 @@ class Fixture final : public Library {
 inline void capture(const char* directory, const char* name) {
   if (activityManager.requestUpdateAndWait() != RequestUpdateResult::Rendered) std::_Exit(12);
   RenderLock lock;
+  if (!std::strcmp(name, "reset-keep-focused")) {
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+    const int line = renderer.getLineHeight(UI_10_FONT_ID);
+    const int x = safe.x + 25, y = header.y + header.height + line * 3 + 30;
+    // Keep has a three-pixel focus border; Reset has a one-pixel outline.
+    if (!renderer.isPixelBlack(x, y) || renderer.isPixelBlack(x, y + line + 26)) std::_Exit(20);
+  }
   std::filesystem::create_directories(directory);
   auto path = std::filesystem::path(directory) / (std::string(name) + ".pgm");
   FILE* file = std::fopen(path.c_str(), "wb");
@@ -125,6 +134,7 @@ inline bool tick() {
         key(MappedInputManager::Button::Confirm);
     }
     if (f == 20) capture(directory, "edit-grid");
+    if (f == 32) capture(directory, "add-picker");
     if (f == 90) capture(directory, "reset-keep-focused");
     if (f == 94 && fixture.page.revision != 3) std::_Exit(16);
     if (f == 124) key(MappedInputManager::Button::Back);

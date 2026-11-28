@@ -249,7 +249,7 @@ class ShellActivity final : public Activity {
       for (uint8_t i = 0; i < (panel == Panel::Selected ? 2 : 3); ++i) {
         const auto r = editorHeaderButton(i);
         const auto row = panel == Panel::Selected ? i : widgets->page().count + i;
-        renderer.drawRect(r.x, r.y, r.width, r.height, editor.focus() == row ? 3 : 1);
+        renderer.drawRect(r.x, r.y, r.width, r.height, editor.focus() == row ? 3 : 1, true);
         paintFittedText(UI_10_FONT_ID, r.x + 5, r.y + 4, editorLabel(row), r.width - 10);
       }
       return;
@@ -292,7 +292,7 @@ class ShellActivity final : public Activity {
     if (panel == Panel::Waiting) return;
     for (uint8_t i = 0; i < editor.rows(); ++i) {
       const auto r = editorRow(i);
-      renderer.drawRect(r.x, r.y, r.width, r.height, i == editor.focus() ? 3 : 1);
+      renderer.drawRect(r.x, r.y, r.width, r.height, i == editor.focus() ? 3 : 1, true);
       paintFittedText(UI_10_FONT_ID, r.x + 12, r.y + 10, editorLabel(i), r.width - 24);
     }
   }
