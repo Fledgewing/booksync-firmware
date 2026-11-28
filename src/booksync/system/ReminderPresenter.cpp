@@ -15,6 +15,7 @@
 #include "GfxRenderer.h"
 #include "MappedInputManager.h"
 #include "ReminderClaimRetry.h"
+#include "ReminderText.h"
 #include "activities/Activity.h"
 #include "activities/RenderLock.h"
 #include "booksync/services/LocalLibrary.h"
@@ -113,43 +114,10 @@ uint8_t hit(GfxRenderer& renderer, const ReminderSheetView& value, int x, int y,
     if (y >= r.actionY + int(i) * 52 && y < r.actionY + int(i) * 52 + r.actionHeight) return i;
   return 255;
 }
-// One bounded line, UTF-8 boundaries preserved. Never clips a message silently.
 void paragraph(GfxRenderer& renderer, int x, int& y, int width, const char* text) {
-  char line[241]{};
-  size_t used = 0;
-  while (*text) {
-    unsigned bytes = 1;
-    const auto c = static_cast<unsigned char>(*text);
-    if (c >= 0xf0)
-      bytes = 4;
-    else if (c >= 0xe0)
-      bytes = 3;
-    else if (c >= 0xc0)
-      bytes = 2;
-    if (used + bytes >= sizeof(line)) {
-      line[used] = 0;
-      renderer.drawText(UI_10_FONT_ID, x, y, line);
-      y += renderer.getLineHeight(UI_10_FONT_ID) + 4;
-      used = 0;
-      continue;
-    }
-    for (unsigned i = 0; i < bytes && text[i]; ++i) line[used + i] = text[i];
-    line[used + bytes] = 0;
-    if (used && renderer.getTextWidth(UI_10_FONT_ID, line) > width) {
-      line[used] = 0;
-      renderer.drawText(UI_10_FONT_ID, x, y, line);
-      y += renderer.getLineHeight(UI_10_FONT_ID) + 4;
-      used = 0;
-      continue;
-    }
-    used += bytes;
-    text += bytes;
-  }
-  if (used) {
-    renderer.drawText(UI_10_FONT_ID, x, y, line);
-    y += renderer.getLineHeight(UI_10_FONT_ID) + 4;
-  }
+  paintReminderParagraph(renderer, text, x, y, width);
 }
+
 void paint(GfxRenderer& renderer, const ReminderSheetView& value) {
   const auto r = geometry(renderer, value);
   renderer.fillRect(r.x, r.y, r.width, r.height, false);
@@ -505,7 +473,8 @@ bool inputReminderScene(GfxRenderer& renderer, MappedInputManager& input, Librar
     key(B::Right);
     key(B::Confirm);
   }
-  const bool okay = state == 7 ? p.sheet.view().open : !p.sheet.view().open;
+  // A long drag may become the native dismiss gesture; it must never sleep.
+  const bool okay = state == 7 ? !p.sheet.sleepRequested() : !p.sheet.view().open;
   p.sheet.retireSheet();
   input.simulatorClearInputFrame();
   input.setMenuMode(menu);

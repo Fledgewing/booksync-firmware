@@ -12311,6 +12311,7 @@
         "MappedInputManager.h",
         "ReminderClaimRetry.h",
         "ReminderPresenter.h",
+        "ReminderText.h",
         "activities/Activity.h",
         "activities/RenderLock.h",
         "algorithm",
@@ -16323,6 +16324,7 @@
         "Memory.h",
         "MemoryBudget.h",
         "ReminderSettingsScreen.h",
+        "ReminderText.h",
         "activities/Activity.h",
         "booksync/services/OfflineLibrary.h",
         "booksync/ui/reminders/Settings.h",
@@ -16335,6 +16337,21 @@
     "src/booksync/system/ReminderSettingsScreen.h": {
       "role": "system",
       "rationale": "R1 Settings lifecycle snapshot and bounded unsaved draft, explicit Library-only mutations; native drawing/input adapter has no storage, protocol, timer or scheduler access."
+    },
+    "src/booksync/system/ReminderText.h": {
+      "role": "system",
+      "rationale": "R1 bounded native word wrapping streams translated paragraphs with one 241-byte line and no heap allocation.",
+      "includes": []
+    },
+    "src/booksync/system/ReminderText.cpp": {
+      "role": "system",
+      "rationale": "R1 bounded native word wrapping streams translated paragraphs with one 241-byte line and no heap allocation.",
+      "includes": [
+        "GfxRenderer.h",
+        "ReminderText.h",
+        "cstring",
+        "fontIds.h"
+      ]
     }
   }
 }

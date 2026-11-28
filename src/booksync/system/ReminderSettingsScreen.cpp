@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include "../../../lib/hal/HalElapsed.h"
+#include "ReminderText.h"
 #include "activities/Activity.h"
 #include "booksync/services/OfflineLibrary.h"
 #include "booksync/ui/reminders/Settings.h"
@@ -63,41 +64,9 @@ class ReminderSettingsActivity final : public Activity {
             (r.w - 24) / 10 - 2, 42};
   }
   void paintReminderText(const char* text, int x, int& y, int width, bool draw = true) const {
-    char buffer[241]{};
-    unsigned used = 0;
-    while (*text) {
-      unsigned n = 1;
-      const auto c = static_cast<unsigned char>(*text);
-      if (c >= 0xf0)
-        n = 4;
-      else if (c >= 0xe0)
-        n = 3;
-      else if (c >= 0xc0)
-        n = 2;
-      if (used + n >= sizeof(buffer)) {
-        buffer[used] = 0;
-        if (draw) renderer.drawText(UI_10_FONT_ID, x, y, buffer);
-        y += renderer.getLineHeight(UI_10_FONT_ID) + 3;
-        used = 0;
-        continue;
-      }
-      for (unsigned i = 0; i < n && text[i]; ++i) buffer[used + i] = text[i];
-      buffer[used + n] = 0;
-      if (used && (used + n >= sizeof(buffer) || renderer.getTextWidth(UI_10_FONT_ID, buffer) > width)) {
-        buffer[used] = 0;
-        if (draw) renderer.drawText(UI_10_FONT_ID, x, y, buffer);
-        y += renderer.getLineHeight(UI_10_FONT_ID) + 3;
-        used = 0;
-        continue;
-      }
-      used += n;
-      text += n;
-    }
-    if (used) {
-      if (draw) renderer.drawText(UI_10_FONT_ID, x, y, buffer);
-      y += renderer.getLineHeight(UI_10_FONT_ID) + 3;
-    }
+    paintReminderParagraph(renderer, text, x, y, width, draw);
   }
+
   void box(Region r, const char* text, bool selected, bool enabled = true) const {
     if (!enabled) renderer.fillRectDither(r.x, r.y, r.w, r.h, Color::LightGray);
     renderer.drawRect(r.x, r.y, r.w, r.h, selected && enabled ? 3 : 1, true);
@@ -747,7 +716,12 @@ class ReminderSettingsActivity final : public Activity {
       if (screen == ReminderScreen::Days) {
         constexpr StrId labels[4] = {StrId::STR_REMINDER_EVERY_DAY, StrId::STR_REMINDER_WEEKDAYS,
                                      StrId::STR_REMINDER_WEEKENDS, StrId::STR_REMINDER_CUSTOM};
-        for (unsigned i = 0; i < 4; ++i) box(row(i), I18N.get(labels[i]), focus == i);
+        for (unsigned i = 0; i < 4; ++i) {
+          const auto chosen = model.draft().child.days;
+          const unsigned preset = chosen == 127 ? 0 : chosen == 31 ? 1 : chosen == 96 ? 2 : 3;
+          std::snprintf(text, sizeof(text), "[%c] %s", preset == i ? 'x' : ' ', I18N.get(labels[i]));
+          box(row(i), text, focus == i);
+        }
         box(footer(0), tr(STR_DONE), focus == 4);
       } else {
         for (unsigned i = 0; i < dayRows(); ++i) {
@@ -770,7 +744,10 @@ class ReminderSettingsActivity final : public Activity {
     } else if (screen == ReminderScreen::Interval) {
       constexpr uint8_t values[4] = {20, 30, 45, 60};
       for (unsigned i = 0; i < 4; ++i) {
-        std::snprintf(text, sizeof(text), tr(STR_REMINDER_MINUTES_FORMAT), unsigned(values[i]));
+        char caption[64]{};
+        std::snprintf(caption, sizeof(caption), tr(STR_REMINDER_MINUTES_FORMAT), unsigned(values[i]));
+        std::snprintf(text, sizeof(text), "[%c] %s", model.draft().child.intervalMinutes == values[i] ? 'x' : ' ',
+                      caption);
         box(row(i), text, focus == i);
       }
       box(footer(0), tr(STR_DONE), focus == 4);
