@@ -720,7 +720,8 @@ class CatalogActivity final : public Activity {
     std::snprintf(label, sizeof(label), "%s", tr(STR_CATALOG_SAVED_VIEW));
     if (panel == CatalogSurface::Panel::Dashboard)
       std::snprintf(label, sizeof(label), "‹ %s ›", tr(STR_CATALOG_TITLE));
-    else if (catalog_->catalogDialog() == CatalogSurface::Dialog::None && catalog_->catalogHasMore() &&
+    else if (catalog_->catalogDialog() == CatalogSurface::Dialog::None &&
+             (catalog_->catalogHasMore() || catalog_->catalogOffset()) &&
              catalog_->catalogResult().membershipComplete) {
       const auto total =
           panel == CatalogSurface::Panel::Groups ? catalog_->catalogResult().optionTotal : catalog_->catalogTotal();

@@ -249,7 +249,9 @@ void CatalogSurface::stepCatalog(int direction) {
 uint32_t CatalogSurface::catalogTotal() const {
   return panel_ == Panel::Sources ? sources_.total : result_.matchedBooks;
 }
-bool CatalogSurface::catalogHasMore() const { return panel_ == Panel::Sources ? sources_.hasMore : result_.hasMore; }
+bool CatalogSurface::catalogHasMore() const {
+  return panel_ == Panel::Sources ? sources_.hasMore || sources_.count > catalogPageRows() : result_.hasMore;
+}
 bool CatalogSurface::pageCatalog(int direction) {
   if (!catalogLive() || dialog_ != Dialog::None ||
       (panel_ != Panel::Sources && panel_ != Panel::Books && panel_ != Panel::Groups))

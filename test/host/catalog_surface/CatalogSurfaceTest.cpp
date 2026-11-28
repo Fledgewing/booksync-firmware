@@ -652,3 +652,20 @@ TEST(CatalogStateMachine, MissingListKeepsFilterAndRetryAsSeparateActions) {
   ASSERT_EQ(ui.activateCatalog(), CommandStatus::Accepted);
   EXPECT_GT(f.queries, before);
 }
+
+TEST(CatalogStateMachine, CompleteSixSourcePublicationStillPagesAllThreeRowWindows) {
+  catalogFixture::SceneLibrary f;
+  CatalogSurface ui(f);
+  ui.enterCatalog();
+  ui.browseCatalog(CatalogRoot::Lists);
+  ui.pollCatalog();
+  f.sources.count = 6;
+  f.sources.hasMore = false;
+  f.sources.total = 6;
+  f.sources.publication = ++f.sequence;
+  ui.pollCatalog();
+  EXPECT_EQ(ui.catalogVisibleRows(), 3u);
+  EXPECT_TRUE(ui.catalogHasMore());
+  ASSERT_TRUE(ui.pageCatalog(1));
+  EXPECT_EQ(ui.catalogOffset(), 3u);
+}
