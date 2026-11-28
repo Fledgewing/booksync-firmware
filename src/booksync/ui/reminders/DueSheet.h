@@ -27,7 +27,7 @@ struct ReminderSheetView {
 class ReminderDueSheet {
  public:
   explicit ReminderDueSheet(Library& library) : library_(library) {}
-  auto stageSheet(ReminderDue) -> bool;
+  auto stageSheet(const ReminderDue&) -> bool;
   auto enterSheet(ReminderDue, ReminderClaim, bool sleepAvailable) -> bool;
   auto enterSheet(const ReminderPresentation&, ReminderClaim, bool sleepAvailable) -> bool;
   auto sheetInput(ReminderSheetInput, uint8_t action = 255) -> void;

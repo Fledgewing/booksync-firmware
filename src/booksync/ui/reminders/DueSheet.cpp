@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "booksync/ui/reminders/DueSheet.h"
 namespace booksync {
-bool ReminderDueSheet::stageSheet(ReminderDue due) {
+bool ReminderDueSheet::stageSheet(const ReminderDue& due) {
   if (view_.open) return false;
   view_.due = due;
   return true;

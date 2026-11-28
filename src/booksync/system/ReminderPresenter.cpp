@@ -222,99 +222,11 @@ void inputs(Presenter& p, GfxRenderer& renderer, MappedInputManager& input) {
       p.sheet.sheetInput(ReminderSheetInput::TouchUp, 255);
   }
 }
-}  // namespace
-bool reminderOwnsFrame() { return presenter().frame.load(); }
-void reminderHidden(bool hidden) {
-  auto& p = presenter();
-  if (p.hidden == hidden) return;
-  p.hidden = hidden;
-  reminderNavigation();
-}
-void reminderNavigation() {
-  auto& p = presenter();
-  p.sheet.retireSheet();
-  if (p.claiming) offlineLibrary().remindersRetire(p.lifetime);
-  p.claiming = false;
-  p.retry.reset();
-  p.frame = false;
-  if (p.lifetime != UINT64_MAX)
-    ++p.lifetime;
-  else
-    p.hidden = true;
-  p.now.page = false;
-  reportActivity(false);
-}
-void reminderInput() {
-  presenter().input = true;
-  reportActivity(true);
-}
-bool takeReminderSleep() {
-  auto& p = presenter();
-  const bool value = p.sleep;
-  p.sleep = false;
-  return value;
-}
-bool reminderLoop(GfxRenderer& renderer, MappedInputManager& input, bool page, bool visible, bool modal) {
-  if constexpr (!CROSSINK_APP_CAP_REMINDERS) return false;
-  auto& p = presenter();
-  auto& facade = reminderRuntime();
-  auto& library = offlineLibrary();
-  if (!p.initialized) {
-    bindReminders(facade);
-    bindReminderActivity(observeActivity);
-    facade.configureFormatter(format);
-    facade.configureListFormatter(formatList);
-    facade.configureSleep({requestSleep, nullptr});
-    facade.sleepAvailable(true);
-    p.initialized = true;
-  }
-  if (takeReminderConnectRequest()) {
-    activityManager.connectReminderClock();
-    return false;
-  }
-  const bool hadFrame = p.frame;
-  sampleRuntimeClock();
-  const bool known = library.clockStatus().known();
-  const uint64_t elapsed = HalElapsed::milliseconds();
-  const int64_t wall = known ? int64_t(std::time(nullptr)) : 0;
-  const int16_t offset =
-      int16_t((static_cast<int>(SETTINGS.clockUtcOffsetQ <= 104 ? SETTINGS.clockUtcOffsetQ : 48) - 48) * 15);
-  const int64_t predicted = p.now.wall + (elapsed >= p.now.elapsed ? int64_t((elapsed - p.now.elapsed) / 1000) : 0);
-  const bool corrected = known && p.now.known && (wall > predicted + 1 || wall < predicted - 1);
-  const bool activePage = page && !p.hidden && !p.sheet.view().open;
-  const bool changed = p.now.page != activePage || p.now.visible != (visible && !p.hidden) || p.now.modal != modal ||
-                       p.now.known != known || p.now.offsetMinutes != offset || corrected;
-  p.now = {wall, elapsed, offset, known, visible && !p.hidden, p.hidden, activePage, modal};
-  // Observe idle before resumed input. Keep a claim's native frame exclusion
-  // through its initial draw; a queued render can never replace that parent in
-  // the gap between a durable claim and the one-use gate.
-  std::optional<RenderLock> claimLock;
-  reportActivity(p.input);
-  if (changed || p.input || facade.hasReminderCommand() || !p.lastEvaluation ||
-      p.now.elapsed - p.lastEvaluation >= 60000) {
-    if (facade.claimCommand()) {
-      claimLock.emplace();
-      const auto fresh = activityManager.reminderContext();
-      p.now.visible = fresh.visible && !p.hidden;
-      p.now.page = fresh.page && !p.hidden;
-      p.now.modal = fresh.modal;
-      p.now.elapsed = HalElapsed::milliseconds();
-      sampleRuntimeClock();
-      p.now.known = library.clockStatus().known();
-      p.now.wall = p.now.known ? int64_t(std::time(nullptr)) : 0;
-      evaluateReminders(facade, p.now, p.input);
-    } else if (facade.storageCommand()) {
-      RenderLock storageLock;  // Exclude the native page/cache file reader.
-      evaluateReminders(facade, p.now, p.input);
-    } else {
-      // Pure ticks/responses never wait for rendering. Sleep preflight takes
-      // the reader's own non-recursive lock and queues the existing native path.
-      evaluateReminders(facade, p.now, p.input);
-    }
-    p.lastEvaluation = p.now.elapsed;
-  }
-  p.input = false;
-  if (!p.now.visible || p.now.sleeping || modal) {
+// Keep the due-value workspace off the durable worker call chain.
+[[gnu::noinline]] bool updateReminderSheet(Presenter& p, RemindersFacade& facade, Library& library, GfxRenderer& renderer,
+                         MappedInputManager& input, std::optional<RenderLock>& claimLock) {
+  const bool hadFrame = p.frame.load();
+  if (!p.now.visible || p.now.sleeping || p.now.modal) {
     if (hadFrame || p.claiming) reminderNavigation();
     return hadFrame;
   }
@@ -382,6 +294,101 @@ bool reminderLoop(GfxRenderer& renderer, MappedInputManager& input, bool page, b
   if (library.remindersDue(due) && p.retry.allows(due, p.now.elapsed) && p.sheet.stageSheet(due))
     p.claiming = library.remindersClaim(due, p.lifetime).status == ReminderStatus::Pending;
   return false;
+}
+}  // namespace
+bool reminderOwnsFrame() { return presenter().frame.load(); }
+void reminderHidden(bool hidden) {
+  auto& p = presenter();
+  if (p.hidden == hidden) return;
+  p.hidden = hidden;
+  reminderNavigation();
+}
+void reminderNavigation() {
+  auto& p = presenter();
+  p.sheet.retireSheet();
+  if (p.claiming) offlineLibrary().remindersRetire(p.lifetime);
+  p.claiming = false;
+  p.retry.reset();
+  p.frame = false;
+  if (p.lifetime != UINT64_MAX)
+    ++p.lifetime;
+  else
+    p.hidden = true;
+  p.now.page = false;
+  reportActivity(false);
+}
+void reminderInput() {
+  presenter().input = true;
+  reportActivity(true);
+}
+bool takeReminderSleep() {
+  auto& p = presenter();
+  const bool value = p.sleep;
+  p.sleep = false;
+  return value;
+}
+bool reminderLoop(GfxRenderer& renderer, MappedInputManager& input, bool page, bool visible, bool modal) {
+  if constexpr (!CROSSINK_APP_CAP_REMINDERS) return false;
+  auto& p = presenter();
+  auto& facade = reminderRuntime();
+  auto& library = offlineLibrary();
+  if (!p.initialized) {
+    bindReminders(facade);
+    bindReminderActivity(observeActivity);
+    facade.configureFormatter(format);
+    facade.configureListFormatter(formatList);
+    facade.configureSleep({requestSleep, nullptr});
+    facade.sleepAvailable(true);
+    p.initialized = true;
+  }
+  if (takeReminderConnectRequest()) {
+    activityManager.connectReminderClock();
+    return false;
+  }
+  sampleRuntimeClock();
+  const bool known = library.clockStatus().known();
+  const uint64_t elapsed = HalElapsed::milliseconds();
+  const int64_t wall = known ? int64_t(std::time(nullptr)) : 0;
+  const int16_t offset =
+      int16_t((static_cast<int>(SETTINGS.clockUtcOffsetQ <= 104 ? SETTINGS.clockUtcOffsetQ : 48) - 48) * 15);
+  const int64_t predicted = p.now.wall + (elapsed >= p.now.elapsed ? int64_t((elapsed - p.now.elapsed) / 1000) : 0);
+  const bool corrected = known && p.now.known && (wall > predicted + 1 || wall < predicted - 1);
+  const bool activePage = page && !p.hidden && !p.sheet.view().open;
+  const bool changed = p.now.page != activePage || p.now.visible != (visible && !p.hidden) || p.now.modal != modal ||
+                       p.now.known != known || p.now.offsetMinutes != offset || corrected;
+  p.now = {wall, elapsed, offset, known, visible && !p.hidden, p.hidden, activePage, modal};
+  // Observe idle before resumed input. Keep a claim's native frame exclusion
+  // through its initial draw; a queued render can never replace that parent in
+  // the gap between a durable claim and the one-use gate.
+  std::optional<RenderLock> claimLock;
+  reportActivity(p.input);
+  if (changed || p.input || facade.hasReminderCommand() || !p.lastEvaluation ||
+      p.now.elapsed - p.lastEvaluation >= 60000) {
+    if (facade.claimCommand()) {
+      claimLock.emplace();
+      const auto fresh = activityManager.reminderContext();
+      p.now.visible = fresh.visible && !p.hidden;
+      p.now.page = fresh.page && !p.hidden;
+      p.now.modal = fresh.modal;
+      p.now.elapsed = HalElapsed::milliseconds();
+      sampleRuntimeClock();
+      p.now.known = library.clockStatus().known();
+      p.now.wall = p.now.known ? int64_t(std::time(nullptr)) : 0;
+      evaluateReminders(facade, p.now, p.input);
+    } else if (facade.storageCommand()) {
+      RenderLock storageLock;  // Exclude the native page/cache file reader.
+      evaluateReminders(facade, p.now, p.input);
+    } else {
+      // Pure ticks/responses never wait for rendering. Sleep preflight takes
+      // the reader's own non-recursive lock and queues the existing native path.
+      evaluateReminders(facade, p.now, p.input);
+    }
+    p.lastEvaluation = p.now.elapsed;
+  }
+  p.input = false;
+  // Large presentation values exist only after the storage worker returns, so
+  // their stack workspace never overlaps mutation/codec scratch on C3.
+  return updateReminderSheet(p, facade, library, renderer, input, claimLock);
 }
 }  // namespace booksync
 #ifdef SIMULATOR
