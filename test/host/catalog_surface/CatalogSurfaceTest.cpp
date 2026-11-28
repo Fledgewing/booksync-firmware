@@ -6,7 +6,10 @@ namespace {
 using namespace booksync;
 class Fixture : public Library {
  public:
-  Fixture() { summary.downloadLogin = true; }
+  Fixture() {
+    summary.provenance.accountEpoch = owner.accountEpoch;
+    summary.downloadLogin = true;
+  }
   Snapshot owner{};
   CatalogSummary summary{};
   QueryResult result{};
@@ -464,4 +467,142 @@ TEST(CatalogStateMachine, BrowseUsesPublishedCountsAndOmitsOnlyUnsupportedRoots)
   ui.selectCatalogControl(6);
   EXPECT_EQ(ui.activateCatalog(), CommandStatus::Accepted);
   EXPECT_EQ(ui.catalogRoot(), CatalogRoot::Lists);
+}
+
+TEST(CatalogStateMachine, ForeignAccountSummaryNeverPublishesCountsOrDownloadCapabilities) {
+  catalogFixture::SceneLibrary library;
+  ++library.summary.provenance.accountEpoch;
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  EXPECT_EQ(ui.catalogSummaryValue().books.availability, Availability::NotSaved);
+  EXPECT_FALSE(ui.catalogSummaryValue().online);
+  EXPECT_FALSE(ui.catalogSummaryValue().downloadLogin);
+  EXPECT_EQ(ui.catalogState(), CatalogSurface::State::Error);
+}
+TEST(CatalogStateMachine, ForeignLateSummaryKeepsOnlyLastOwnAccountCounts) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  ++library.summary.provenance.accountEpoch;
+  ++library.summary.publication;
+  library.summary.books.value = 99999;
+  ui.pollCatalog();
+  EXPECT_EQ(ui.catalogSummaryValue().books.value, 10020u);
+  EXPECT_TRUE(ui.catalogSummaryValue().stale);
+  EXPECT_FALSE(ui.catalogSummaryValue().online);
+  EXPECT_FALSE(ui.catalogSummaryValue().downloadLogin);
+}
+TEST(CatalogStateMachine, EmptyForeignWindowCannotPublishItsShelfTotals) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  ++library.window.provenance.accountEpoch;
+  library.window.count = 0;
+  for (unsigned n = 0; n < 2; ++n) {
+    library.window.windows[n].first = library.window.windows[n].count = 0;
+    library.window.windows[n].bytes = sizeof(WindowSpan);
+    library.window.windows[n].total = 99999;
+  }
+  library.window.publication = ++library.sequence;
+  ui.pollCatalog();
+  EXPECT_EQ(ui.catalogState(), CatalogSurface::State::Error);
+  EXPECT_EQ(ui.catalogCovers().windowCount, 0);
+}
+
+TEST(CatalogStateMachine, SelectingLocalBookRetiresPreviousDownloadAutoOpen) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  ui.browseCatalog(CatalogRoot::All);
+  ui.pollCatalog();
+  ASSERT_EQ(ui.activateCatalogRow(1), CommandStatus::Accepted);
+  ASSERT_EQ(ui.chooseCatalogDownload(0), CommandStatus::Accepted);
+  library.status.id = 8;
+  library.status.state = DownloadState::Transferring;
+  library.status.sequence = ++library.sequence;
+  ui.pollCatalog();
+  ASSERT_EQ(ui.activateCatalogRow(0), CommandStatus::Accepted);
+  ASSERT_EQ(library.opens, 1u);
+  library.status.state = DownloadState::Complete;
+  library.status.sequence = ++library.sequence;
+  ui.pollCatalog();
+  EXPECT_EQ(library.opens, 1u);
+}
+
+TEST(CatalogStateMachine, UnknownAuthorAllUsesMissingMembershipAndRestoresParent) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  ui.browseCatalog(CatalogRoot::Authors);
+  ui.pollCatalog();
+  ASSERT_TRUE(ui.catalogResult().entries[2].missing);
+  ASSERT_EQ(ui.activateCatalogRow(2), CommandStatus::Accepted);
+  EXPECT_TRUE(library.wanted.filter.withoutAuthor);
+  EXPECT_EQ(library.wanted.filter.authors.count, 0);
+  ui.pollCatalog();
+  EXPECT_TRUE(ui.backCatalog());
+  ui.pollCatalog();
+  EXPECT_EQ(ui.catalogPanel(), CatalogSurface::Panel::Groups);
+  EXPECT_FALSE(library.wanted.filter.withoutAuthor);
+}
+
+TEST(CatalogStateMachine, DashboardDetailsUsesDisplayedCoverWithoutCatalogQuery) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  ASSERT_EQ(ui.catalogDetails(6), CommandStatus::Accepted);
+  EXPECT_TRUE(library.lastDetails == ui.catalogCovers().rows[4].key);
+  EXPECT_EQ(library.queries, 0u);
+  EXPECT_EQ(library.opens, 0u);
+}
+TEST(CatalogStateMachine, SourceRootsCannotReuseStaleBookDetailEntries) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  ui.browseCatalog(CatalogRoot::All);
+  ui.pollCatalog();
+  ui.browseCatalog(CatalogRoot::Lists);
+  ui.pollCatalog();
+  EXPECT_EQ(ui.catalogDetails(0), CommandStatus::Unavailable);
+  EXPECT_EQ(library.detailsCalls, 0u);
+}
+TEST(CatalogStateMachine, DetailsRetiresPendingManifestPresentation) {
+  catalogFixture::SceneLibrary library;
+  library.configureScene(20);
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  catalogFixture::arrange(ui, library);
+  ASSERT_TRUE(ui.catalogPreparing());
+  ASSERT_EQ(ui.catalogDetails(1), CommandStatus::Accepted);
+  library.choices.availability = Availability::Ready;
+  ++library.sequence;
+  ui.pollCatalog();
+  EXPECT_FALSE(ui.catalogPreparing());
+  EXPECT_EQ(ui.catalogDialog(), CatalogSurface::Dialog::None);
+  EXPECT_EQ(library.starts, 0u);
+}
+
+TEST(CatalogStateMachine, IncompleteZeroRowsDoNotClaimCompleteEmptyMembership) {
+  catalogFixture::SceneLibrary library;
+  library.configureScene(15);
+  CatalogSurface ui(library);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  ui.browseCatalog(CatalogRoot::Series);
+  ui.pollCatalog();
+  library.result.count = 0;
+  library.result.bytes = 0;
+  library.result.publication = ++library.sequence;
+  ui.pollCatalog();
+  EXPECT_FALSE(ui.catalogResult().membershipComplete);
+  EXPECT_EQ(ui.catalogVisibleRows(), 0);
+  EXPECT_EQ(ui.catalogState(), CatalogSurface::State::Ready);
 }

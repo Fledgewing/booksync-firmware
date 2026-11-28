@@ -302,9 +302,13 @@ class CatalogActivity final : public Activity {
         std::snprintf(
             label, sizeof(label), "%u %s", unsigned(catalog_->catalogTotal()),
             catalog_->catalogRoot() == CatalogRoot::Lists ? tr(STR_HOME_LISTS) : rootTitle(catalog_->catalogRoot()));
+      else if (!catalog_->catalogResult().membershipComplete)
+        std::snprintf(label, sizeof(label), "%s", tr(STR_CATALOG_INCOMPLETE));
       else
         std::snprintf(label, sizeof(label), tr(STR_CATALOG_BOOKS_FORMAT), unsigned(catalog_->catalogTotal()));
-      text(Rect{s.x + 164, headerBottom() + 18, s.width - 176, line}, label);
+      if (catalog_->catalogState() == CatalogSurface::State::Ready ||
+          catalog_->catalogState() == CatalogSurface::State::Empty)
+        text(Rect{s.x + 164, headerBottom() + 18, s.width - 176, line}, label);
       if (catalog_->catalogState() == CatalogSurface::State::Empty)
         text(Rect{s.x + 12, top + 15, s.width - 24, line * 2},
              stateTitle(catalog_->catalogState(), catalog_->catalogPanel() == CatalogSurface::Panel::Sources));
@@ -372,15 +376,21 @@ class CatalogActivity final : public Activity {
             detail = tr(STR_CATALOG_PREPARING);
           else if (selected && catalog_->catalogTransferValue().state == DownloadState::Transferring)
             detail = tr(STR_DOWNLOADING);
-          const int metadataY = row.y + line + 9;
-          if (entry.label[0]) text(Rect{row.x + inset, metadataY, row.width - inset - 50, line}, entry.label.data());
+          const int metadataFont = textOnly_ ? SMALL_FONT_ID : UI_10_FONT_ID;
+          const int metadataLine = renderer.getLineHeight(metadataFont);
+          const int metadataY = row.y + line + (textOnly_ ? 4 : 9);
+          if (entry.label[0])
+            text(Rect{row.x + inset, metadataY, row.width - inset - 50, metadataLine}, entry.label.data(),
+                 metadataFont);
           const bool transferText =
               selected && (catalog_->catalogAvailabilityUnknown() || catalog_->catalogPreparing() ||
                            catalog_->catalogInlineError() != DownloadError::None ||
                            catalog_->catalogTransferValue().state == DownloadState::Transferring);
           catalogRowMetadata(label, entry, detail, transferText);
           detail = label;
-          text(Rect{row.x + inset, metadataY + (entry.label[0] ? line + 4 : 0), row.width - inset - 50, line}, detail);
+          text(Rect{row.x + inset, metadataY + (entry.label[0] ? metadataLine + 4 : 0), row.width - inset - 50,
+                    metadataLine},
+               detail, metadataFont);
           text(Rect{row.x + row.width - 44, row.y + 8, 40, line}, "...");
           hit(Rect{row.x + row.width - 50, row.y, 50, row.height}, i, 1);
         }
@@ -579,6 +589,12 @@ class CatalogActivity final : public Activity {
                 catalog_->catalogDetails(h.index);
               else if (h.action == 2)
                 catalog_->catalogSeries(h.index);
+              else if (heldMs >= 1000 && (((catalog_->catalogPanel() == CatalogSurface::Panel::Books ||
+                                            catalog_->catalogPanel() == CatalogSurface::Panel::Groups) &&
+                                           h.index < catalog_->catalogVisibleRows()) ||
+                                          (catalog_->catalogPanel() == CatalogSurface::Panel::Dashboard &&
+                                           h.index > 0 && h.index < 10 && h.index != 5)))
+                catalog_->catalogDetails(h.index);
               else {
                 catalog_->selectCatalogControl(h.action == 4 ? catalog_->catalogVisibleRows() + 3 + h.index : h.index);
                 catalog_->activateCatalog();

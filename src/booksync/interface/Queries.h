@@ -31,7 +31,7 @@ struct QueryFilter {
   QueryWhere where = QueryWhere::Anywhere;
   QueryGroup group = QueryGroup::None;
   QuerySort sort = QuerySort::Order;
-  bool wantToRead = false, withoutSeries = false, descending = false;
+  bool wantToRead = false, withoutSeries = false, descending = false, withoutAuthor = false;
 };
 struct QueryRequest {
   uint64_t requestId = 0;  // Caller correlation; never a durable job or server identity.

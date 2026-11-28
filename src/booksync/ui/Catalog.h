@@ -70,7 +70,7 @@ class CatalogSurface {
     uint8_t focus = 0;
     std::array<char, 96> author{};
     std::array<char, 64> scope{}, series{};
-    bool withoutSeries = false;
+    bool withoutSeries = false, withoutAuthor = false;
   } current_{}, history_[4]{};
   // One last-good visible page (not a second catalog/result window). It keeps
   // local rows usable after a same-owner read failure without retaining 24 rows.

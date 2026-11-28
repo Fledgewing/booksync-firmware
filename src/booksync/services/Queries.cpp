@@ -81,7 +81,8 @@ QueryFields Queries::required() const {
   need(f.show != QueryShow::All && f.show != QueryShow::WantToRead, QueryField::Status);
   need(f.wantToRead || f.show == QueryShow::WantToRead, QueryField::WantToRead);
   need(f.where != QueryWhere::Anywhere, QueryField::Device);
-  need(f.authors.count || (grouped && f.group == QueryGroup::Author) || (ordered && f.sort == QuerySort::Author),
+  need(f.withoutAuthor || f.authors.count || (grouped && f.group == QueryGroup::Author) ||
+           (ordered && f.sort == QuerySort::Author),
        QueryField::Author);
   need(f.series.count || f.withoutSeries || (grouped && f.group == QueryGroup::Series), QueryField::Series);
   need(f.tags.count, QueryField::Tags);
@@ -203,6 +204,7 @@ bool Queries::matches(bool omitFacet) const {
   if (where == QueryWhere::OnDevice && row_.onDevice != QueryTruth::Yes) return false;
   if (where == QueryWhere::ServerOnly && row_.onDevice != QueryTruth::No) return false;
   if (f.withoutSeries && row_.seriesCount) return false;
+  if (f.withoutAuthor && row_.authorCount) return false;
   if ((!ignore(QueryFacet::Author) && !selected(f.authors, row_.authors, row_.authorCount)) ||
       (!ignore(QueryFacet::Series) && !selected(f.series, row_.series, row_.seriesCount)) ||
       (!ignore(QueryFacet::Tags) && !selected(f.tags, row_.tags, row_.tagCount)) ||

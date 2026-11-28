@@ -44,6 +44,7 @@ class SceneLibrary final : public Library {
   Snapshot owner{};
   CatalogSummary summary{};
   QueryRequest wanted{};
+  BookKey lastDetails{};
   QueryResult result{};
   LibraryWindow window{};
   CatalogSources sources{};
@@ -235,7 +236,8 @@ class SceneLibrary final : public Library {
     ++resumes;
     return CommandStatus::Accepted;
   }
-  CommandStatus showBookDetails(BookKey) override {
+  CommandStatus showBookDetails(BookKey key) override {
+    lastDetails = key;
     ++detailsCalls;
     return CommandStatus::Accepted;
   }
