@@ -4,7 +4,7 @@ Approved 2026-11-28 in BookSync #253. Library and Lists each use one F39 project
 
 Library retains independently known library/on-card totals, storage and saved age. Unknown account totals never borrow the native file count. The optional card has Authors, Series and Collections links. Lists retains one named list in main and three in optional; All uses the authoritative total, independently of the preview count. Known zero differs from not saved. Empty, off, unsupported, stale, error and oversize remain independent; oversize uses the approved explanation and Retry.
 
-The combined Home host is bounded by 10 KiB (7,576 bytes on the host compiler), allocated once and freed before reader entry. Shared C3 paths keep this bounded metadata in ordinary RAM and retain their allocation-failure fallback.
+The combined Home host is bounded by 11 KiB (10,696 bytes on the host compiler with all ten main stats cards), allocated once and freed before reader entry. Shared C3 paths keep this bounded metadata in ordinary RAM and retain their allocation-failure fallback.
 
 Caller-owned payloads charge two summary rows and one/three list records. No whole catalog or second framebuffer is allocated. Private frozen-source bindings are borrowed under the main-loop lock and retired before their owner is freed. The default native facade proves its on-card count only; unregistered account sources remain unknown.
 
