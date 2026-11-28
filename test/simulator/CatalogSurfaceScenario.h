@@ -29,6 +29,9 @@ inline bool tick() {
     if (!controller) std::_Exit(1);
     catalogFixture::arrange(*controller, library);
   }
+  // Fixture arrangement bypasses input; publish its geometry before tapping.
+  if (scene == 6 && frame == 7 && activityManager.requestUpdateAndWait() != RequestUpdateResult::Rendered)
+    std::_Exit(7);
   // Exercise the actual profile input route for the group header, then Back.
   if (scene == 6 && frame == 8) {
     bool touch = false;
@@ -52,8 +55,12 @@ inline bool tick() {
   if (scene == 6 && frame == 11) {
     RenderLock lock;
     auto* controller = booksync::catalogSceneController();
-    if (controller->catalogPanel() != booksync::CatalogSurface::Panel::Books || !library.wanted.filter.authors.count)
+    if (controller->catalogPanel() != booksync::CatalogSurface::Panel::Books || !library.wanted.filter.authors.count) {
+      LOG_ERR("BSC", "Group header route failed: panel=%u authors=%u", unsigned(controller->catalogPanel()),
+              unsigned(library.wanted.filter.authors.count));
+      std::fflush(nullptr);
       std::_Exit(5);
+    }
     mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Back);
   }
   if (scene == 6 && frame == 14) {
