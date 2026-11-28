@@ -6,7 +6,7 @@ void EditorAddRemove::enter() {
   revision_ = page.revision;
   page_ = page.page;
   focus_ = 0;
-  panel_ = page.textOnly || !page.revision ? Panel::Closed : Panel::Select;
+  panel_ = !page.revision ? Panel::Closed : Panel::Select;
 }
 uint8_t EditorAddRemove::rows() const {
   if (panel_ == Panel::Select) return library_.homePage().count + 3;  // Add, Reset, Done after tiles.
@@ -17,7 +17,7 @@ uint8_t EditorAddRemove::rows() const {
 }
 void EditorAddRemove::stepEditor(int direction) {
   if (panel_ == Panel::Closed || panel_ == Panel::Waiting) return;
-  if (panel_ == Panel::Selected) {
+  if (panel_ == Panel::Selected && !library_.homePage().textOnly) {
     geometryStep(direction > 0 ? LayoutStep::Next : LayoutStep::Previous);
     return;
   }
@@ -27,7 +27,7 @@ void EditorAddRemove::stepEditor(int direction) {
 void EditorAddRemove::chooseEditor(uint8_t index) {
   if (index >= rows() || panel_ == Panel::Waiting) return;
   focus_ = index;
-  if (panel_ == Panel::Selected) {
+  if (panel_ == Panel::Selected && !library_.homePage().textOnly) {
     if (index == 0)
       send(LayoutEditKind::Remove);
     else
@@ -86,7 +86,7 @@ void EditorAddRemove::activateEditor() {
       draft_ = page;
       blocked_ = false;
       panel_ = Panel::Selected;
-      updateSizePreview();
+      if (!page.textOnly) updateSizePreview();
       focus_ = 0;
     } else if (focus_ == page.count) {
       panel_ = Panel::Add;
@@ -97,7 +97,13 @@ void EditorAddRemove::activateEditor() {
     } else
       panel_ = Panel::Closed;
   } else if (panel_ == Panel::Selected) {
-    send(LayoutEditKind::Geometry);
+    if (library_.homePage().textOnly) {
+      if (focus_ == 1)
+        send(LayoutEditKind::Remove);
+      else
+        back();
+    } else
+      send(LayoutEditKind::Geometry);
   } else if (panel_ == Panel::Options) {
     if (focus_ == 0)
       send(LayoutEditKind::Remove);
@@ -145,7 +151,7 @@ bool EditorAddRemove::pollEditor() {
   return true;
 }
 void EditorAddRemove::geometryStep(LayoutStep movement) {
-  if (panel_ != Panel::Selected) return;
+  if (panel_ != Panel::Selected || library_.homePage().textOnly) return;
   const auto preview = library_.previewLayout(draft_, selected_, movement);
   if (preview.status == LayoutEditStatus::Saved) {
     draft_ = preview.page;
@@ -164,6 +170,7 @@ void EditorAddRemove::updateSizePreview() {
   nextH_ = sizePreview.status == LayoutEditStatus::Saved ? sizePreview.page.widgets[selected_].h : 0;
 }
 void EditorAddRemove::moreEditor() {
+  if (library_.homePage().textOnly) return;
   if (panel_ == Panel::Selected)
     geometryStep(LayoutStep::Size);
   else if (panel_ == Panel::Select && focus_ < library_.homePage().count) {

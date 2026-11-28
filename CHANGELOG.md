@@ -10,13 +10,13 @@
 - BookSync prepares verified in-place copy updates, deferring open books, retaining the old EPUB for rollback and preserving native reading, annotation and sidecar state across interrupted replacement. Live scheduling remains deferred.
 
 - BookSync captures bounded timestamped reading-page history and checkpoints stats batches through its sole sync owner, retaining explicit coverage gaps and reconciling uncertain uploads without counting reading time twice; live delivery remains deferred.
-- BookSync Home supports local add/remove/reset widget edits on X4 Pro and Classic, with revision checks and atomic saves. The X3 Settings-list editor remains pending design approval.
+- BookSync Home supports local add/remove/reset widget edits on X4 Pro and Classic, with revision checks and atomic saves. X3 provides the approved Home widgets list in Settings, with safe remove/reset choices and storage/no-space recovery.
 - BookSync checkpoints read/unread/finished state and ratings through its single sync owner, preserving uncertain deliveries, explicit clears and deferred native writeback across restarts; validated against a fake server.
 - BookSync prepares verified same-path downloads with explicit Resume after interruption, progress and Cancel, space checks, and quiet completion for departed views; live download screens remain deferred.
 - BookSync checkpoints bounded highlight, note and bookmark exchanges under its sole sync owner, retains pending deletions through restart and defers remote application until the book closes; validated against a durable fake server.
 - BookSync adds bounded offline filter, counted facet, series and grouping projections, with explicit unsupported results when saved metadata cannot answer a query.
 
-- BookSync activates retained credentials, Wi-Fi and Tailnet identity with recoverable checkpoints, preserves native reader and legacy files, and records a once-only pending upgrade notice through Library. The revised B2 screen remains unbuilt pending approval.
+- BookSync activates retained credentials, Wi-Fi and Tailnet identity with recoverable checkpoints, preserves native reader and legacy files, and records a once-only pending upgrade notice through Library. The approved once-only Welcome to BookSync 0.12 notice waits for Home; Now dispatches neutral sync, while Later and Back dismiss it.
 
 - BookSync streams server catalog and manifest records with fixed memory bounds, rejects incomplete or revoked responses, and preserves the prior offline index after interrupted refreshes.
 - BookSync commits account-scoped catalog generations only after complete refreshes, coalesces refresh requests under one network lease, and keeps closed Home views quiet after cancellation or late completion.

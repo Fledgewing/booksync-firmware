@@ -147,7 +147,7 @@ with tempfile.TemporaryDirectory(prefix='booksync-activation-',dir=root/'build/a
 
 (out/'scenario.json').write_text(json.dumps({'profile':profile,'result':'PASS','boots':boots,
     'checks':checks,'hard_power_cuts':cuts,'legacy_sources_unchanged':True,'network_requests':0,
-    'notice_ui_built':False,'application_workspace_bound_bytes':20480,
+    'notice_ui_exercised':False,'notice_ui_scenario':'upgrade_notice.py','application_workspace_bound_bytes':20480,
     'internal_heap':None,'largest_block':None,'stack_high_water':None,
     'metrics_note':'Native HAL and synthetic NVS are not ESP32 hardware-memory acceptance.'},indent=2)+'\n')
 print(f'BookSync F29 {profile}: {checks} checks / {boots} boots / {cuts} hard power cuts PASS')

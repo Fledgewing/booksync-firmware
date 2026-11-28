@@ -103,4 +103,5 @@ subprocess.run([sys.executable, 'test/simulator/copy_jobs.py', profile], cwd=roo
 
 
 subprocess.run([sys.executable, 'test/simulator/update_install.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/upgrade_notice.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

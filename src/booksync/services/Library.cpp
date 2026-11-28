@@ -48,6 +48,9 @@ static_assert(sizeof(LocalState) <= 28 * 1024);
 std::unique_ptr<LocalState> local;
 AccountView accountPresentation{};
 bool noticeDismissalPending = false;
+// Presentation retirement spans Home instances, independently of SD checkpoint
+// success. A failed write must not reopen a dismissed notice during this boot.
+bool noticePresentationRetired = false;
 bool noticePending = false, upgradeRecovery = false;
 bool (*noticeCheckpoint)() = nullptr;
 class OfflineLibrary final : public Library {
@@ -69,7 +72,7 @@ class OfflineLibrary final : public Library {
   Snapshot snapshot() const override {
     Snapshot value;
     value.canOpenLastBook = available;
-    value.upgradeNoticePending = noticePending;
+    value.upgradeNoticePending = noticePending && !noticePresentationRetired;
     value.upgradeRecoveryRequired = upgradeRecovery;
     if (local) {
       value.catalog = local->model.availability();
@@ -153,6 +156,7 @@ class OfflineLibrary final : public Library {
   CommandStatus submit(Intent intent) override {
     if (intent == Intent::DismissUpgradeNotice) {
       if (!noticeCheckpoint) return CommandStatus::Unavailable;
+      noticePresentationRetired = true;
       noticeDismissalPending = true;
       return CommandStatus::Accepted;
     }
