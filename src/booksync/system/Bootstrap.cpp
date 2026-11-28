@@ -306,7 +306,7 @@ class ShellActivity final : public Activity {
       // The approved Home menu entry is reached with More / header tap.
       const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
       const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
-      if (mappedInput.wasReleased(MappedInputManager::Button::Right) ||
+      if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Right)) ||
           (tapped && x >= header.x + header.width - 80 && y >= header.y && y < header.y + header.height)) {
         editor.enter();
         requestUpdate();

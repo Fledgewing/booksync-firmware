@@ -81,7 +81,7 @@ inline bool tick() {
   if (fixture.page.textOnly) {
     // The unapproved Settings-list UI cannot be entered. Shared service parity
     // still uses real HAL files and restart, without a spatial editor on C3.
-    if (f == 10) key(MappedInputManager::Button::Right);
+    if (f == 10) key(mappedInputManager.menuButton(MappedInputManager::Button::Right));
     if (f == 20) capture(directory, "x3-home-editor-disabled");
     if (f == 24 || f == 54 || f == 96) {
       LayoutEdit edit;
@@ -117,7 +117,7 @@ inline bool tick() {
     } else
 #endif
     {
-      if (f == 10) key(MappedInputManager::Button::Right);
+      if (f == 10) key(mappedInputManager.menuButton(MappedInputManager::Button::Right));
       if (f == 24 || f == 26 || f == 28 || f == 34 || f == 36 || f == 76 || f == 78 || f == 80 || f == 82 || f == 96 ||
           f == 98 || f == 100 || f == 102 || f == 106)
         down();
