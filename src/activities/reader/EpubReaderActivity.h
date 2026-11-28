@@ -53,6 +53,10 @@ struct ToastRect {
 
 class EpubReaderActivity final : public Activity {
   booksync::reader::Bridge booksyncCapture;
+  // Two reusable captions extend the existing fallibly allocated Activity by
+  // 192 bytes; no per-exit metadata strings or task-stack arrays are needed.
+  std::array<char, 96> booksyncCurrentChapter{}, booksyncNextChapter{};
+  void observeChapterRoute();
   void observeBookSync(bool closed = false, bool refreshNative = false);
 
   PluginReaderEvents pluginEvents;

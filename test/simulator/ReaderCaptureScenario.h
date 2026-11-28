@@ -53,6 +53,7 @@ static bool readerCaptureScenarioTick() {
     bool ok = journal.recover() == JournalResult::Ok;
     uint64_t id = 0;
     unsigned opens = 0, artifacts = 0, sessions = 0;
+    uint64_t chapterOpen = 0;
     bool closed = false;
     char bytes[4096];
     JournalEntry entry;
@@ -61,6 +62,7 @@ static bool readerCaptureScenarioTick() {
       ok = journal.read(id, entry, bytes, sizeof(bytes)) == JournalResult::Ok && entry.acknowledged == 0;
       if (entry.payload.substr(0, 4) == "BSO1") {
         ++opens;
+        chapterOpen = id;
         ok = ok && Capture::decode(entry.checkpoint, sample, closed) && closed && sample.hasSourceOffset &&
              sample.totalSeconds >= 10 && sample.primaryBytes + sample.backupBytes >= 20;
       } else if (entry.payload.substr(0, 4) == "BSS1")
@@ -68,6 +70,9 @@ static bool readerCaptureScenarioTick() {
       else if (entry.payload.substr(0, 4) == "BSA1")
         ++artifacts;
     }
+    const auto& chapters = chapterCapture().value();
+    ok = ok && chapters.open == chapterOpen && chapters.state == ChapterState::Ready && chapters.current[0];
+    LOG_INF("BSC", "Native current-book chapter capture: %s (next=%u end=%u)", ok ? "PASS" : "FAIL", unsigned(chapters.toNextKnown), unsigned(chapters.toEndKnown));
     finish(ok && opens == 1 && artifacts >= 4 && sessions >= 1,
            "native turn/time, raw slots, highlight/bookmark add/remove and close");
   }

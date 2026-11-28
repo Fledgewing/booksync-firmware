@@ -142,6 +142,9 @@ class BookMetadataCache {
   SpineEntry getSpineEntry(int index);
   size_t getSpineCumulativeSize(int index);
   TocEntry getTocEntry(int index);
+  // Read only a bounded UTF-8 label and spine locator; no strings are allocated
+  // and a failed optional observation never invalidates the reader cache.
+  bool readTocLabel(int index, char* out, size_t capacity, int16_t& spine, bool& truncated);
   int getSpineCount() const { return spineCount; }
   int getTocCount() const { return tocCount; }
   bool isLoaded() const { return loaded; }

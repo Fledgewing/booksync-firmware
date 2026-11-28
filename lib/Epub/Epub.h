@@ -217,6 +217,7 @@ class Epub {
                                const std::string& destPxcPath) const;
   BookMetadataCache::SpineEntry getSpineItem(int spineIndex) const;
   BookMetadataCache::TocEntry getTocItem(int tocIndex) const;
+  bool readTocLabel(int tocIndex, char* out, size_t capacity, int16_t& spine, bool& truncated) const;
   int getSpineItemsCount() const;
   int getTocItemsCount() const;
   int getSpineIndexForTocIndex(int tocIndex) const;

@@ -2386,6 +2386,11 @@ BookMetadataCache::TocEntry Epub::getTocItem(const int tocIndex) const {
   return bookMetadataCache->getTocEntry(tocIndex);
 }
 
+bool Epub::readTocLabel(int tocIndex, char* out, size_t capacity, int16_t& spine, bool& truncated) const {
+  spine = -1; truncated = false; if (out && capacity) out[0] = 0;
+  return bookMetadataCache && bookMetadataCache->readTocLabel(tocIndex, out, capacity, spine, truncated);
+}
+
 int Epub::getTocItemsCount() const {
   if (!bookMetadataCache || !bookMetadataCache->isLoaded()) {
     return 0;

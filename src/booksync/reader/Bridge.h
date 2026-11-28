@@ -14,6 +14,7 @@ namespace booksync::reader {
 class Bridge {
  public:
   Bridge();
+  uint64_t nativeOpen() const { return capture_.id(); }
   const Sample& lastObservation() const { return capture_.lastSample(); }
   void open(std::string_view path, uint16_t format);
   void startPage(const ReadingStatsDateTime&, uint8_t utcOffset, uint32_t spine, uint32_t page, uint32_t pages,

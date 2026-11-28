@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='crossink-metadata-build-io-') as tmp:
     compiler = shlex.split(os.environ.get('CXX', 'c++'))
     sanitizers = ['-fsanitize=address,undefined'] if os.environ.get('CROSSINK_TEST_SANITIZERS') == '1' else []
     subprocess.run([*compiler, '-std=c++20', '-Wall', '-Wextra', *sanitizers,
-                    '-I' + str(build), str(ROOT / 'test/epub_metadata_build_io/MetadataBuildIoTest.cpp'),
+                    '-I' + str(build), '-I' + str(ROOT / 'lib/Utf8'), str(ROOT / 'lib/Utf8/Utf8.cpp'), str(ROOT / 'test/epub_metadata_build_io/MetadataBuildIoTest.cpp'),
                     '-o', str(executable)], check=True)
     subprocess.run([str(executable)], check=True)
 
