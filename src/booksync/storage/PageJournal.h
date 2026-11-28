@@ -28,7 +28,7 @@ class PageJournal {
  private:
   const char* directory_;
   uint32_t limit_, count_ = 0;
-  bool ready_ = false, capped_ = false;
+  bool ready_ = false, capped_ = false, uncertain_ = false;
   char current_[128]{}, staging_[132]{}, backup_[132]{};
   bool paths(uint32_t segment);
   PublishedFile select(uint32_t segment, uint32_t& rows);

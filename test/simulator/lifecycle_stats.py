@@ -83,7 +83,7 @@ with tempfile.TemporaryDirectory(prefix='booksync-stats-', dir=out) as directory
 (out / 'lifecycle-stats.json').write_text(json.dumps({
     'profile': profile, 'scenarios': len(cases)+1, 'power_cuts': 5, 'boots': boots,
     'result': 'PASS', 'history_rows': 50000, 'history_bytes': 50000*64+782*16,
-    'batch_rows': 32, 'production_heap_allocations': 0, 'derived': totals,
+    'batch_rows': 32, 'explicit_heap_allocations': 0, 'derived': totals,
     'runtime_memory': {'internal_heap': None, 'largest_block': None, 'stack_high_water': None,
         'reason': 'Native HAL does not model ESP32 heap/stack; maintainer hardware acceptance required'}
 }, indent=2)+'\n')

@@ -163,23 +163,30 @@ JournalResult PageJournal::append(const PageEvent& input) {
     auto result = recover();
     if (result != JournalResult::Ok) return result;
   }
-  if (capped_) return error(JournalResult::Capacity);
+  if (capped_ && !uncertain_) return error(JournalResult::Capacity);
+  PageEvent event = input;
+  bool duplicate = false;
   if (count_) {
     PageEvent last;
     if (read(count_ - 1, last) != JournalResult::Ok) return error(JournalResult::RecoveryRequired);
-    if (last == input) return JournalResult::Ok;
+    if (capped_) event = last;
+    duplicate = last == event;
   }
   // One permanently reserved slot records an open-ended capacity gap. No old
   // row, synced or unsynced, is ever overwritten to admit a new observation.
-  PageEvent event = input;
-  const bool cap = count_ == limit_;
+  // An identical visible tail after a failed directory barrier is not a
+  // durable acknowledgment. Republish that same bounded generation before
+  // releasing the producer's copy, including an uncertain capacity marker.
+  const bool cap = !duplicate && count_ == limit_;
   if (cap) event = {0, input.start, input.ordinal, 0, 0, 0, 0, 0, 0, 0, PageEvent::Gap};
-  const uint32_t segment = count_ / SegmentRows, rows = count_ % SegmentRows;
+  const uint32_t prefix = count_ - uint32_t(duplicate);
+  const uint32_t segment = prefix / SegmentRows, rows = prefix % SegmentRows;
+  const uint32_t existing = rows + uint32_t(duplicate);
   if (!paths(segment)) return error(JournalResult::Invalid);
   Segment s{segment};
   const auto selected = select(segment, s.rows);
-  if ((rows && ((selected != PublishedFile::Current && selected != PublishedFile::Backup) || s.rows != rows)) ||
-      (!rows && selected != PublishedFile::Missing))
+  if ((existing && ((selected != PublishedFile::Current && selected != PublishedFile::Backup) || s.rows != existing)) ||
+      (!existing && selected != PublishedFile::Missing))
     return error(JournalResult::RecoveryRequired);
 
   char bytes[RowBytes]{};
@@ -197,10 +204,12 @@ JournalResult PageJournal::append(const PageEvent& input) {
   ok = ok && closed && writer.write(bytes, RowBytes) && writer.finish();
   if (!ok) {
     ready_ = false;
+    uncertain_ = true;
     return error(JournalResult::IoError);
   }
-  ++count_;
-  capped_ = cap;
-  return cap ? error(JournalResult::Capacity) : JournalResult::Ok;
+  if (!duplicate) ++count_;
+  capped_ = capped_ || cap;
+  uncertain_ = false;
+  return capped_ ? error(JournalResult::Capacity) : JournalResult::Ok;
 }
 }  // namespace booksync::storage

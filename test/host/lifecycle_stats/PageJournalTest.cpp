@@ -192,3 +192,35 @@ TEST_F(PageJournalTest, FutureBackupBlocksOlderWriterEvenWhenCurrentIsReadable) 
   EXPECT_NE(reboot.append(event(2)), JournalResult::Ok);
   EXPECT_EQ(card.disk, source);
 }
+
+TEST_F(PageJournalTest, VisibleButUnflushedAppendIsNotAcknowledgedByReadOnlyDedup) {
+  for (bool cap : {false, true}) {
+    SCOPED_TRACE(cap);
+    card = {};
+    const uint32_t limit = cap ? 1 : PageJournal::MaxEvents;
+    PageJournal source{"/pages", limit};
+    ASSERT_EQ(source.recover(), JournalResult::Ok);
+    ASSERT_EQ(source.append(event(0)), JournalResult::Ok);
+    const auto seed = card.disk;
+    card.events.clear();
+    ASSERT_EQ(source.append(event(1)), cap ? JournalResult::Capacity : JournalResult::Ok);
+    size_t fail = 0;
+    for (size_t i = 0; i < card.events.size(); ++i)
+      if (card.events[i] == "fs-sync:before") fail = i;
+    card.disk = seed;
+    card.restart();
+    card.eager = false;
+    PageJournal writer{"/pages", limit};
+    ASSERT_EQ(writer.recover(), JournalResult::Ok);
+    card.events.clear();
+    card.fail = fail;
+    ASSERT_EQ(writer.append(event(1)), JournalResult::IoError);
+    card.fail = -1;
+    ASSERT_EQ(writer.append(event(1)), cap ? JournalResult::Capacity : JournalResult::Ok);
+    card.restart();
+    PageJournal reboot{"/pages", limit};
+    ASSERT_EQ(reboot.recover(), JournalResult::Ok);
+    EXPECT_EQ(reboot.count(), 2);
+    EXPECT_EQ(reboot.capped(), cap);
+  }
+}

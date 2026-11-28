@@ -86,6 +86,6 @@ subprocess.run([sys.executable, 'test/simulator/lifecycle_match.py', profile], c
 subprocess.run([sys.executable, 'test/simulator/widgets.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/credentials.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/version.py', profile], cwd=root, env=env, check=True)
-raise SystemExit(0)
 
 subprocess.run([sys.executable, "test/simulator/lifecycle_stats.py", profile], cwd=root, env=env, check=True)
+raise SystemExit(0)
