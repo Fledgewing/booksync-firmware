@@ -1,12 +1,4 @@
 {
-  "generators": {
-    "web": "scripts/build_web.py",
-    "i18n": "scripts/gen_i18n.py",
-    "icons": "scripts/generate_icons.py",
-    "scalable-fonts": "scripts/build_scalable_font_assets.py"
-  },
-  "schema": 1,
-  "policy": "New/stale production inputs and changed retained include edges fail. Review the dependency rationale for every inventory change. Product roles are path-owned, not exemptions.",
   "pinned": {
     "freeink-sdk": "f7fa9b6871192ea27d8aa37a03beaa749462c3ab",
     "freeink-sdk-inputs": [
@@ -1235,6 +1227,7 @@
       "x25519-license.txt"
     ]
   },
+  "policy": "New/stale production inputs and changed retained include edges fail. Review the dependency rationale for every inventory change. Product roles are path-owned, not exemptions.",
   "files": {
     ".gitmodules": {
       "role": "retained-build-input",
@@ -12165,7 +12158,7 @@
     },
     "src/booksync/system/BatteryRuntime.cpp": {
       "role": "system",
-      "rationale": "Native HAL and existing physical-reader origin; serialized before SD shutdown, no network activation."
+      "rationale": "Native HAL and immutable physical-reader identity; separate path construction cannot change reader migration state. Serialized before SD shutdown with no network activation."
     },
     "src/booksync/system/BatteryRuntime.h": {
       "role": "system",
@@ -16404,5 +16397,12 @@
       "rationale": "Native portal source; scanned alongside generated output for backend leakage.",
       "includes": []
     }
+  },
+  "schema": 1,
+  "generators": {
+    "web": "scripts/build_web.py",
+    "i18n": "scripts/gen_i18n.py",
+    "icons": "scripts/generate_icons.py",
+    "scalable-fonts": "scripts/build_scalable_font_assets.py"
   }
 }

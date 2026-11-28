@@ -1,6 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "BatteryCapture.h"
+
+#include <cstdio>
 namespace booksync::battery {
+bool measurementDirectory(std::string_view id, char* out, size_t capacity) {
+  if (!out || !capacity) return false;
+  out[0] = 0;
+  if (id.empty() || id.size() > 31) return false;
+  for (unsigned char c : id)
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_'))
+      return false;
+  const int n = std::snprintf(out, capacity, "/.crosspoint/battery_%.*s", static_cast<int>(id.size()), id.data());
+  if (n <= 0 || static_cast<size_t>(n) >= capacity) {
+    out[0] = 0;
+    return false;
+  }
+  return true;
+}
+
 bool Capture::publish(Record record, uint32_t uptime, CaptureSink sink) {
   queued_ = record;
   queuedUptime_ = uptime;

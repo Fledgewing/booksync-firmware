@@ -19,11 +19,11 @@
 #include <esp_system.h>
 #endif
 #include "NetworkPhase.h"
+#include "StatsIdentity.h"
 #include "activities/Activity.h"
 #include "activities/RenderLock.h"
 #include "booksync/services/BatteryCapture.h"
 #include "booksync/storage/BatteryJournal.h"
-#include "util/StatsStorage.h"
 namespace booksync {
 namespace {
 // Static ownership spans reader/Home activities and failed writes; fixed <1 KiB,
@@ -56,15 +56,15 @@ bool prepare() {
   if (failed) return false;
   if (prepared) return true;
   if (!recovering) {
-    // Existing native origin policy qualifies this new family to the physical
-    // reader. A copied card cannot mix another device's discharge curve.
-    const auto path = StatsStorage::localPath("/.crosspoint/battery", true, true);
-    if (path.empty() || path.size() >= sizeof(directory)) {
+    // Read the immutable identity directly. StatsStorage's migration helper
+    // shares a failure latch with reader counters and must not be called here.
+    char readerId[32]{};
+    if (!StatsIdentity::readerId(readerId, sizeof(readerId)) ||
+        !battery::measurementDirectory(readerId, directory, sizeof(directory))) {
       LOG_ERR("BSBT", "Native battery origin unavailable");
       failed = true;
       return false;
     }
-    std::memcpy(directory, path.c_str(), path.size() + 1);
     const auto result = history.startRecovery(true);
     if (result != storage::JournalResult::Incomplete) {
       failed = true;

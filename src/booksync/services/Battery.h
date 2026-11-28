@@ -175,6 +175,7 @@ struct Summary {
   float standbyPctH = 0, readingPctH = 0, screenOnPctH = 0, per100Pages = 0, timeLeftH = 0;
   float dataHours = 0;  // non-charging hours behind the rates
   uint8_t pct = 0;
+  bool pctKnown = false;
 };
 Summary summarize(const Analyzer& a);
 

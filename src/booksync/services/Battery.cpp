@@ -338,7 +338,8 @@ Summary summarize(const Analyzer& a) {
   s.screenOn = shown(on, 1);
   if (s.screenOn) s.screenOnPctH = static_cast<float>(on.pctPerHour(false));
   s.dataHours = static_cast<float>(sb.hours + rd.hours + a.rate(CAT_AWAKE).hours);
-  s.pct = a.haveLast ? a.last.pct : 0;
+  s.pctKnown = a.haveLast && a.last.kind != KIND_GAP;
+  s.pct = s.pctKnown ? a.last.pct : 0;
   if ((s.standby = shown(sb, 1))) s.standbyPctH = static_cast<float>(sb.pctPerHour(false));
   if ((s.reading = shown(rd, 1))) s.readingPctH = static_cast<float>(rd.pctPerHour(false));
   if (s.reading && rd.pages >= 100) {
@@ -346,7 +347,7 @@ Summary summarize(const Analyzer& a) {
     s.per100Pages = static_cast<float>(s.readingPctH * rd.hours / rd.pages * 100);
   }
   const double recent = a.recentAwakeS + a.recentStandbyS;
-  if (s.standby && s.screenOn && recent >= 24 * 3600.0) {
+  if (s.pctKnown && s.standby && s.screenOn && recent >= 24 * 3600.0) {
     const double f = a.recentAwakeS / recent;
     const double drain = f * s.screenOnPctH + (1 - f) * s.standbyPctH;
     if (drain > 0) {

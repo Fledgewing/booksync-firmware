@@ -22,8 +22,8 @@ creates a task nor wakes the device. Renderer exclusion and existing admission
 keep it outside paint, network ownership and USB raw-storage handoff. A retained
 sleep marker is set only after the sleep record is durably acknowledged and
 consumed at the next observed boot; intervening failed/unrecorded boots cannot
-inherit standby evidence. The existing native physical-reader origin policy
-qualifies the directory, so a copied card does not mix discharge curves.
+inherit standby evidence. The existing immutable native physical-reader ID
+qualifies an independent directory, so a copied card does not mix discharge curves.
 X3/C3 and unrelated boards compile out the producer and its static workspace.
 
 `/.crosspoint/battery_<native-reader-id>/` contains BSB1 segments. Each has a
@@ -45,13 +45,13 @@ pending observation intact and stop acquisition, rather than manufacturing data.
 The later provider will report these source states explicitly through Library.
 
 Memory: static native ownership spans activity lifetimes, uses less than 1 KiB
-and avoids a fallible allocation during sleep. The only origin-path string is
-cold setup, immediately copied into fixed storage. Analysis uses fixed pooled
+and avoids a fallible allocation during sleep. Origin-path construction uses fixed buffers and never calls the shared native
+stats migration/failure latch. Analysis uses fixed pooled
 accumulators and callbacks. Segment operations keep 20-byte row scratch and no
 open file between calls. Hardware compiler frame gates cover all four sources.
 Linked size and native RSS do not measure ESP32 runtime heap or stack watermarks.
 
-Validation: 32 independent host cases cover analytical rates, thresholds, known
+Validation: 34 independent host cases cover analytical rates, thresholds, known
 zero, mixed awake/reading weighting, calendar clipping, charging, clocks, gaps,
 coalescing and every F06 publication cut. Nine actual-HAL simulator cases per
 profile cover durable readback, cooperative recovery, cap gaps, future versions,

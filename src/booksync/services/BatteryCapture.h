@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include <string_view>
+
 #include "Battery.h"
 namespace booksync::battery {
+// Uses only the immutable native ID; no stats migration or global failure state.
+bool measurementDirectory(std::string_view id, char* out, size_t capacity);
 struct CaptureInput {
   uint32_t epoch = 0, uptime = 0;
   uint8_t pct = 0;

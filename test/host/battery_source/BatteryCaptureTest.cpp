@@ -144,3 +144,16 @@ TEST(BatteryCapture, LostStorageOwnershipBreaksTheUnobservedInterval) {
   c.tick(input(61), s.port());
   EXPECT_EQ(s.rows.back().kind, KIND_BOOT);
 }
+TEST(BatteryCapture, DeviceIdentityUsesASeparateExactDirectoryAndRejectsPathSyntax) {
+  char first[96], second[96];
+  ASSERT_TRUE(measurementDirectory("reader-alpha", first, sizeof(first)));
+  ASSERT_TRUE(measurementDirectory("reader-beta", second, sizeof(second)));
+  EXPECT_STRNE(first, second);
+  EXPECT_STREQ(first, "/.crosspoint/battery_reader-alpha");
+  for (auto bad : {"", "../reader", "reader/other", "reader.other", "reader\\other"}) {
+    EXPECT_FALSE(measurementDirectory(bad, first, sizeof(first)));
+    EXPECT_EQ(first[0], 0);
+  }
+  EXPECT_FALSE(measurementDirectory("reader-alpha", first, 8));
+  EXPECT_EQ(first[0], 0);
+}

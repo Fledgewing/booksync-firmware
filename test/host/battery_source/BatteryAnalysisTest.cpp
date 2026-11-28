@@ -214,3 +214,14 @@ TEST(BatteryAnalysis, ExternalPowerAtSleepDoesNotProduceAStandbyDrainWhenUnplugg
   EXPECT_FALSE(a.rate(CAT_STANDBY).has());
   EXPECT_EQ(a.recentStandbyS, 0);
 }
+TEST(BatteryAnalysis, AnUnavailableCurrentSampleCannotBecomeAZeroHourEstimate) {
+  Analyzer a({}, Base + 86401, nullptr, nullptr, nullptr);
+  normal(a);
+  a.add(point(Base + 86401, KIND_GAP, 0));
+  a.finish();
+  auto s = summarize(a);
+  EXPECT_FALSE(s.pctKnown);
+  EXPECT_FALSE(s.timeLeft);
+  EXPECT_TRUE(s.reading);
+  EXPECT_TRUE(s.standby);
+}
