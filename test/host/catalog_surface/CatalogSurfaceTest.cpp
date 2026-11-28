@@ -714,3 +714,40 @@ TEST(CatalogWidgetEntry, AccountSourceUsesItsTicketEpochIndependentlyOfNativeInd
     EXPECT_EQ(ui.activateCatalogRow(0), CommandStatus::Unavailable);
   }
 }
+
+TEST(CatalogCollectionEntry, AuthorAndSeriesEnterGroupsWithoutDashboardAcquisition) {
+  for (const auto destination : {CatalogDestination::Authors, CatalogDestination::Series}) {
+    catalogFixture::SceneLibrary library;
+    CatalogSurface ui(library);
+    ui.enterCatalog(false, {destination});
+    EXPECT_EQ(ui.catalogPanel(), CatalogSurface::Panel::Groups);
+    EXPECT_EQ(ui.catalogRoot(),
+              destination == CatalogDestination::Authors ? CatalogRoot::Authors : CatalogRoot::Series);
+    EXPECT_EQ(library.batches, 0u);
+    EXPECT_EQ(library.queries, 1u);
+    EXPECT_EQ(library.wanted.kind, QueryKind::Groups);
+  }
+}
+TEST(CatalogCollectionEntry, CollectionsAndListsEnterSourcesWithoutDashboardAcquisition) {
+  for (const auto destination : {CatalogDestination::Collections, CatalogDestination::Lists}) {
+    catalogFixture::SceneLibrary library;
+    CatalogSurface ui(library);
+    ui.enterCatalog(false, {destination});
+    EXPECT_EQ(ui.catalogPanel(), CatalogSurface::Panel::Sources);
+    EXPECT_EQ(ui.catalogRoot(),
+              destination == CatalogDestination::Collections ? CatalogRoot::Collections : CatalogRoot::Lists);
+    EXPECT_EQ(library.batches, 0u);
+    EXPECT_EQ(library.queries, 0u);
+    EXPECT_GT(library.sources.publication, 0u);
+  }
+}
+TEST(CatalogCollectionEntry, SavedListPassesExactOpaqueKeyToItsOwnBookQuery) {
+  catalogFixture::SceneLibrary library;
+  CatalogSurface ui(library);
+  const ListKey key{{91, 1, 17, 3}, 42};
+  ui.enterCatalog(false, {CatalogDestination::SavedList, key});
+  EXPECT_EQ(ui.catalogPanel(), CatalogSurface::Panel::Books);
+  EXPECT_EQ(library.batches, 0u);
+  EXPECT_EQ(library.listQueries, 1u);
+  EXPECT_EQ(library.requestedList, key);
+}

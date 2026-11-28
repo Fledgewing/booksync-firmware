@@ -39,7 +39,13 @@ class SceneLibrary final : public Library {
  public:
   unsigned scene = 0, queries = 0, batches = 0, starts = 0, opens = 0, connects = 0, cancelCalls = 0, resumes = 0,
            detailsCalls = 0, seriesCalls = 0;
-  unsigned coverRequests = 0, retiredOpenCalls = 0;
+  unsigned coverRequests = 0, retiredOpenCalls = 0, listQueries = 0;
+  ListKey requestedList{};
+  bool requestListBooks(const QueryRequest& q, ListKey key) override {
+    ++listQueries;
+    requestedList = key;
+    return requestQuery(q);
+  }
   void retireOpen(BookKey) override { ++retiredOpenCalls; }
   mutable unsigned reads = 0;
   Snapshot owner{};
