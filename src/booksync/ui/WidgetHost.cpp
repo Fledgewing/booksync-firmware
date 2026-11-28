@@ -108,7 +108,8 @@ WidgetView boundedWidget(const LibraryWindow& batchValue, const WindowSpan& span
           batchValue.stale || span.stale,
           span.ageDays,
           span.ageKnown,
-          span.count ? &batchValue.fileAvailability[span.first] : nullptr};
+          span.count ? &batchValue.fileAvailability[span.first] : nullptr,
+          span.year};
 }
 WidgetView WidgetHost::view(uint8_t widget) const {
   if (widget >= page_.count) return {WidgetState::Error};

@@ -151,3 +151,47 @@ TEST(BookListGeometry, HeaderUsesApprovedRightInsetAndCenteredFiftyPixelTarget) 
   EXPECT_EQ(cell.h, 50);
   EXPECT_EQ(cell.x + cell.w, 449);
 }
+
+TEST(BookListGeometry, ApprovedContextAndCoverCaptionsRetainTheirMeaning) {
+  widgets::Canvas canvas;
+  BookRow books[4];
+  WidgetView view{WidgetState::Known, books, 37, 4};
+  view.year = 2026;
+  widgets::Shelf::paint(canvas, view, WindowSource::FinishedYear, 0, {456, 224, 25, false, true}, 0);
+  bool year = false, cover = false, caption = false;
+  for (uint8_t i = 0; i < canvas.count; ++i) {
+    const auto& c = canvas.commands[i];
+    if (c.label == widgets::Label::ShelfTitle && c.kind == widgets::Drawing::Text) {
+      EXPECT_EQ(c.second, 2026u);
+      year = true;
+    }
+    if (c.kind == widgets::Drawing::BookJacket) {
+      EXPECT_EQ(c.box.y, 51);
+      EXPECT_EQ(c.box.h, 144);
+      cover = true;
+    }
+    if (c.kind == widgets::Drawing::Title) {
+      EXPECT_EQ(c.box.y, 198);
+      EXPECT_EQ(c.box.h, 19);
+      EXPECT_EQ(c.scale, 176);
+      EXPECT_FALSE(c.bold);
+      caption = true;
+    }
+  }
+  EXPECT_TRUE(year);
+  EXPECT_TRUE(cover);
+  EXPECT_TRUE(caption);
+  for (bool stale : {false, true}) {
+    canvas.clear();
+    view.stale = stale;
+    view.ageKnown = true;
+    view.ageDays = 2;
+    widgets::Shelf::paint(canvas, view, WindowSource::Unopened, 0, {456, 224, 25, false, true}, 0);
+    bool meaning = false;
+    for (uint8_t i = 0; i < canvas.count; ++i)
+      if (canvas.commands[i].label == (stale ? widgets::Label::UnopenedSavedAge : widgets::Label::UnopenedMeaning))
+        meaning = true;
+    EXPECT_TRUE(meaning);
+    booksync::test::expectTextGeometry(canvas, 456, 224);
+  }
+}

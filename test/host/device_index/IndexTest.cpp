@@ -524,6 +524,19 @@ TEST_F(IndexTest, RegisteredBookListSharesOneSnapshotWithNativeAndPagesItsOwnMem
   ASSERT_TRUE(model.materialize({0, 4, LibraryBytes, WindowSource::Recent, WindowPresentation::Preview}));
   EXPECT_EQ(model.window().windows[0].availability, Availability::NotSaved);
 }
+TEST_F(IndexTest, PublishedBookListYearSurvivesTheWindowAndRetiresWithItsSource) {
+  publish(2);
+  ReadModel model{index};
+  BookListProjection scratch;
+  SavedSelection saved;
+  model.setBookListScratch(&scratch);
+  model.setBookListSource(saved.source(), {17, 4}, 2026);
+  ASSERT_TRUE(model.materialize({0, 4, LibraryBytes, WindowSource::FinishedYear, WindowPresentation::Preview}));
+  EXPECT_EQ(model.window().windows[0].year, 2026);
+  model.invalidate(Invalidation::Account);
+  ASSERT_TRUE(model.materialize({0, 4, LibraryBytes, WindowSource::FinishedYear, WindowPresentation::Preview}));
+  EXPECT_EQ(model.window().windows[0].year, 0);
+}
 TEST_F(IndexTest, ChangedOrMalformedSourceClearsItsPageWithoutSuppressingNativeSibling) {
   publish(2);
   ReadModel model{index};
