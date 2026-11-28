@@ -13,8 +13,8 @@ struct CompactGrid {
     const int left = leftInset > Margin ? leftInset : Margin;
     const int right = rightInset > Margin ? rightInset : Margin;
     const int top = topInset > HeaderHeight + 6 ? topInset : HeaderHeight + 6;
-    const int footer = bottomInset > FooterHeight ? bottomInset : FooterHeight;
-    return {left, panelWidth - left - right, top, panelHeight - footer, cols, rows};
+    const int hintBand = bottomInset > FooterHeight ? bottomInset : FooterHeight;
+    return {left, panelWidth - left - right, top, panelHeight - hintBand, cols, rows};
   }
   WidgetCell compactTile(WidgetPlacement placement) const {
     if (!cols || !rows || gridWidth <= 0 || gridEdge <= gridTop || !placement.w || !placement.h ||
