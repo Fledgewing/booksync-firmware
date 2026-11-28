@@ -292,7 +292,7 @@ class ShellActivity final : public Activity {
       case WindowSource::PickBackUp:
         return tr(STR_HOME_PICK_BACK_UP);
       case WindowSource::OnDevice:
-        return tr(STR_HOME_ON_DEVICE);
+        return tr(STR_SERIES_ON_DEVICE);
       default:
         return tr(STR_HOME_RECENT);
     }
