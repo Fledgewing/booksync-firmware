@@ -26,6 +26,7 @@
 #include "../../test/simulator/LayoutScenario.h"
 #include "../../test/simulator/UpdateScenario.h"
 #include "../../test/simulator/VersionScenario.h"
+#include "../../test/simulator/UpdateInstallScenario.h"
 #include "../../test/simulator/WidgetScenario.h"
 #include "../../test/simulator/EditorScenario.h"
 #include "../../test/simulator/AccountSurfaceScenario.h"
@@ -12204,6 +12205,7 @@ void prepareSimulatorSmokeState() {
   runCredentialsScenario();
   runDeviceIndexScenario();
   runLayoutScenario();
+  runUpdateInstallScenario();
   runVersionScenario();
   runUpdateScenario();
   // Smoke tests and scripted-input harnesses (scripts/test_*.py) expect to drive Home directly.

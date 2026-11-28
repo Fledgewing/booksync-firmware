@@ -2782,3 +2782,20 @@ bytes; label at most 100. The entire checkpoint must fit the existing 1024-byte
 journal limit. Unpersistable replies stay uncertain; no truncation is allowed.
 Publication is idempotent and durable before the progress phase acknowledgement,
 which restores the unchanged nested match/stats checkpoint.
+
+## Update boot receipt (BSU1)
+
+F32 stores one redacted `/.booksync/update.receipt` (76 bytes) with atomic
+`.tmp`/`.bak` siblings. Bytes 0–3 are `BSU1`; byte 4 is phase (0 Idle,
+1 Writing, 2 AwaitBoot, 3 Complete, 4 Interrupted, 5 Returned); byte 5 is
+returning (0/1); bytes 6–7 are zero; bytes 8–39 and 40–71 are SHA-256 digests
+of the source and target application respectively. Bytes 72–75 contain
+little-endian FNV-1a of bytes 0–71. The current file alone is authority;
+missing, unknown, damaged or unreadable state never falls back to an old success.
+An intent commits before writing/selecting the boot image. Writing/AwaitBoot
+receipts reconcile only against a complete, verified boot image with the exact
+board and partition map: target proves completion/return; source proves an
+interrupted attempt; another image leaves the outcome unknown. A failed write
+result is never assumed to mean boot selection failed. No receipt proves that
+an older version can understand current durable state; return requires a separate,
+current compatibility proof bound to the verified previous image digest.

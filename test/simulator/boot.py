@@ -100,4 +100,7 @@ subprocess.run([sys.executable, 'test/simulator/personal_reading.py', profile], 
 subprocess.run([sys.executable, 'test/simulator/account_surface.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, "test/simulator/lifecycle_progress.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/copy_jobs.py', profile], cwd=root, env=env, check=True)
+
+
+subprocess.run([sys.executable, 'test/simulator/update_install.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)
