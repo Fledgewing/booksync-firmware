@@ -8,6 +8,8 @@ namespace booksync {
 Library& homeLibrary();
 void showHome(GfxRenderer& renderer, MappedInputManager& input, HalDisplay::RefreshMode refresh);
 #ifdef SIMULATOR
+// Scenario-only counter; caller holds RenderLock.
+uint32_t homeScenePaints();
 void showHomeScene(GfxRenderer& renderer, MappedInputManager& input, Library& library);
 #endif
 }  // namespace booksync

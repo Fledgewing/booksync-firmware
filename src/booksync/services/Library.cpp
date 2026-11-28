@@ -16,6 +16,9 @@ struct LocalState {
   storage::LayoutStore layout{
       {"/.booksync/home-layout.json", "/.booksync/home-layout.json.tmp", "/.booksync/home-layout.json.bak"},
       Layout::deviceClass()};
+  LayoutEditor editor{};
+  LayoutEdit edit{};
+  LayoutEditResult editResult{};
   bool layoutPending = true;
   HomePage page{};
   uint8_t wantedPage = 0;
@@ -28,9 +31,9 @@ struct LocalState {
   BookKey openKey{};
   bool requested = false, rescan = false, resolveOpen = false, openReady = false;
 };
-static_assert(sizeof(LocalState) <= 24 * 1024);
-// One fallible allocation per Home lifetime, <=24 KiB. These codec/window/history
-// buffers exceed the task stack; releasing them before reader entry keeps C3
+static_assert(sizeof(LocalState) <= 28 * 1024);
+// One fallible allocation per Home lifetime, <=28 KiB. These codec/window/history
+// buffers and the <=3 KiB editor splice workspace exceed the task stack; releasing them before reader entry keeps C3
 // buffers out of the reader lifetime. HAL owns its bounded directory-handle allocations.
 std::unique_ptr<LocalState> local;
 class OfflineLibrary final : public Library {
@@ -78,6 +81,13 @@ class OfflineLibrary final : public Library {
     local->layoutPending = true;
     return true;
   }
+  CommandStatus editLayout(LayoutEdit edit) override {
+    if (!local || local->editResult.status == LayoutEditStatus::Pending) return CommandStatus::Unavailable;
+    local->edit = edit;
+    local->editResult = {LayoutEditStatus::Pending, edit.revision};
+    return CommandStatus::Accepted;
+  }
+  LayoutEditResult layoutEditResult() const override { return local ? local->editResult : LayoutEditResult{}; }
   void readWindow(LibraryWindow& out) const override {
     if (local)
       local->model.copyWindow(out);
@@ -152,6 +162,13 @@ void leaveLocalLibrary() {
 void workLocalLibrary() {
   if (!local) return;
   auto& state = *local;
+  if (state.editResult.status == LayoutEditStatus::Pending) {
+    state.editResult.status = state.layout.edit(state.editor, state.edit);
+    state.wantedPage = state.edit.kind == LayoutEditKind::Reset && state.editResult.status == LayoutEditStatus::Saved
+                           ? 0
+                           : state.edit.page;
+    state.layoutPending = true;
+  }
   if (state.layoutPending) {
     state.layoutPending = false;
     state.layout.load();
@@ -161,6 +178,7 @@ void workLocalLibrary() {
       state.layout.projectDefault(state.page);
     }
   }
+  state.editResult.revision = state.page.revision;
   if (state.rescan) {
     state.rescan = false;
     auto provenance = state.index.provenance();

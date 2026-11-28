@@ -2,6 +2,7 @@
 #pragma once
 #include "FilePublish.h"
 #include "booksync/services/Layout.h"
+#include "booksync/services/LayoutEditor.h"
 namespace booksync::storage {
 enum class LayoutSource { Current, Backup, Default };
 // Worker-only, externally serialized with SyncOwner. No automatic repair/deletion.
@@ -13,6 +14,7 @@ class LayoutStore {
       : paths_(paths), device_(deviceClass), spans_(spans), context_(context) {}
   LayoutSource load();
   bool save(LayoutInput input);
+  LayoutEditStatus edit(LayoutEditor& editor, LayoutEdit request);
   bool project(uint8_t page, HomePage& output);
   bool projectDefault(HomePage& output) { return validator_.project(Layout::defaults(), device_, 0, output); }
   // Validated selected path, or null for defaults(). Caller must exclude writers

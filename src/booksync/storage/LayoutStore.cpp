@@ -38,7 +38,12 @@ LayoutSource LayoutStore::load() {
   }
 }
 bool LayoutStore::save(LayoutInput input) {
-  if (!validator_.validate(input, device_, spans_, context_)) return false;
+  const bool validInput = validator_.validate(input, device_, spans_, context_);
+  if (input.release && !input.release(input.context)) {
+    LOG_ERR("BSL", "Cannot close layout input reader");
+    return false;
+  }
+  if (!validInput) return false;
   // Do not overwrite even a damaged primary on an explicit save. Recovery is
   // read-only; a future recovery flow can preserve damaged bytes before repair.
   if (Storage.exists(paths_.current)) {
@@ -68,6 +73,10 @@ bool LayoutStore::save(LayoutInput input) {
     if (!writer.write(copy_, n)) return false;
     offset += n;
   }
+  if (input.release && !input.release(input.context)) {
+    LOG_ERR("BSL", "Cannot close layout input reader");
+    return false;
+  }
   if (!writer.finish()) return false;
   selected_ = paths_.current;
   return true;
@@ -90,5 +99,45 @@ bool LayoutStore::project(uint8_t page, HomePage& output) {
   const bool ok = validator_.project(input, device_, page, output);
   file.close();
   return ok;
+}
+}  // namespace booksync::storage
+
+namespace booksync::storage {
+LayoutEditStatus LayoutStore::edit(LayoutEditor& editor, LayoutEdit request) {
+  load();
+  // One lazy read handle, explicitly closed before validating the same path
+  // or renaming it. A source and staging writer may coexist on different paths.
+  struct Source {
+    const char* path;
+    FsFile file;
+    bool close() { return file.close(); }
+  } source{selected_, {}};
+  LayoutInput input = Layout::defaults();
+  if (source.path) {
+    source.file = Storage.open(source.path, O_RDONLY);
+    if (!source.file) {
+      LOG_ERR("BSL", "Cannot read editor source");
+      return LayoutEditStatus::StorageError;
+    }
+    input = {[](void* context, size_t offset, void* out, size_t n) {
+               auto& s = *static_cast<Source*>(context);
+               if (!s.file) s.file = Storage.open(s.path, O_RDONLY);
+               return s.file && s.file.seekSet(offset) && s.file.read(out, n) == static_cast<int>(n);
+             },
+             &source, static_cast<size_t>(source.file.fileSize()),
+             [](void* context) { return static_cast<Source*>(context)->close(); }};
+  }
+  auto result = editor.prepare(input, device_, request);
+  if (!source.close()) {
+    LOG_ERR("BSL", "Cannot close editor source");
+    result = LayoutEditStatus::StorageError;
+  }
+  if (result == LayoutEditStatus::Saved) {
+    result = save(editor.output()) ? LayoutEditStatus::Saved : LayoutEditStatus::StorageError;
+    source.close();
+  }
+  if (result != LayoutEditStatus::Saved) LOG_ERR("BSL", "Home edit rejected (%u)", unsigned(result));
+  load();
+  return result;
 }
 }  // namespace booksync::storage

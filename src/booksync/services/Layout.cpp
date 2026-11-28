@@ -525,17 +525,18 @@ bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePa
         Span tile;
         nodes_ = 0;
         if (!value(q, tile) || !text(field(tile, "instance"), text_)) return false;
-        auto override = field(over, std::string_view(text_, textLength_));
+        auto override = over.type ? field(over, std::string_view(text_, textLength_)) : Span{};
         Geometry g;
         if (!geometry(tile, g, false) || (override.type && !geometry(override, g, true))) return false;
         if (!text(field(tile, "widget"), text_) || !number(field(tile, "version"), 1, 2147483647, n)) return false;
+        const auto widgetId = std::string_view(text_, textLength_);
         WidgetKind kind{};
         bool installed = n == 1 && !g.hidden;
-        if (!std::strcmp(text_, "continue-reading"))
+        if (widgetId == "continue-reading")
           kind = WidgetKind::Continue;
-        else if (!std::strcmp(text_, "booklist"))
+        else if (widgetId == "booklist")
           kind = WidgetKind::Shelf;
-        else if (!std::strcmp(text_, "library"))
+        else if (widgetId == "library")
           kind = WidgetKind::Browse;
         else
           installed = false;

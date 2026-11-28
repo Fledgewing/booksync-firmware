@@ -1237,7 +1237,7 @@
     },
     "include/AppCapabilities.h": {
       "role": "retained-runtime",
-      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover.",
+      "rationale": "Native runtime/UI baseline; exact edges retained until explicitly owned bridge cutover. F35a gates editor presentation to approved X4 profiles; X3 editor awaits approval.",
       "includes": [
         "BoardConfig.h"
       ]
@@ -13298,7 +13298,7 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F35a adds isolated editor HAL/interaction scenario coverage.",
       "includes": [
         "../../test/simulator/AccountScenario.h",
         "../../test/simulator/CatalogJobsScenario.h",
@@ -13306,6 +13306,7 @@
         "../../test/simulator/CredentialsScenario.h",
         "../../test/simulator/DeliveryScenario.h",
         "../../test/simulator/DeviceIndexScenario.h",
+        "../../test/simulator/EditorScenario.h",
         "../../test/simulator/FilePublishScenario.h",
         "../../test/simulator/LayoutScenario.h",
         "../../test/simulator/LifecycleJournalScenario.h",
@@ -15357,6 +15358,26 @@
     "src/booksync/server/bookorbit/LifecycleStats.cpp": {
       "role": "server",
       "rationale": "F18b private companion-compatible page-stats mapping, scoped F18a evidence and F15 auth/epoch gates; only F17 token can call transport. Fixed batch and checkpoint output, no UI or writer activation."
+    },
+    "src/booksync/interface/LayoutEdit.h": {
+      "role": "interface",
+      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only."
+    },
+    "src/booksync/services/LayoutEditor.h": {
+      "role": "services",
+      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only."
+    },
+    "src/booksync/services/LayoutEditor.cpp": {
+      "role": "services",
+      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only."
+    },
+    "src/booksync/ui/EditorAddRemove.h": {
+      "role": "ui",
+      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only."
+    },
+    "src/booksync/ui/EditorAddRemove.cpp": {
+      "role": "ui",
+      "rationale": "F35a bounded Home add/remove/reset: public revision-checked intents; worker streaming edits; UI consumes Library only."
     }
   },
   "generators": {
