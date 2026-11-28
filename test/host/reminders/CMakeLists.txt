@@ -1,6 +1,7 @@
 add_executable(BookSyncRemindersTest RemindersTest.cpp
   ${REPO_ROOT}/src/booksync/services/Reminders.cpp
   ${REPO_ROOT}/src/booksync/services/RemindersFacade.cpp
+  ${REPO_ROOT}/src/booksync/services/Delivery.cpp
   ${REPO_ROOT}/src/booksync/storage/RemindersStore.cpp
   ${REPO_ROOT}/src/booksync/system/RemindersRuntime.cpp
   ${REPO_ROOT}/src/booksync/storage/FilePublish.cpp)

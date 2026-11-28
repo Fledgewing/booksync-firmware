@@ -28,6 +28,7 @@
 
 #include "booksync/system/NetworkPhase.h"
 #include "booksync/system/SleepRuntime.h"
+#include "booksync/system/ReminderPresenter.h"
 #include "sync/ProgressBookIterator.h"
 #include "util/PluginEvents.h"
 #if !defined(SIMULATOR) && !FREEINK_MCU_C3
@@ -97,7 +98,6 @@ inline esp_sleep_wakeup_cause_t esp_sleep_get_wakeup_cause() { return ESP_SLEEP_
 #include "AppVersion.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
-#include "booksync/system/Bootstrap.h"
 #include "DeviceCapabilities.h"
 #include "FilenameFontSystem.h"
 #include "GlobalActions.h"
@@ -119,6 +119,7 @@ inline esp_sleep_wakeup_cause_t esp_sleep_get_wakeup_cause() { return ESP_SLEEP_
 #include "activities/settings/FontDownloadActivity.h"
 #include "activities/settings/OtaUpdateActivity.h"
 #include "activities/settings/SdFirmwareUpdateActivity.h"
+#include "booksync/system/Bootstrap.h"
 #include "components/UITheme.h"
 #include "components/icons/tablerFilledIcons.h"
 #include "fontIds.h"
@@ -555,6 +556,7 @@ CrossPointSettings::SHORT_PWRBTN getPowerButtonAction() {
 
 void notifyQuickLockChanged() {
   const bool locked = buttonShortcutController.isQuickLocked();
+  booksync::reminderHidden(locked);
   x4ProHomeKeyTapPending = false;
   mappedInputManager.clearInjectedReleases();
   LOG_DBG("MAIN", "Quick Lock %s", locked ? "enabled" : "disabled");
@@ -1202,6 +1204,7 @@ static bool holdSleepWhileUsbPowered(bool monochrome = false) {
 #endif
 
 void enterDeepSleep(bool fromTimeout) {
+  booksync::reminderHidden(true);
   const auto readiness = booksync::prepareSleep(static_cast<uint32_t>(millis()));
   if (readiness == booksync::SleepReadiness::Draining) {
     sleepWaitingForNetwork = true;
@@ -1210,6 +1213,7 @@ void enterDeepSleep(bool fromTimeout) {
   }
   sleepWaitingForNetwork = false;
   if (readiness == booksync::SleepReadiness::Expired) {
+    booksync::reminderHidden(buttonShortcutController.isQuickLocked());
     sleepAttemptEnded = true;
     return;
   }
@@ -1277,6 +1281,7 @@ void enterDeepSleep(bool fromTimeout) {
   if (!storageStopped) {
     deepSleepInProgress = false;
     booksync::retireSleep();
+    booksync::reminderHidden(false);
     APP_STATE.quickLockResumePending = false;
     APP_STATE.quickLockRestoreFrontlight = false;
     if (buttonShortcutController.isQuickLocked()) {
@@ -1311,6 +1316,7 @@ void enterDeepSleep(bool fromTimeout) {
 #endif
   powerManager.startDeepSleep(gpio);
   booksync::retireSleep();  // Simulator returns; hardware starts a fresh boot.
+  booksync::reminderHidden(buttonShortcutController.isQuickLocked());
 }
 
 void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, const bool useReaderRenderStack) {
@@ -1939,6 +1945,8 @@ void loop() {
       // A fresh wake press retires only this sleep request. The existing
       // admission tick still owns draining workers and restoring C3 storage.
       booksync::retireSleep();
+      booksync::reminderHidden(buttonShortcutController.isQuickLocked());
+      booksync::reminderInput();
       sleepWaitingForNetwork = false;
       sleepAttemptEnded = true;
       powerButtonReleasedSinceWake = false;
@@ -2053,6 +2061,14 @@ void loop() {
   if (userInputReceived) {
     activityManager.notifyUserInput();
   }
+  // Reminder activity is a fresh interaction, not the release half of a
+  // dismissal, a held contact, sensor polling or arriving background work.
+  bool reminderFreshInput = gpio.wasAnyPressed();
+#if CROSSINK_APP_CAP_TOUCH
+  float reminderTouchX = 0.0f, reminderTouchY = 0.0f;
+  reminderFreshInput = reminderFreshInput || gpio.wasTouchDown(reminderTouchX, reminderTouchY) || gpio.wasHomeKeyPressed();
+#endif
+  if (reminderFreshInput) booksync::reminderInput();
 
   // Let wake continue as soon as its hold has been verified. The release can
   // arrive after setup, so consume that one input frame rather than making it
@@ -2262,6 +2278,10 @@ void loop() {
   // unrelated gesture took priority, do not carry it into the next activity.
   mappedInputManager.clearDeferredHomeGesture();
 #endif
+  if (booksync::takeReminderSleep()) {
+    enterDeepSleep(false);
+    return;
+  }
   const unsigned long activityDuration = millis() - activityStartTime;
   // A blocking activity (for example an OPDS download) is not idle time.
   lastActivityTime += activityDuration;

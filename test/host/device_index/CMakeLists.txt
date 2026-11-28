@@ -27,6 +27,7 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/services/Library.cpp
   ${REPO_ROOT}/src/booksync/services/Reminders.cpp
   ${REPO_ROOT}/src/booksync/services/RemindersFacade.cpp
+  ${REPO_ROOT}/src/booksync/services/Delivery.cpp
   ${REPO_ROOT}/src/booksync/services/SdIndexSource.cpp)
 target_include_directories(BookSyncIndexTest BEFORE PRIVATE ${REPO_ROOT}/lib/Memory)
 target_include_directories(BookSyncIndexTest PRIVATE ../file_publish/stubs ${REPO_ROOT}/src ${REPO_ROOT}/lib/Memory)

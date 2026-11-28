@@ -40,6 +40,9 @@ class Reminders {
   ReminderResult respond(uint64_t token, uint64_t lifetime, ReminderAction, const ReminderNow&);
   void activity(const ReminderNow&, bool input = false);
   void retire(uint64_t lifetime);
+  ReminderAuthorization authorize(ReminderClaim, const ReminderNow&);
+  bool sleepFailed(uint64_t token, uint64_t owner);
+  bool presentation(ReminderClaim, const ReminderNow&, ReminderDue&) const;
   unsigned count() const;
   uint64_t nextMutation() const;
   bool intervalEnabled() const { return data_.enabled; }
@@ -65,10 +68,12 @@ class Reminders {
     ReminderKind kind = ReminderKind::Time;
     uint64_t id = 0, revision = 0;
     int32_t day = -1;
-    int64_t scheduled = 0;
+    int64_t scheduled = 0, effective = 0;
+    uint64_t expires = 0, session = 0, sequence = 0;
+    bool drawn = false;
   } grant_{};
   uint64_t owner_ = 0, token_ = 0, serial_ = 0;
-  bool waiting_ = false, live_ = false;
+  bool waiting_ = false, live_ = false, sleepPending_ = false;
   bool save();
   void resetInterval();
 };

@@ -130,6 +130,7 @@ class XtcReaderActivity final : public Activity {
   BookLoadingFeedback openingFeedback;
   bool showOpeningFeedback() {
     if (!openingFeedback.showIfPending(renderer)) return false;
+    markReminderNonReadingFrame();
     pagesUntilFullRefresh = 0;
     return true;
   }
@@ -159,6 +160,15 @@ class XtcReaderActivity final : public Activity {
     return true;
   }
   bool isReaderActivity() const override { return true; }
+  void onReminderVisibilityChanged(bool visible) override {
+    if (visible)
+      recordCurrentPageReadingTime("reminder", true);
+    else {
+      lastPageTurnTime = millis();
+      resumeReadingStatsTimer("reminder_return");
+    }
+  }
+  bool checkpointReminderSleep() override { return saveProgressBeforeRestart(); }
   bool isBookReaderActivity() const override { return true; }
   bool usesMenuButtonOrientation() const override;
   bool usesFullScreenReaderVerticalSwipes() const override {

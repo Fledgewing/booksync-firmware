@@ -58,3 +58,19 @@
 #else
 #define CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS 0
 #endif
+
+// R1 reminders are approved for these BookSync reader profiles only. Keep this
+// policy separate from touch, RTC availability and PSRAM capabilities.
+#if (defined(FREEINK_DEVICE_X3) && FREEINK_DEVICE_X3) || (defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO) || \
+    (defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC) || defined(SIMULATOR_DEVICE_X3) ||              \
+    defined(SIMULATOR_DEVICE_X4_PRO) || defined(SIMULATOR_DEVICE_X4_CLASSIC)
+#define CROSSINK_APP_CAP_REMINDERS 1
+#else
+#define CROSSINK_APP_CAP_REMINDERS 0
+#endif
+
+#if (defined(FREEINK_DEVICE_X3) && FREEINK_DEVICE_X3) || defined(SIMULATOR_DEVICE_X3)
+#define CROSSINK_APP_REMINDER_TEXT_LAYOUT 1
+#else
+#define CROSSINK_APP_REMINDER_TEXT_LAYOUT 0
+#endif

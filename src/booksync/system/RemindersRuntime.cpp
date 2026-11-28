@@ -11,7 +11,9 @@ struct ReminderRuntime {
 };
 // One fixed boot-lifetime workspace; never duplicated per Home/reader/account.
 // No heap allocation, PSRAM requirement, task or second framebuffer is added.
-static_assert(sizeof(ReminderRuntime) <= ReminderServiceBytes);
+// Reserve includes facade binding pointers and static-init
+// guard/alignment outside this aggregate; the due presenter has its own budget.
+static_assert(sizeof(ReminderRuntime) + 48 <= ReminderServiceBytes);
 }  // namespace
 RemindersFacade& reminderRuntime() {
   static ReminderRuntime runtime;

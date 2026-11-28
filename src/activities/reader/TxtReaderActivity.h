@@ -116,6 +116,7 @@ class TxtReaderActivity final : public Activity {
   BookLoadingFeedback openingFeedback;
   bool showOpeningFeedback() {
     if (!openingFeedback.showIfPending(renderer)) return false;
+    markReminderNonReadingFrame();
     pagesUntilFullRefresh = 0;
     return true;
   }
@@ -146,6 +147,7 @@ class TxtReaderActivity final : public Activity {
     return true;
   }
   bool isReaderActivity() const override { return true; }
+  bool checkpointReminderSleep() override;
   bool isBookReaderActivity() const override { return true; }
   bool usesMenuButtonOrientation() const override { return quickActionsPopup.isActive(); }
   bool usesFullScreenReaderVerticalSwipes() const override {

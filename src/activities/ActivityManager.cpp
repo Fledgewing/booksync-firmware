@@ -1,7 +1,9 @@
 #include "ActivityManager.h"
-#include "booksync/system/ClockRuntime.h"
 
+#include "booksync/system/ClockRuntime.h"
 #include "booksync/system/NetworkPhase.h"
+#include "booksync/system/ReminderPresenter.h"
+#include "settings/ClockSyncActivity.h"
 
 #if FREEINK_DEVICE_PICCO && CROSSINK_BATTERY_DIAG_LOG
 #include "util/BatteryDiagnosticLog.h"
@@ -501,7 +503,9 @@ void ActivityManager::renderTaskLoop() {
     entryRenderRequested = false;
     TouchRegistry::getInstance().setEnabled(mappedInput.hasTouch());
     TouchRegistry::getInstance().beginFrame();
-    if (currentActivity && booksync::networkDisplayReady()) {
+    const bool reminderSuppressed = booksync::reminderOwnsFrame();
+    if (currentActivity && booksync::networkDisplayReady() && !reminderSuppressed) {
+      currentActivity->reminderFrame_.beginRender();
       HalPowerManager::Lock powerLock;  // Ensure we don't go into low-power mode while rendering
       // Apply Night Mode to each activity's normal-polarity frame. SleepActivity
       // preserves it for retained pages and clears it for generated sleep screens.
@@ -514,6 +518,9 @@ void ActivityManager::renderTaskLoop() {
       BatteryDiagnosticLog::beginDisplayFrame();
 #endif
       currentActivity->render(std::move(lock));
+      currentActivity->reminderFrame_.finishRender(
+          currentActivity->isBookReaderActivity(),
+          currentActivity->allowsReminderOverlay() && !currentActivity->blocksGlobalInput());
 #if FREEINK_DEVICE_PICCO && CROSSINK_BATTERY_DIAG_LOG
       BatteryDiagnosticLog::finishDisplayFrame();
 #endif
@@ -527,6 +534,8 @@ void ActivityManager::renderTaskLoop() {
     TaskHandle_t waiter = nullptr;
     taskENTER_CRITICAL(&renderStateMux);
     waiter = waitingTaskHandle;
+    if (waitingReminderRejected) waitingReminderRejected->store(reminderSuppressed, std::memory_order_release);
+    waitingReminderRejected = nullptr;
     waitingTaskHandle = nullptr;
     taskEXIT_CRITICAL(&renderStateMux);
     if (waiter) {
@@ -548,6 +557,25 @@ void ActivityManager::loop() {
       }
       return;
     }
+  }
+
+  const auto reminderState = reminderContext();
+  const bool reminderHandled =
+      booksync::reminderLoop(renderer, mappedInput, reminderState.page, reminderState.visible, reminderState.modal);
+  const bool reminderFrame = booksync::reminderOwnsFrame();
+  if (reminderFrame != reminderOverlayVisible) {
+    RenderLock lock;
+    if (currentActivity) {
+      currentActivity->markReminderFrameBlocked();
+      currentActivity->onReminderVisibilityChanged(reminderFrame);
+    }
+    reminderOverlayVisible = reminderFrame;
+  }
+  if (reminderHandled) {
+    // Dismissal owns this input frame; restore the parent without polling it or
+    // replaying a key. Its automatic-page timer resumes from this boundary.
+    if (!reminderFrame) processPendingActivities();
+    return;
   }
 
 #if CROSSINK_APP_CAP_TOUCH
@@ -635,7 +663,8 @@ void ActivityManager::processPendingActivities() {
   // Navigation cannot enter a reader or paint a new activity while C3 storage
   // belongs to transport. Cancel/drain first, retaining the pending navigation.
   if ((pendingAction != PendingAction::None || (afterReturnActivity && afterReturnOwnerExited)) &&
-      booksync::networkAdmission().busy() && !booksync::networkAdmission().finish()) return;
+      booksync::networkAdmission().busy() && !booksync::networkAdmission().finish())
+    return;
   // A deferred full-stack replace waits until its requester has popped and every
   // result handler has settled, then runs as an ordinary Replace.
   while (pendingAction != PendingAction::None || (afterReturnActivity && afterReturnOwnerExited)) {
@@ -673,6 +702,7 @@ void ActivityManager::processPendingActivities() {
 
       } else {
         currentActivity = std::move(stackActivities.back());
+        currentActivity->markReminderFrameBlocked();
         stackActivities.pop_back();
         mappedInput.setMenuMode(currentActivity->usesMenuButtonOrientation());
         restoredActivityNeedsRender = true;
@@ -746,6 +776,7 @@ void ActivityManager::processPendingActivities() {
         }
       } else if (pendingAction == PendingAction::Push) {
         // Move current activity to stack
+        if (currentActivity) currentActivity->markReminderFrameBlocked();
         stackActivities.push_back(std::move(currentActivity));
       }
       pendingAction = PendingAction::None;
@@ -947,6 +978,9 @@ void ActivityManager::enterCurrentActivity() {
 }
 
 void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
+  if (booksync::reminderOwnsFrame()) return;
+  if (currentActivity) currentActivity->markReminderFrameBlocked();
+  booksync::reminderNavigation();
   // Note: no lock here, this is usually called by loop() and we may run into deadlock
   if (currentActivity) {
     TouchRegistry::getInstance().clear();
@@ -1144,6 +1178,9 @@ void ActivityManager::goHome(HomeMenuItem, const HalDisplay::RefreshMode initial
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
+  if (booksync::reminderOwnsFrame()) return;
+  if (currentActivity) currentActivity->markReminderFrameBlocked();
+  booksync::reminderNavigation();
   if (pendingActivity) {
     // Should never happen in practice
     LOG_ERR("ACT", "pendingActivity while pushActivity is not expected");
@@ -1162,6 +1199,9 @@ void ActivityManager::replaceAfterReturn(std::unique_ptr<Activity>&& activity) {
 }
 
 void ActivityManager::popActivity() {
+  if (booksync::reminderOwnsFrame()) return;
+  if (currentActivity) currentActivity->markReminderFrameBlocked();
+  booksync::reminderNavigation();
   if (pendingActivity) {
     // Should never happen in practice
     LOG_ERR("ACT", "pendingActivity while popActivity is not expected");
@@ -1177,7 +1217,9 @@ bool ActivityManager::requiresExclusiveStorageLoop() const {
   return currentActivity && currentActivity->requiresExclusiveStorageLoop();
 }
 
-bool ActivityManager::blocksGlobalInput() const { return currentActivity && currentActivity->blocksGlobalInput(); }
+bool ActivityManager::blocksGlobalInput() const {
+  return booksync::reminderOwnsFrame() || (currentActivity && currentActivity->blocksGlobalInput());
+}
 
 bool ActivityManager::isHomeActivity() const { return currentActivity && currentActivity->name == "Home"; }
 
@@ -1394,10 +1436,15 @@ void ActivityManager::requestUpdate(bool immediate) {
   }
 }
 RequestUpdateResult ActivityManager::requestUpdateAndWait() {
+  if (booksync::reminderOwnsFrame()) return RequestUpdateResult::Rejected;
   if (!renderTaskHandle) {
     return RequestUpdateResult::Rejected;
   }
 
+  std::atomic<uint32_t> reminderRejected{0};
+  // The stack flag lives until this waiter is notified; only its pointer is
+  // shared under renderStateMux. Rejected reminder frames are never reported
+  // as a successful parent render, including the queue/draw race.
   // Atomic section to perform checks
   taskENTER_CRITICAL(&renderStateMux);
   auto currTaskHandler = xTaskGetCurrentTaskHandle();
@@ -1407,6 +1454,7 @@ RequestUpdateResult ActivityManager::requestUpdateAndWait() {
   bool holdingRenderLock = (mutexHolder == currTaskHandler);
   if (!alreadyWaiting && !isRenderTask && !holdingRenderLock) {
     waitingTaskHandle = currTaskHandler;
+    waitingReminderRejected = &reminderRejected;
   }
   taskEXIT_CRITICAL(&renderStateMux);
 
@@ -1433,7 +1481,8 @@ RequestUpdateResult ActivityManager::requestUpdateAndWait() {
   }
   xTaskNotify(renderTaskHandle, 1, eIncrement);
   ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-  return RequestUpdateResult::Rendered;
+  return reminderRejected.load(std::memory_order_acquire) ? RequestUpdateResult::Rejected
+                                                          : RequestUpdateResult::Rendered;
 }
 
 // RenderLock
@@ -1485,4 +1534,41 @@ void ActivityManager::captureSleepEvents() {
   const std::string book = getCurrentBookPath();
   pluginevents::queueSleep(book.c_str(), getScreenshotInfo().progressPercent);
   return;
+}
+
+bool ActivityManager::checkpointReminderSleep() {
+  if (pendingAction != PendingAction::None) return false;
+  if (currentActivity && currentActivity->isBookReaderActivity()) return currentActivity->checkpointReminderSleep();
+  for (auto it = stackActivities.rbegin(); it != stackActivities.rend(); ++it)
+    if ((*it)->isBookReaderActivity()) return (*it)->checkpointReminderSleep();
+  return true;
+}
+
+bool ActivityManager::connectReminderClock() {
+  if (!currentActivity || currentActivity->name != "Reminders" || pendingAction != PendingAction::None ||
+      booksync::reminderOwnsFrame() || !currentActivity->allowsReminderOverlay() ||
+      currentActivity->blocksGlobalInput())
+    return false;
+  auto sync = makeUniqueNoThrow<ClockSyncActivity>(renderer, mappedInput);
+  if (!sync) {
+    LOG_ERR("BSR", "Cannot allocate manual clock connection");
+    return false;
+  }
+  auto* parent = currentActivity.get();
+  parent->startActivityForResult(std::move(sync), [parent](const ActivityResult&) { parent->onReminderClockResult(); });
+  return true;
+}
+
+ActivityManager::ReminderContext ActivityManager::reminderContext() const {
+  ReminderContext out;
+  if (!currentActivity) return out;
+  const bool frame = currentActivity->reminderFrame_.ready();
+  out.modal = currentActivity->blocksGlobalInput() || !currentActivity->allowsReminderOverlay();
+  out.visible = pendingAction == PendingAction::None && booksync::networkDisplayReady() &&
+                (booksync::reminderOwnsFrame() || frame);
+  out.page = frame && currentActivity->isBookReaderActivity() && !out.modal;
+  return out;
+}
+void ActivityManager::notifyReminderReadingInput() {
+  if (currentActivity && currentActivity->isBookReaderActivity()) booksync::reminderInput();
 }

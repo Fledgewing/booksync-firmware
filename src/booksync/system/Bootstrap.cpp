@@ -1297,6 +1297,14 @@ class ShellActivity final : public Activity {
         initialRefresh(refresh) {
   }
   bool isHomeActivity() const override { return !editorOnly; }
+  bool allowsReminderOverlay() const override {
+    if (editorOnly || notice.visible()) return false;
+#if CROSSINK_APP_CAP_HOME_EDITOR
+    return editor.panel() == EditorAddRemove::Panel::Closed;
+#else
+    return true;
+#endif
+  }
   void onEnter() override {
     Activity::onEnter();
 #if CROSSINK_SCALABLE_FONTS

@@ -92,6 +92,7 @@ static bool sleepScenarioTick() {
   LOG_INF("SLEEPTEST", "BookSync sleep scenario PASS: durable capture before native sleep");
   std::fflush(nullptr);
   enterDeepSleep(false);
-  finish(!homeLibrary().sleepView().captured, "native sleep returns without stale presentation ownership");
+  finish(!homeLibrary().sleepView().captured && !reminderSceneHidden(),
+         "native sleep returns without stale sleep or reminder ownership");
   return true;
 }

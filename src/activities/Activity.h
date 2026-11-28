@@ -14,6 +14,7 @@
 #include "MappedInputManager.h"
 #include "RenderLock.h"
 #include "util/QuickLockTrigger.h"
+#include "booksync/system/ReminderFrame.h"
 #include "util/ScreenshotInfo.h"
 
 struct PendingOverlayResume;
@@ -28,6 +29,12 @@ class Activity {
 
   ActivityResultHandler resultHandler;
   ActivityResult result;
+  // Renderer publishes a scalar after a real foreground frame. Main-loop
+  // reminder policy never infers visibility from a loaded book or page count.
+  booksync::ReminderFrame reminderFrame_;
+  void markReminderReadingFrame() { reminderFrame_.readingPage(); }
+  void markReminderFrameBlocked() { reminderFrame_.block(); }
+  void markReminderNonReadingFrame() { reminderFrame_.nonReadingFrame(); }
 
   // Use when a screen exits on Back press instead of Back release so the
   // parent screen does not also receive the held button's release.
@@ -40,6 +47,10 @@ class Activity {
   virtual void onEnter();
   virtual void onExit();
   virtual void prepareForSleep() {}
+  // Explicit reminder Sleep preflight; keep the book open on failure.
+  virtual void onReminderVisibilityChanged(bool) {}
+  virtual void onReminderClockResult() {}
+  virtual bool checkpointReminderSleep() { return !isBookReaderActivity(); }
   virtual void loop() {}
 
   virtual void render(RenderLock&&) {}
@@ -78,6 +89,8 @@ class Activity {
   // Lists use spatial menu directions; text-selection/keyboard screens keep their own navigation rules.
   virtual bool usesMenuButtonOrientation() const { return !isBookReaderActivity(); }
   virtual bool isHomeActivity() const { return false; }
+  // Opt-in foreground surfaces; dialogs/keyboards and future activities defer.
+  virtual bool allowsReminderOverlay() const { return isHomeActivity() || isBookReaderActivity(); }
   // The open book uses its vertical swipe actions across the entire page;
   // dialogs and lists retain their normal edge or scroll gestures.
   virtual bool usesFullScreenReaderVerticalSwipes() const { return false; }

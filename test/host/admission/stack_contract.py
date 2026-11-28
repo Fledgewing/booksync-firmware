@@ -51,6 +51,18 @@ class StackContract(unittest.TestCase):
         self.assertIn('return SleepReadiness::Ready', bridge)
         loop = source[source.index('void loop() {'):]
         self.assertLess(loop.index('networkAdmissionTick()'), loop.index('enterDeepSleep(sleepWaitingFromTimeout)'))
+    def test_reminder_visibility_pauses_for_the_entire_sleep_attempt(self):
+        source = (ROOT/'src/main.cpp').read_text()
+        sleep = source.split('void enterDeepSleep(bool fromTimeout) {', 1)[1].split('void setupDisplayAndFonts', 1)[0]
+        self.assertLess(sleep.index('booksync::reminderHidden(true)'), sleep.index('booksync::prepareSleep('))
+        expired = sleep.split('SleepReadiness::Expired)', 1)[1].split('return;', 1)[0]
+        self.assertIn('booksync::reminderHidden(buttonShortcutController.isQuickLocked())', expired)
+        returned = sleep.split('powerManager.startDeepSleep(gpio);', 1)[1]
+        self.assertIn('booksync::reminderHidden(buttonShortcutController.isQuickLocked())', returned)
+        pending = source.split('if (sleepWaitingForNetwork) {', 1)[1].split('enterDeepSleep(sleepWaitingFromTimeout)', 1)[0]
+        self.assertIn('booksync::reminderHidden(buttonShortcutController.isQuickLocked())', pending)
+        self.assertIn('booksync::reminderInput()', pending)
+
     def test_simulator_profiles_mirror_framebuffer_ownership(self):
         config = (ROOT/'platformio.ini').read_text()
         for profile in ('x4-pro-simulator','x4-classic-simulator'):

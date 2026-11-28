@@ -33,6 +33,7 @@ class XtcReaderMenuActivity final : public Activity {
   void loop() override;
   void render(RenderLock&&) override;
   bool isReaderActivity() const override { return true; }
+  bool allowsReminderOverlay() const override { return true; }
   bool allowPowerAsConfirmInReaderMode() const override { return true; }
   bool allowGlobalHomeGesture() const override { return false; }
 

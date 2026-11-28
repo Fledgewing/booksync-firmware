@@ -64,7 +64,9 @@ def main():
     (out / 'reading-stack-usage.txt').write_text(''.join(frames))
     reminder_frames = []
     for area, name in (('services', 'Reminders'), ('services', 'RemindersFacade'),
-                       ('storage', 'RemindersStore'), ('system', 'RemindersRuntime')):
+                       ('storage', 'RemindersStore'), ('system', 'RemindersRuntime'),
+                       ('services', 'RemindersFormat'), ('system', 'ReminderPresenter'),
+                       ('ui/reminders', 'DueSheet')):
         paths = list((build / 'src/booksync' / area).glob(name + '*.su'))
         if not paths:
             raise SystemExit(f'missing reminder stack evidence: {name}')

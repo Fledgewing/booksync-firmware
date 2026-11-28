@@ -31,6 +31,7 @@ FIXTURES = r'''
 #include <algorithm>
 #include <new>
 #include "BuildScratch.h"
+#include "booksync/system/ReminderFrame.h"
 #define LOG_ERR(...) assert(false)
 struct Esp { void restart() { assert(false); } } ESP;
 struct Display {
@@ -124,7 +125,11 @@ template<typename T, typename... Args>
 std::unique_ptr<T> makeUniqueNoThrow(Args&&... args) {
   return std::unique_ptr<T>(new (std::nothrow) T(std::forward<Args>(args)...));
 }
-struct Activity { virtual bool canSnapshotForSleepOverlay() const { return false; } };
+struct Activity {
+  booksync::ReminderFrame reminderFrame;
+  void markReminderNonReadingFrame() { reminderFrame.nonReadingFrame(); }
+  virtual bool canSnapshotForSleepOverlay() const { return false; }
+};
 struct EpubReaderActivity : Activity {
   GfxRenderer renderer;
   int mappedInput = 0;
@@ -177,11 +182,14 @@ struct EpubReaderActivity : Activity {
 TESTS = r'''
 int main() {
   EpubReaderActivity reader;
+  reader.reminderFrame.readingPage();
+  reader.reminderFrame.finishRender(true);
   reader.renderer.frameBuffer[0] = 0x42;
   const uint32_t before = reader.renderer.frameBufferLoanCount();
   assert(reader.backgroundBuildCanUsePageBuffer());
   reader.invalidatePageBufferAfterBuild(before);
   assert(reader.updates == 0 && !reader.pageBufferStale);
+  assert(reader.reminderFrame.ready());
   {
     GfxRenderer::FrameBufferLoan outer(reader.renderer);
     assert(!reader.renderer.hasFrameBuffer());
@@ -202,6 +210,7 @@ int main() {
   }
   reader.invalidatePageBufferAfterBuild(before);
   assert(reader.updates == 1 && reader.pageBufferStale);
+  assert(!reader.reminderFrame.ready());
   assert(reader.canSnapshotForSleepOverlay());  // Preserve global screenshot dispatch to the reader.
   assert(reader.renderer.frameBuffer[0] == 0x99);  // Error frame, never a white base.
   reader.openWordSelect(true, 0, 0, false);
@@ -215,11 +224,14 @@ int main() {
   reader.openWordSelect(true, 0, 0, false);
   assert(reader.handoffs == 2 && reader.dictionaryReusesPage);
   for (bool rejected : {false, true}) {
+    reader.reminderFrame.readingPage();
+    reader.reminderFrame.finishRender(true);
     reader.pageBufferStale = true;
     reader.syncRenderCompletes = false;
     reader.syncRenderRejected = rejected;
     reader.onInputLockChanged(true);
     assert(reader.pageBufferStale && reader.renderer.frameBuffer[0] == 0x99);
+    assert(!reader.reminderFrame.ready());
   }
   reader.syncRenderCompletes = true;
   reader.syncRenderRejected = false;
@@ -242,9 +254,12 @@ int main() {
   assert(!earlyReturn());
   assert(reader.renderer.hasFrameBuffer() && reader.renderer.frameBufferLoanCount() == before + 2);
   reader.restoreSucceeds = true;
+  reader.reminderFrame.readingPage();
+  reader.reminderFrame.finishRender(true);
   reader.invalidatePageBufferAfterBuild(before + 1);
   assert(!reader.pageBufferStale && reader.renderer.frameBuffer[0] == 0x42);
   assert(reader.updates == 1);  // Successful RAM restoration needs no panel redraw.
+  assert(reader.reminderFrame.ready());
 }
 '''
 
@@ -263,7 +278,7 @@ with tempfile.TemporaryDirectory(prefix="crossink-image-loan-") as directory:
     source.write_text(FIXTURES + bodies + TESTS)
     binary = Path(directory) / "test"
     subprocess.run(["c++", "-std=c++20", "-Wall", "-Wextra", "-Werror", "-fsanitize=address,undefined",
-                    "-fno-omit-frame-pointer", "-I" + str(ROOT / "lib/Memory"),
+                    "-fno-omit-frame-pointer", "-I" + str(ROOT / "lib/Memory"), "-I" + str(ROOT / "src"),
                     "-I" + str(ROOT / "test/chapter_html_slim_parser/stubs"), str(source),
                     str(ROOT / "lib/Memory/BuildScratch.cpp"), "-o", str(binary)], check=True)
     subprocess.run([str(binary)], check=True)
