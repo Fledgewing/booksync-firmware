@@ -4,8 +4,8 @@
 #include "Commands.h"
 #include "Models.h"
 #include "booksync/interface/AccountForm.h"
-#include "booksync/interface/Clock.h"
 #include "booksync/interface/AccountView.h"
+#include "booksync/interface/Clock.h"
 #include "booksync/interface/Covers.h"
 #include "booksync/interface/Downloads.h"
 #include "booksync/interface/HomeLayout.h"
@@ -14,6 +14,7 @@
 #include "booksync/interface/Reminders.h"
 #include "booksync/interface/Sleep.h"
 #include "booksync/interface/Series.h"
+#include "booksync/interface/SeriesFlow.h"
 
 namespace booksync {
 // UI reads bounded published values. No scans, writes, parsing or transport in
@@ -67,6 +68,10 @@ class Library {
     out.clear();
     out.availability = Availability::Unsupported;
   }
+  // Sole worker owns manifests, frozen choices, admission and queue execution.
+  virtual CommandStatus seriesAction(const SeriesFlowRequest&) { return CommandStatus::Unavailable; }
+  virtual void readSeriesFlow(SeriesFlowView& out) const { out.clear(); }
+  virtual CommandStatus searchSeries(std::array<char, 64>) { return CommandStatus::Unavailable; }
   // Post-paint intent; cached reference/bitmap reads perform no filesystem or decode work.
   virtual CommandStatus requestCover(BookKey) { return CommandStatus::Unavailable; }
   virtual CoverReference coverReference(BookKey) const { return {}; }
@@ -74,6 +79,7 @@ class Library {
     out = {};
     return false;
   }
+  virtual CommandStatus showBook(BookKey key) { return open(key); }
   virtual CommandStatus open(BookKey) { return CommandStatus::Unavailable; }
   virtual LibraryWindow window() const { return {}; }
   virtual void readWindow(LibraryWindow& out) const { out = window(); }

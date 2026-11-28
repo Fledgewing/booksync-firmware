@@ -29,6 +29,7 @@
 #include "../../test/simulator/QueriesScenario.h"
 #include "../../test/simulator/SeriesPlanScenario.h"
 #include "../../test/simulator/SeriesQueueScenario.h"
+#include "../../test/simulator/SeriesSurfaceScenario.h"
 #include "../../test/simulator/CopyJobsScenario.h"
 #include "../../test/simulator/CoverJobsScenario.h"
 #include "../../test/simulator/DeviceIndexScenario.h"
@@ -12182,7 +12183,7 @@ SimulatorSmokeTest smokeTest;
 }  // namespace
 
 void runSimulatorSmokeTestTick() {
-  if (!upgradeNoticeScenario::tick() && !accountSurfaceScenario::tick() && !editorScenario::tick() &&
+  if (!seriesSurfaceScenario::tick() && !upgradeNoticeScenario::tick() && !accountSurfaceScenario::tick() && !editorScenario::tick() &&
       !widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() &&
       !EpubReaderCompletionSmokeTest::sleepScenarioTick() &&
       !EpubReaderCompletionSmokeTest::readerCaptureScenarioTick() &&

@@ -27,6 +27,7 @@ class SeriesQueue {
   bool read(uint64_t id, SeriesQueueView& out);
   uint64_t find(const char* series) const;
   bool ready() const { return ready_; }
+  bool transferBusy() const { return engine_.busy(); }
   uint64_t revision() const { return revision_; }
 
  private:
