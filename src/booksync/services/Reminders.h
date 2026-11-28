@@ -44,7 +44,7 @@ class Reminders {
   uint64_t nextMutation() const;
   bool intervalEnabled() const { return data_.enabled; }
   uint8_t intervalMinutes() const { return data_.interval; }
-  const ReminderData& data() const { return data_; }
+  const ReminderData& reminderData() const { return data_; }
   static bool valid(const ReminderData&);
   static bool validRecord(const ReminderRecord&, uint64_t nextId);
   static bool valid(const ReminderFields&);

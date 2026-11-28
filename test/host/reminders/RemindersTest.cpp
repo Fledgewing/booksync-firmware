@@ -31,7 +31,7 @@ class RemindersTest : public ::testing::Test {
   void eyes(unsigned minutes = 20) {
     ReminderMutation m{};
     m.id = 1;
-    m.revision = service.data().intervalRevision;
+    m.revision = service.reminderData().intervalRevision;
     m.key = service.nextMutation();
     m.operation = ReminderOperation::Edit;
     m.fields.kind = ReminderKind::Interval;
@@ -653,7 +653,7 @@ TEST_F(RemindersTest, NewRegularClaimDoesNotChangeOlderPendingSnoozeOrigin) {
   ASSERT_EQ(service.respond(grant.token, 7, ReminderAction::Snooze10, now).status, ReminderStatus::Saved);
   // Inject the state of repeated, explicit snoozes extending past tomorrow's
   // regular due time. No synthetic backlog is allocated in production.
-  ReminderData stored = service.data();
+  ReminderData stored = service.reminderData();
   ReminderRecord* row = nullptr;
   for (auto& candidate : stored.rows)
     if (candidate.id == due.id) row = &candidate;
@@ -696,7 +696,7 @@ TEST_F(RemindersTest, SixtyFourByteCharactersUseMaximumMessageBudget) {
   const char glyph[] = "\xf0\x9f\x93\x96";
   for (unsigned i = 0; i < 60; ++i) std::memcpy(request.fields.message + i * 4, glyph, 4);
   EXPECT_EQ(service.mutate(request, now).status, ReminderStatus::Saved);
-  for (const auto& row : service.data().rows)
+  for (const auto& row : service.reminderData().rows)
     if (row.id) EXPECT_EQ(std::strlen(row.fields.message), 240u);
 }
 }  // namespace

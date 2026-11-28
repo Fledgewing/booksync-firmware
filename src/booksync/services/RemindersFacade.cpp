@@ -39,7 +39,7 @@ void RemindersFacade::list(ReminderList& out) const {
   out.nextMutationKey = service_.nextMutation();
   out.storage = storage_;
   out.clockKnown = now_.known;
-  const auto& data = service_.data();
+  const auto& data = service_.reminderData();
   for (const auto& r : data.rows)
     if (r.id) {
       auto& row = out.rows[out.count++];
