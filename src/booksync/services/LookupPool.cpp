@@ -9,7 +9,10 @@ namespace booksync {
 void LookupPool::retire() {
   scratch_.reset();
   ports_ = {};
-  value_ = {};
+  value_.word.fill(0);
+  value_.revision = 0;
+  value_.total = 0;
+  value_.state = LookupPoolState::NotSaved;
   used_ = count_ = 0;
   busy_ = false;
 }

@@ -48,7 +48,9 @@ LookupStep LookupDecoder::push(uint8_t byte, LookupEntry& out) {
   if (status != 'D' && status != 'T' && status != 'Y' && status != 'S' && status != 'X') return LookupStep::Malformed;
   const auto validity = validateWord({line_.data(), separator});
   if (validity != LookupStep::Record) return validity;
-  out = {};
+  out.word.fill(0);
+  out.offset = 0;
+  out.outcome = 0;
   std::memcpy(out.word.data(), line_.data(), separator);
   out.offset = start;
   out.outcome = status;
