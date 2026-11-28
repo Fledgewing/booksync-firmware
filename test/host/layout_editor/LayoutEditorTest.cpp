@@ -437,8 +437,8 @@ TEST(LayoutGeometry, BandSwapResizeAndCancelValues) {
   EXPECT_EQ(moved.page.widgets[1].y, 0);
   EXPECT_EQ(page.widgets[0].y, before.widgets[0].y);
   auto resized = previewGeometry(page, 0, LayoutStep::Size);
-  ASSERT_EQ(resized.status, LayoutEditStatus::Saved);
-  EXPECT_EQ(resized.page.widgets[0].w, 1);
+  EXPECT_EQ(resized.status, LayoutEditStatus::NoSpace);
+  EXPECT_EQ(resized.page.widgets[0].w, 2);
   EXPECT_EQ(resized.page.widgets[0].h, 2);
   EXPECT_EQ(previewGeometry(page, 0, LayoutStep::Up).status, LayoutEditStatus::NoSpace);
   EXPECT_EQ(previewGeometry(page, 99, LayoutStep::Size).status, LayoutEditStatus::Invalid);
@@ -1021,4 +1021,19 @@ TEST(EditorAddRemove, EveryInstalledAddEntryHasAVisibleFocusedViewport) {
   }
   ui.activateEditor();
   EXPECT_EQ(lib.captured.widget, WidgetKind(uint8_t(WidgetKind::Count) - 1));
+}
+
+TEST(LayoutGeometry, ContinueOffersOnlyApprovedSizeAndCanNormalizeLegacySize) {
+  EXPECT_TRUE(supportedGeometry(WidgetKind::Continue, 2, 2));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Continue, 1, 2));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Continue, 2, 3));
+  HomePage page;
+  page.cols = 2;
+  page.rows = 6;
+  page.count = 1;
+  page.widgets[0] = {WidgetKind::Continue, WindowSource::Continue, 0, 0, 1, 2};
+  const auto resized = previewGeometry(page, 0, LayoutStep::Size);
+  EXPECT_EQ(resized.status, LayoutEditStatus::Saved);
+  EXPECT_EQ(resized.page.widgets[0].w, 2);
+  EXPECT_EQ(resized.page.widgets[0].h, 2);
 }

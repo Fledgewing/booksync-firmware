@@ -133,7 +133,7 @@ bool LayoutEditor::geometry(Layout::Span root, Layout::Span pg, const char* devi
       const auto& g = edit.geometry[installed];
       const auto kind = page_.widgets[installed++].kind;
       if (g.x != old.x || g.y != old.y || g.w != old.w || g.h != old.h) {
-        if (!supportedGeometry(kind, g.w, g.h)) return false;
+        if ((g.w != old.w || g.h != old.h) && !supportedGeometry(kind, g.w, g.h)) return false;
         if (over.type) {
           static constexpr const char* keys[] = {"x", "y", "w", "h"};
           const uint8_t values[] = {g.x, g.y, g.w, g.h};
