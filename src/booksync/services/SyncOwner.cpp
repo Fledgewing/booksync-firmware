@@ -2,6 +2,8 @@
 #include "SyncOwner.h"
 
 #include <Logging.h>
+
+#include "Finish.h"
 namespace booksync {
 namespace {
 struct Unlock {
@@ -15,7 +17,8 @@ SyncResult storageError() {
 }  // namespace
 std::atomic<SyncOwner*> SyncOwner::active_{nullptr};
 SyncOwner::SyncOwner(storage::LifecycleJournal& journal, ServerAdapter& adapter, std::string_view adapterId,
-                     std::string_view account, char* scratch, size_t capacity, SyncObserver observer, void* context)
+                     std::string_view account, char* scratch, size_t capacity, SyncObserver observer, void* context,
+                     Finish* finish)
     : journal_(journal),
       adapter_(adapter),
       adapterId_(adapterId),
@@ -23,7 +26,8 @@ SyncOwner::SyncOwner(storage::LifecycleJournal& journal, ServerAdapter& adapter,
       scratch_(scratch),
       capacity_(capacity),
       observer_(observer),
-      context_(context) {}
+      context_(context),
+      finish_(finish) {}
 void SyncOwner::observe(SyncCheckpoint point, uint64_t id, unsigned phase) const {
   if (observer_) observer_(point, id, phase, context_);
 }
@@ -33,6 +37,11 @@ SyncResult SyncOwner::activate() {
   Unlock unlock{busy_};
   if (adapterId_.empty() || account_.empty() || adapterId_.size() > storage::LifecycleJournal::MaxIdentity ||
       account_.size() > storage::LifecycleJournal::MaxIdentity || !scratch_ || capacity_ < ScratchBytes)
+    return SyncResult::Invalid;
+  if (finish_ &&
+      (&finish_->journal_ != &journal_ || !finish_->ready() ||
+       (reinterpret_cast<uintptr_t>(scratch_) < reinterpret_cast<uintptr_t>(finish_->scratch_) + finish_->capacity_ &&
+        reinterpret_cast<uintptr_t>(finish_->scratch_) < reinterpret_cast<uintptr_t>(scratch_) + capacity_)))
     return SyncResult::Invalid;
   SyncOwner* expected = nullptr;
   if (!active_.compare_exchange_strong(expected, this)) return SyncResult::Busy;
@@ -55,14 +64,34 @@ SyncResult SyncOwner::step() {
   if (active_.load() != this) return SyncResult::Inactive;
   using namespace storage;
   if (journal_.verify() != JournalResult::Ok) return storageError();
+  if (!finish_) {
+    uint64_t cursor = 0;
+    JournalResult scan;
+    while ((scan = journal_.next(adapterId_, account_, cursor, cursor)) == JournalResult::Ok) {
+      JournalEntry candidate;
+      if (journal_.read(cursor, candidate, scratch_, capacity_) != JournalResult::Ok) return storageError();
+      if (Finish::recognizes(candidate.payload) && !Finish::settled(candidate)) return SyncResult::Unavailable;
+    }
+    if (scan != JournalResult::NotFound) return storageError();
+  }
   uint64_t id = 0;
-  auto result = journal_.next(adapterId_, account_, 0, id);
+  JournalEntry entry;
+  auto result = JournalResult::Ok;
+  do {
+    result = journal_.next(adapterId_, account_, id, id);
+    if (result != JournalResult::Ok) break;
+    if (journal_.read(id, entry, scratch_, capacity_) != JournalResult::Ok) return storageError();
+  } while (Finish::recognizes(entry.payload) && Finish::settled(entry));
   if (result == JournalResult::NotFound) return SyncResult::Idle;
   if (result != JournalResult::Ok) return storageError();
-  JournalEntry entry;
-  if (journal_.read(id, entry, scratch_, capacity_) != JournalResult::Ok) return storageError();
+  if (Finish::recognizes(entry.payload)) {
+    if (!finish_) return SyncResult::Unavailable;
+    SyncWriterToken token;
+    return finish_->step(token, adapter_, entry);
+  }
   if (entry.acknowledged == LifecycleJournal::AllPhases) {
     if (entry.attempting) return storageError();
+    if (finish_ && finish_->positionDelivered(entry) != JournalResult::Ok) return storageError();
     if (journal_.finish(id) != JournalResult::Ok) return storageError();
     observe(SyncCheckpoint::Finished, id);
     return SyncResult::Completed;
@@ -73,6 +102,19 @@ SyncResult SyncOwner::step() {
   if (entry.acknowledged != (1U << phase) - 1 || (entry.attempting && entry.attempting != phase + 1))
     return storageError();
   const auto selected = static_cast<LifecyclePhase>(phase);
+  if ((selected == LifecyclePhase::State || selected == LifecyclePhase::Progress) && finish_) {
+    bool suppressState = false, cancelPosition = false;
+    if (finish_->positionPlan(entry, suppressState, cancelPosition) != JournalResult::Ok) return storageError();
+    if ((selected == LifecyclePhase::State && suppressState) ||
+        (selected == LifecyclePhase::Progress && cancelPosition)) {
+      // F20 owns status/rating for this final capture. Do not send them through
+      // ordinary state exchange before the required final position delivery.
+      if (entry.attempting || journal_.acknowledge(id, selected, entry.checkpoint) != JournalResult::Ok)
+        return storageError();
+      observe(SyncCheckpoint::AckStored, id, phase);
+      return SyncResult::Advanced;
+    }
+  }
   const bool reconcile = entry.attempting != 0;
   if (!reconcile && journal_.attempt(id, selected) != JournalResult::Ok) return storageError();
   observe(SyncCheckpoint::AttemptStored, id, phase);

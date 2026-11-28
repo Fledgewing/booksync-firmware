@@ -12,3 +12,11 @@ def bounded_reading_frame(node_env, node):
 
 env.AddBuildMiddleware(bounded_reading_frame, "*/PersonalReading.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/ReadingStats.cpp")
+
+# F20 keeps payloads in borrowed worker storage; retain exact hardware frame
+# measurements separately from F39's stricter pure-projection gate.
+def finish_frames(node_env, node):
+    return node_env.Object(node, CCFLAGS=node_env["CCFLAGS"] + ["-fstack-usage"])
+
+env.AddBuildMiddleware(finish_frames, "*/Finish.cpp")
+env.AddBuildMiddleware(finish_frames, "*/SyncOwner.cpp")

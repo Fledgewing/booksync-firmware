@@ -2832,3 +2832,9 @@ must match the current nonzero token and an answerable decision, and saves its
 marker/decline before it can authorize native movement. Same-remote observation
 is idempotent. Unknown versions, bad checksums and damaged primary files remain
 retained; valid backup selection is read-only if the primary is damaged.
+
+## BookSync finish intent payload
+
+F20 adds the versioned `BSFI` v1 payload inside the unchanged LifecycleJournal v2
+envelope. See [finish journal](booksync-f20-finish.md#format-and-resource-use) for
+field offsets, phase bits, cancellation marker and conservative recovery rules.
