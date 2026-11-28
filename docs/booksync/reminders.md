@@ -64,3 +64,9 @@ with a page turn and choose Sleep explicitly. Check wake inside/outside the miss
 window and cold start without synchronization. Enable eye rest, cross its interval,
 verify a five-minute break reset and simultaneous bedtime priority, then Turn off.
 No EPUB cache reset is required by the foundation. Agents never operate devices.
+
+Mutation identity includes its source namespace. Add remains local-only, and the
+service rejects managed or unknown source values before examining or modifying
+local rows/receipts, even when their numeric IDs collide. This does not register
+a family provider or allow UI code to choose provider authority. The extra tag
+uses existing mutation padding; it adds no allocation or serialized field.

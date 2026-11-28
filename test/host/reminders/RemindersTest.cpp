@@ -173,6 +173,33 @@ TEST_F(RemindersTest, BackupRecoveryIgnoresTmpAndPreservesDamage) {
   now.wall += 3601;
   EXPECT_FALSE(service.next(now, due));
 }
+TEST_F(RemindersTest, ForgedNonLocalMutationsNeverChangeLocalRowsOrReceipts) {
+  const auto saved = add();
+  ASSERT_EQ(saved.status, ReminderStatus::Saved);
+  const auto bytes = card.files;
+  const auto next = service.nextMutation();
+  for (const auto source : {ReminderSource::Managed, static_cast<ReminderSource>(255)}) {
+    for (const auto operation : {ReminderOperation::Add, ReminderOperation::Edit,
+                                 ReminderOperation::SetEnabled, ReminderOperation::Delete}) {
+      auto request = time();
+      request.source = source;
+      request.operation = operation;
+      request.key = next;
+      request.id = operation == ReminderOperation::Add ? 0 : saved.id;
+      request.revision = saved.revision;
+      request.fields.enabled = false;
+      EXPECT_EQ(service.mutate(request, now).status, ReminderStatus::ReadOnly);
+      EXPECT_EQ(service.nextMutation(), next);
+      EXPECT_EQ(service.count(), 1);
+      EXPECT_EQ(card.files, bytes);
+    }
+  }
+  now.wall += 60;
+  ReminderDue due{};
+  ASSERT_TRUE(service.next(now, due));
+  EXPECT_EQ(due.id, saved.id);
+  EXPECT_EQ(due.revision, saved.revision);
+}
 TEST_F(RemindersTest, PublicationPowerCutsSelectOnlyCompleteSchedules) {
   ASSERT_EQ(add().status, ReminderStatus::Saved);
   const auto initial = card;

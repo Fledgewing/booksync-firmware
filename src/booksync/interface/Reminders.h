@@ -37,6 +37,7 @@ struct ReminderFields {
 };
 struct ReminderMutation {
   ReminderOperation operation = ReminderOperation::Add;
+  ReminderSource source = ReminderSource::Local;  // Namespace proof, never provider registration.
   uint64_t id = 0, revision = 0, key = 0;
   ReminderFields fields{};
 };

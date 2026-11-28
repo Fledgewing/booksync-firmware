@@ -120,6 +120,7 @@ void Reminders::resetInterval() {
   ++interval_.sequence;
 }
 ReminderResult Reminders::mutate(const ReminderMutation& m, const ReminderNow& now) {
+  if (m.source != ReminderSource::Local) return {ReminderStatus::ReadOnly};
   if (storage_ == ReminderStorage::Unreadable) return {ReminderStatus::StorageError};
   if (!m.key || m.key == UINT64_MAX ||
       static_cast<unsigned>(m.operation) > static_cast<unsigned>(ReminderOperation::Delete))
