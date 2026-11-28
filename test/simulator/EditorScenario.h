@@ -25,12 +25,15 @@ class Fixture final : public Library {
   LayoutEditResult reply{};
   bool queued = false;
   mutable unsigned paints = 0;
-  unsigned writes = 0;
+  unsigned writes = 0, batches = 0;
   Capabilities capabilities() const override { return {}; }
   Snapshot snapshot() const override { return {}; }
   HomePage homePage() const override { return page; }
   bool requestHomePage(uint8_t) override { return true; }
-  bool requestBatch(WindowBatchRequest) override { return true; }
+  bool requestBatch(WindowBatchRequest) override {
+    ++batches;
+    return true;
+  }
   CommandStatus submit(Intent) override { return CommandStatus::Unavailable; }
   CommandStatus editLayout(LayoutEdit edit) override {
     if (queued) return CommandStatus::Unavailable;
@@ -163,16 +166,18 @@ inline bool tick() {
   }
   if (f == 130) {
     fixture.store.load();
-    if (!fixture.store.project(0, fixture.page) || fixture.page.revision != 4 || fixture.writes != 3) std::_Exit(18);
+    if (!fixture.store.project(0, fixture.page) || fixture.page.revision != 4 || fixture.writes != 3 ||
+        fixture.batches != 4)
+      std::_Exit(18);
     LayoutEdit stale;
     stale.kind = LayoutEditKind::Remove;
     stale.revision = 1;
     if (fixture.store.edit(fixture.worker, stale) != LayoutEditStatus::Stale) std::_Exit(19);
-    LOG_INF(
-        "BSE",
-        "BookSync F35a PASS: add/remove/reset/restart/stale/keep/idle; class=%s editor=%u payload-allocations=0; X3 UI "
-        "NEEDS APPROVAL",
-        Layout::deviceClass(), unsigned(sizeof(LayoutEditor)));
+    LOG_INF("BSE",
+            "BookSync F35a PASS: add/remove/reset/restart/stale/keep/idle/one-batch; class=%s editor=%u "
+            "payload-allocations=0; X3 UI "
+            "NEEDS APPROVAL",
+            Layout::deviceClass(), unsigned(sizeof(LayoutEditor)));
     std::fflush(nullptr);
     std::_Exit(0);
   }

@@ -431,7 +431,15 @@ class ShellActivity final : public Activity {
       }
 #if CROSSINK_APP_CAP_HOME_EDITOR
       if (editor.pollEditor()) {
-        if (widgets) widgets->enter(library.homePage().page);
+        if (widgets) {
+          const auto page = library.homePage().page;
+          // The host already batches a changed revision on this page. Only a
+          // reset from another page needs a new page request.
+          if (widgets->page().page != page) {
+            widgets->enter(page);
+            widgets->pollWidgets();  // Adopt the reset page before the next draw.
+          }
+        }
         requestUpdate();
       }
 #endif
