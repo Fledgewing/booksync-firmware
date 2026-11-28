@@ -38,7 +38,17 @@ class StackContract(unittest.TestCase):
         source = (ROOT/'src/main.cpp').read_text()
         begin = source.index('void enterDeepSleep(bool fromTimeout) {')
         end = source.index('gpio.stopButtonCapture()', begin)
-        self.assertIn('networkAdmission().finish()', source[begin:end])
+        preparation = source[begin:end]
+        self.assertIn('booksync::prepareSleep(', preparation)
+        # Both pending and expired drains return before native teardown.
+        self.assertRegex(preparation, r'SleepReadiness::Draining\)\s*\{[^}]*return;')
+        self.assertRegex(preparation, r'SleepReadiness::Expired\)\s*\{[^}]*return;')
+        bridge = (ROOT/'src/booksync/system/SleepRuntime.cpp').read_text()
+        self.assertLess(bridge.index('activityManager.prepareForSleep()'),
+                        bridge.index('networkAdmission().finish()'))
+        self.assertIn('released && networkDisplayReady()', bridge)
+        self.assertIn('step == SleepStep::Ready', bridge)
+        self.assertIn('return SleepReadiness::Ready', bridge)
         loop = source[source.index('void loop() {'):]
         self.assertLess(loop.index('networkAdmissionTick()'), loop.index('enterDeepSleep(sleepWaitingFromTimeout)'))
     def test_simulator_profiles_mirror_framebuffer_ownership(self):

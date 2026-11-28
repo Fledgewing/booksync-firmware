@@ -11,4 +11,5 @@ bool takeHomeOpenRequest();
 // Main-loop publication; the worker snapshot has already been normalized.
 void publishAccountView(AccountView value);
 void publishClockStatus(ClockStatus value);
+void publishSleepView(SleepView value);
 }  // namespace booksync

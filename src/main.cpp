@@ -1,4 +1,3 @@
-#include "booksync/system/NetworkPhase.h"
 #include <Arduino.h>
 #include <BoardConfig.h>
 #include <CrossInkHalFrontlight.h>
@@ -27,6 +26,8 @@
 
 #include <cstdlib>
 
+#include "booksync/system/NetworkPhase.h"
+#include "booksync/system/SleepRuntime.h"
 #include "sync/ProgressBookIterator.h"
 #include "util/PluginEvents.h"
 #if !defined(SIMULATOR) && !FREEINK_MCU_C3
@@ -395,6 +396,7 @@ using BootResume = SleepWakePolicy::Resume;
 // storage shutdown cancels sleep before peripheral power is cut.
 static bool deepSleepInProgress = false;
 static bool sleepWaitingForNetwork = false;
+static bool sleepAttemptEnded = false;
 static bool sleepWaitingFromTimeout = false;
 static bool quickLockWaitingForNetwork = false;
 
@@ -1200,14 +1202,17 @@ static bool holdSleepWhileUsbPowered(bool monochrome = false) {
 #endif
 
 void enterDeepSleep(bool fromTimeout) {
-  // Retain the sleep intent while callbacks close their files and transport
-  // returns C3 display storage. Never paint/suspend hardware under live workers.
-  if (booksync::networkAdmission().busy() && !booksync::networkAdmission().finish()) {
+  const auto readiness = booksync::prepareSleep(static_cast<uint32_t>(millis()));
+  if (readiness == booksync::SleepReadiness::Draining) {
     sleepWaitingForNetwork = true;
     sleepWaitingFromTimeout = fromTimeout;
     return;
   }
   sleepWaitingForNetwork = false;
+  if (readiness == booksync::SleepReadiness::Expired) {
+    sleepAttemptEnded = true;
+    return;
+  }
 #ifndef SIMULATOR
   gpio.stopButtonCapture();
 #endif
@@ -1271,6 +1276,7 @@ void enterDeepSleep(bool fromTimeout) {
 #endif
   if (!storageStopped) {
     deepSleepInProgress = false;
+    booksync::retireSleep();
     APP_STATE.quickLockResumePending = false;
     APP_STATE.quickLockRestoreFrontlight = false;
     if (buttonShortcutController.isQuickLocked()) {
@@ -1304,6 +1310,7 @@ void enterDeepSleep(bool fromTimeout) {
   }
 #endif
   powerManager.startDeepSleep(gpio);
+  booksync::retireSleep();  // Simulator returns; hardware starts a fresh boot.
 }
 
 void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, const bool useReaderRenderStack) {
@@ -1927,7 +1934,19 @@ void loop() {
     notifyQuickLockChanged();
   }
   if (sleepWaitingForNetwork) {
+    mappedInputManager.update();
+    if (mappedInputManager.wasPressed(MappedInputManager::Button::Power)) {
+      // A fresh wake press retires only this sleep request. The existing
+      // admission tick still owns draining workers and restoring C3 storage.
+      booksync::retireSleep();
+      sleepWaitingForNetwork = false;
+      sleepAttemptEnded = true;
+      powerButtonReleasedSinceWake = false;
+      allowSleepAt = millis() + 2000;
+      return;
+    }
     enterDeepSleep(sleepWaitingFromTimeout);
+    delay(1);  // Yield while the existing worker observes cancellation.
     return;
   }
   static unsigned long maxLoopDuration = 0;
@@ -2025,8 +2044,9 @@ void loop() {
   // Check for any user activity (button press or release) or active background work
   static unsigned long lastActivityTime = millis();
   const bool transitionWasAborted = storageTransitionAborted.exchange(false, std::memory_order_relaxed);
-  if (userInputReceived || activityManager.preventAutoSleep() || transitionWasAborted ||
+  if (userInputReceived || activityManager.preventAutoSleep() || transitionWasAborted || sleepAttemptEnded ||
       usbResult == UsbSerialFileTransfer::ProcessResult::SyncActivity) {
+    sleepAttemptEnded = false;
     lastActivityTime = millis();         // Reset inactivity timer
     powerManager.setPowerSaving(false);  // Restore normal CPU frequency on user activity
   }

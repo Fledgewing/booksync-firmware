@@ -27,7 +27,9 @@ class Bridge {
   }
   void acceptPage(const ReadingStatsDateTime&, uint8_t utcOffset, uint32_t seconds);
   void observeSession(const ReadingSessionJournal::Record& record);
-  void observe(Sample sample, const std::string& cache, bool closed = false);
+  // Sleep flushes native progress without necessarily changing live coordinates.
+  // Refresh its two bounded raw slots even when the ordinary observation dedupes.
+  void observe(Sample sample, const std::string& cache, bool closed = false, bool refreshNative = false);
   // Exact, bounded native artifact snapshot. Parts reference the first journal
   // ID; only a terminal part makes a complete snapshot. Native files stay owned
   // by CrossInk. Empty bytes are a deletion observation, never an empty import.

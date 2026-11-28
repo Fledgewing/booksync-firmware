@@ -1398,7 +1398,7 @@ void TxtReaderActivity::saveProgressBeforeRestart() {
   }
 }
 
-void TxtReaderActivity::observeBookSync(bool closed) {
+void TxtReaderActivity::observeBookSync(bool closed, bool refreshNative) {
   std::optional<RenderLock> lock;
   if (!RenderLock::heldByCurrentTask()) {
     lock.emplace(closed ? RenderLock::Mode::Blocking : RenderLock::Mode::Try);
@@ -1410,5 +1410,5 @@ void TxtReaderActivity::observeBookSync(bool closed) {
   sample.pages = pageOffsets.size();
   sample.hasSourceOffset = currentPage >= 0 && static_cast<size_t>(currentPage) < pageOffsets.size();
   if (sample.hasSourceOffset) sample.sourceOffset = pageOffsets[currentPage];
-  booksyncCapture.observe(sample, txt->getCachePath(), closed);
+  booksyncCapture.observe(sample, txt->getCachePath(), closed, refreshNative);
 }

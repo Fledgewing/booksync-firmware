@@ -1727,7 +1727,7 @@ bool XtcReaderActivity::saveProgressBeforeRestart() {
   return saved;
 }
 
-void XtcReaderActivity::observeBookSync(bool closed) {
+void XtcReaderActivity::observeBookSync(bool closed, bool refreshNative) {
   std::optional<RenderLock> lock;
   if (!RenderLock::heldByCurrentTask()) {
     lock.emplace(closed ? RenderLock::Mode::Blocking : RenderLock::Mode::Try);
@@ -1743,5 +1743,5 @@ void XtcReaderActivity::observeBookSync(bool closed) {
   sample.sessionSeconds = sessionReadingSeconds;
   sample.forwardTurns = stats.totalPagesTurned;
   sample.counter = stats.counterId.bytes;
-  booksyncCapture.observe(sample, xtc->getCachePath(), closed);
+  booksyncCapture.observe(sample, xtc->getCachePath(), closed, refreshNative);
 }

@@ -12,6 +12,7 @@
 #include "booksync/interface/LayoutEdit.h"
 #include "booksync/interface/Queries.h"
 #include "booksync/interface/Reminders.h"
+#include "booksync/interface/Sleep.h"
 
 namespace booksync {
 // UI reads bounded published values. No scans, writes, parsing or transport in
@@ -33,6 +34,7 @@ class Library {
   virtual ReminderResult remindersRespond(uint64_t, uint64_t, ReminderAction) { return {}; }
   virtual void remindersRetire(uint64_t) {}
   virtual Snapshot snapshot() const = 0;
+  virtual SleepView sleepView() const { return {}; }
   virtual ClockStatus clockStatus() const { return {}; }
   virtual AccountView accountView() const { return {}; }
   virtual CommandStatus accountAction(AccountFormRequest) { return CommandStatus::Unavailable; }

@@ -8989,15 +8989,15 @@ bool EpubReaderActivity::saveProgressBeforeRestart() {
   return saved;
 }
 
-void EpubReaderActivity::observeBookSync(bool closed) {
+void EpubReaderActivity::observeBookSync(bool closed, bool refreshNative) {
   std::optional<RenderLock> lock;
   if (!RenderLock::heldByCurrentTask()) {
     lock.emplace(closed ? RenderLock::Mode::Blocking : RenderLock::Mode::Try);
     if (!lock->ownsLock()) return;
   }
   if (!epub) return;
-  if (!closed && (activeFootnotePreview || !section || section->isBuilding())) return;
-  // Exiting from a preview or between chapters still closes the observed
+  if (!closed && !refreshNative && (activeFootnotePreview || !section || section->isBuilding())) return;
+  // Sleep/exit from a preview or between chapters retains the observed
   // reading origin, without attaching the preview's page table to that origin.
   booksync::reader::Sample sample = booksyncCapture.lastObservation();
   if (!activeFootnotePreview && section && !section->isBuilding()) {
@@ -9023,5 +9023,5 @@ void EpubReaderActivity::observeBookSync(bool closed) {
   sample.sessionSeconds = sessionReadingSeconds;
   sample.forwardTurns = stats.totalPagesTurned;
   sample.counter = stats.counterId.bytes;
-  booksyncCapture.observe(sample, epub->getCachePath(), closed);
+  booksyncCapture.observe(sample, epub->getCachePath(), closed, refreshNative);
 }

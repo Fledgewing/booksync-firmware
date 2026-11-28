@@ -307,3 +307,5 @@ add_subdirectory(host/finish)
 add_subdirectory(host/live_adapter)
 add_subdirectory(host/reminders)
 add_subdirectory(host/clock_values)
+
+add_subdirectory(host/sleep)

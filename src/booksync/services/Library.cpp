@@ -48,6 +48,7 @@ static_assert(sizeof(LocalState) <= 28 * 1024);
 // buffers out of the reader lifetime. HAL owns its bounded directory-handle allocations.
 std::unique_ptr<LocalState> local;
 ClockStatus currentClock{};
+SleepView currentSleep{};
 RemindersFacade* reminders = nullptr;
 AccountView accountPresentation{};
 // One fixed <=368-byte cached form plus an 8-byte monotonic counter: avoids
@@ -65,6 +66,7 @@ class OfflineLibrary final : public Library {
   bool available = false;
   bool openRequested = false;
   BookRow lastBook{};
+  SleepView sleepView() const override { return currentSleep; }
   ClockStatus clockStatus() const override { return currentClock; }
   Capabilities capabilities() const override {
     ReminderCapabilities support{reminders != nullptr};
@@ -233,6 +235,7 @@ OfflineLibrary& shellLibrary() {
 }
 }  // namespace
 Library& offlineLibrary() { return shellLibrary(); }
+void publishSleepView(SleepView value) { currentSleep = value; }
 void publishClockStatus(ClockStatus value) { currentClock = value; }
 void bindReminders(RemindersFacade& facade) { reminders = &facade; }
 void publishAccountView(AccountView value) {

@@ -2,6 +2,8 @@
 
 ### Fixed
 
+- BookSync captures reader progress before a bounded sleep drain even with plugins disabled, retires stale sleep presentation ownership on return, and preserves native sleep screens while new artwork awaits approval.
+
 - BookSync Home widgets no longer pulls the retired native Settings screen graph into button images; X3 uses a bounded Settings entry and X4 keeps its spatial editor. Physical symbol guards reject regressions.
 
 ### Added
