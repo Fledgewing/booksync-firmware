@@ -102,14 +102,14 @@ battery::CaptureInput observe() {
     in.content = activityManager.hasActivityNamed("XtcReader") ? battery::CONTENT_XTC : battery::CONTENT_TEXT;
   return in;
 }
-bool admitted() {
+bool batteryCaptureAdmitted() {
   return Storage.ready() && !activityManager.requiresExclusiveStorageLoop() && !networkAdmission().busy() &&
          networkDisplayReady() && tailnet_service_idle();
 }
 }  // namespace
 void workBatteryCapture() {
   observeBoot();
-  if (!admitted()) {
+  if (!batteryCaptureAdmitted()) {
     producer.pause();
     return;
   }
@@ -125,7 +125,7 @@ void workBatteryCapture() {
 }
 void captureBatterySleep() {
   observeBoot();
-  if (!admitted() || !RenderLock::heldByCurrentTask()) return;
+  if (!batteryCaptureAdmitted() || !RenderLock::heldByCurrentTask()) return;
   // A cold boot sleeping before recovery completes supplies no standby proof;
   // the next boot will see the previous awake/gap tail and fail closed.
   if (!prepared) return;
