@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <atomic>
+#include <cstdint>
 namespace booksync {
 // Native accepted-frame publication. Only the render owner changes kind_; a
 // main-loop navigation may clear ready_ at any time. No scheduling runs here.
@@ -24,7 +25,7 @@ class ReminderFrame {
 
  private:
   enum class Kind : unsigned char { Unchanged, Reading, Other } kind_ = Kind::Unchanged;
-  std::atomic<bool> ready_{false};
+  std::atomic<uint32_t> ready_{0};
 };
-static_assert(std::atomic<bool>::is_always_lock_free);
+static_assert(std::atomic<uint32_t>::is_always_lock_free);
 }  // namespace booksync

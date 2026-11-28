@@ -123,7 +123,7 @@ class ActivityManager {
   // Set by requestUpdateAndWait(); read and cleared by the render task after render completes.
   // Note: only one waiting task is supported at a time
   TaskHandle_t waitingTaskHandle = nullptr;
-  std::atomic<bool>* waitingReminderRejected = nullptr;
+  std::atomic<uint32_t>* waitingReminderRejected = nullptr;
   portMUX_TYPE renderStateMux = portMUX_INITIALIZER_UNLOCKED;
 
   // Mutex to protect rendering operations from race conditions

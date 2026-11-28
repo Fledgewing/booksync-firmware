@@ -35,7 +35,7 @@ struct Presenter {
   ReminderNow now{};
   uint64_t lifetime = 1, lastEvaluation = 0, revision = 0, changes = 0;
   bool initialized = false, hidden = false, input = false, claiming = false, sleep = false;
-  std::atomic<bool> frame{false};
+  std::atomic<uint32_t> frame{0};
 };
 static_assert(sizeof(Presenter) <= ReminderDueBytes);
 Presenter& presenter() {

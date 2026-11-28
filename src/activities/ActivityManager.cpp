@@ -1440,7 +1440,7 @@ RequestUpdateResult ActivityManager::requestUpdateAndWait() {
     return RequestUpdateResult::Rejected;
   }
 
-  std::atomic<bool> reminderRejected{false};
+  std::atomic<uint32_t> reminderRejected{0};
   // The stack flag lives until this waiter is notified; only its pointer is
   // shared under renderStateMux. Rejected reminder frames are never reported
   // as a successful parent render, including the queue/draw race.
