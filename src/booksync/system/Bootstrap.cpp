@@ -34,9 +34,11 @@
 #include "booksync/services/LocalLibrary.h"
 #include "booksync/services/OfflineLibrary.h"
 #include "booksync/system/CatalogScreen.h"
+#include "booksync/ui/CompactGrid.h"
 #include "booksync/ui/EditorAddRemove.h"
 #include "booksync/ui/Home.h"
 #include "booksync/ui/WidgetHost.h"
+#include "booksync/ui/widgets/Continue.h"
 #include "booksync/ui/widgets/Forecast.h"
 #include "booksync/ui/widgets/Goal.h"
 #include "booksync/ui/widgets/Monthly.h"
@@ -47,8 +49,6 @@
 #include "booksync/ui/widgets/Week.h"
 #include "booksync/ui/widgets/When.h"
 #include "booksync/ui/widgets/Year.h"
-#include "booksync/ui/CompactGrid.h"
-#include "booksync/ui/widgets/Continue.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -1154,11 +1154,17 @@ class ShellActivity final : public Activity {
       if (command.label == widgets::Label::Progress) {
         font = UI_10_FONT_ID;
         scale = 230;
+        rightAligned = true;
       }
       if (command.label == widgets::Label::SavedAge || command.label == widgets::Label::SavedUnknown ||
           command.label == widgets::Label::FinishDayText)
         scale = 144;
-      paintWidgetText(x, y, b.w, b.h, value, black, font, scale, command.bold, rightAligned);
+      if (command.label == widgets::Label::Resume) {
+        const int measured = renderer.getTextWidth(font, value, EpdFontFamily::BOLD) * scale / 256;
+        const int centered = measured < b.w ? (b.w - measured) / 2 : 0;
+        paintWidgetText(x + centered, y, b.w - centered, b.h, value, black, font, scale, command.bold);
+      } else
+        paintWidgetText(x, y, b.w, b.h, value, black, font, scale, command.bold, rightAligned);
     }
   }
 #endif

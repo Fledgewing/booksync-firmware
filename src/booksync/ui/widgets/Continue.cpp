@@ -10,7 +10,6 @@ void Continue::paint(Canvas& canvas, WidgetView viewValue, const ContinueValues&
                      : viewValue.viewState == WidgetState::Known ? ContinueState::Ready
                                                                  : ContinueState::NotSaved;
   canvas.fill({0, 0, box.width, box.height}, true, 9);
-  (void)focused;  // Native host draws the approved outer Classic focus ring.
   const int microLine = box.line * 3 / 4;
   const bool fullContext = box.width >= 360 && box.height >= 210;
   const int titleHeight = box.line * (fullContext && box.titleLines > 1 ? 2 : 1);
@@ -60,14 +59,15 @@ void Continue::paint(Canvas& canvas, WidgetView viewValue, const ContinueValues&
                    : 0;
   if (positionKnown) {
     canvas.text({box.width - 64, progressY - 2, 52, box.line}, Label::Progress, black, true, percent, 100);
-    const int barY = progressY + 4;
-    const int barWidth = width - 64;
-    canvas.border({textX, barY, barWidth, 5}, black);
-    canvas.fill({textX, barY, int(uint64_t(barWidth) * percent / 100), 5}, black);
+    const int barY = progressY + 3;
+    const int barWidth = width - 52;
+    canvas.border({textX, barY, barWidth, 7}, black);
+    canvas.fill({textX, barY, int(uint64_t(barWidth) * percent / 100), 7}, black);
   }
   const int desiredActionY = fullContext ? top + titleHeight + 78 : box.height - 58;
   const int actionY = desiredActionY < box.height - 58 ? desiredActionY : box.height - 58;
   const int actionWidth = fullContext ? 108 : 86;
+  if (focused && !box.touch) canvas.border({textX - 4, actionY - 4, actionWidth + 8, 58}, false, 2, 27);
   canvas.fill({textX, actionY, actionWidth, 50}, false, 24);
   canvas.border({textX, actionY, actionWidth, 50}, black, 1, 24);
   canvas.text({textX + 8, actionY + 14, actionWidth - 16, microLine}, Label::Resume, true, true);
