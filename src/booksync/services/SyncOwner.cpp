@@ -82,6 +82,12 @@ SyncResult SyncOwner::step() {
   const auto outcome = adapter_.syncPhase(token, {entry, selected, reconcile, &checkpoint});
   observe(SyncCheckpoint::RemoteReturned, id, phase);
   if (outcome == PhaseOutcome::Uncertain) return SyncResult::Uncertain;
+  if (outcome == PhaseOutcome::Checkpointed) {
+    if (checkpoint == entry.checkpoint || journal_.checkpoint(id, checkpoint) != JournalResult::Ok)
+      return storageError();
+    observe(SyncCheckpoint::AckStored, id, phase);
+    return SyncResult::Advanced;
+  }
   if (outcome != PhaseOutcome::Confirmed) return SyncResult::Unavailable;
   if (journal_.acknowledge(id, selected, checkpoint) != JournalResult::Ok) return storageError();
   observe(SyncCheckpoint::AckStored, id, phase);

@@ -691,6 +691,7 @@ void XtcReaderActivity::recordCurrentPageReadingTime(const char* source, const b
     ReadingStatsDateTime end;
     getCurrentLocalDailyReadingDateTime(end);
     readingSessionDates.accept(end, SETTINGS.clockUtcOffsetQ, seconds);
+    booksyncCapture.acceptPage(end, SETTINGS.clockUtcOffsetQ, seconds);
     deferredReadingStats = {end, seconds, SETTINGS.clockUtcOffsetQ};
     if (!deferStorage) flushDeferredReadingStats();
   }
@@ -1699,6 +1700,8 @@ void XtcReaderActivity::startDailyReadingInterval() {
   dailyReadingSession.start(local, SETTINGS.clockUtcOffsetQ);
   readingSessionDates.start(local, SETTINGS.clockUtcOffsetQ);
   readingSessionJournal.start(local, SETTINGS.clockUtcOffsetQ);
+  const uint32_t pages = xtc ? xtc->getPageCount() : 0;
+  booksyncCapture.startPage(local, SETTINGS.clockUtcOffsetQ, 0, currentPage, pages, currentPage, pages);
 }
 
 bool XtcReaderActivity::checkpointReadingStatsBeforeRestart() {

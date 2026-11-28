@@ -6,6 +6,7 @@
 #include "../../test/simulator/LifecycleJournalScenario.h"
 #include "../../test/simulator/SyncOwnerScenario.h"
 #include "../../test/simulator/LifecycleMatchScenario.h"
+#include "../../test/simulator/LifecycleStatsScenario.h"
 #include "../../test/simulator/DeliveryScenario.h"
 #include "../../test/simulator/AccountScenario.h"
 #include "../../test/simulator/CatalogScenario.h"
@@ -12172,6 +12173,7 @@ bool simulatorInterceptNetworkRestart(const uint32_t target, const uint32_t payl
 void prepareSimulatorSmokeState() {
   runFilePublishScenario();
   runLifecycleMatchScenario();
+  runLifecycleStatsScenario();
   runSyncOwnerScenario();
   runLifecycleJournalScenario();
   runDeliveryScenario();

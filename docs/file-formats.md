@@ -2591,3 +2591,23 @@ changed or unreadable owned copies are retained as conflicts. FilePublish's
 `.tmp` and `.bak` siblings are owned publication candidates; a complete current or
 backup is selected read-only. Incomplete staging is never selected. No import
 operation deletes or renames a legacy original/backup.
+## BookSync page history and stats checkpoints (F09/F18b)
+
+`/.booksync/pages/NNNNNN.bin` uses version magic `BSP1`, u32 segment number,
+u32 row count (1–64) and a reserved-zero u32. It is published through F06 with
+`.tmp` and `.bak` siblings. All integers are little endian, with no C++ ABI layout.
+Each 64-byte row stores F09 open ID u64 (0), UTC page start u64 (8), observation
+ordinal u32 (16), accepted seconds u32 (20), native spine/page/page-count/source
+offset u32 (24/28/32/36), whole-book fraction/scale u32 (40/44), flags u8 (48),
+11 reserved zeros (49–59), and IEEE CRC32 of bytes 0–59 (60). Flag 1 means an
+explicit coverage gap; flag 2 means source offset present. Unknown flags/formats
+are unresolved. A reserved row after the 50,000-event cap is a permanent,
+open-ended gap; nothing silently replaces an unsynced event. F09 open IDs resolve
+source identity through its retained original capture, never a title/path guess.
+
+Adapter-private `BST1` checkpoints have a 36-byte header: magic; next/begin/end
+source rows u32 at 4/8/12; captured open ID u64 at 16; immutable capture cutoff
+u64 at 24; nested F18a byte count u32 at 32. The complete unmodified `BSM1`
+checkpoint follows at 36. A partial batch leaves the F07 Stats attempt set;
+only final Stats acknowledgment advances the phase. Unknown versions remain
+pending. Native/EPUB cache formats and partition maps do not change.

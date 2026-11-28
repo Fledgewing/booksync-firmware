@@ -2,6 +2,8 @@
 
 ### Added
 
+- BookSync captures bounded timestamped reading-page history and checkpoints stats batches through its sole sync owner, retaining explicit coverage gaps and reconciling uncertain uploads without counting reading time twice; live delivery remains deferred.
+
 - BookSync streams server catalog and manifest records with fixed memory bounds, rejects incomplete or revoked responses, and preserves the prior offline index after interrupted refreshes.
 - BookSync commits account-scoped catalog generations only after complete refreshes, coalesces refresh requests under one network lease, and keeps closed Home views quiet after cancellation or late completion.
 - BookSync checkpoints verified local-to-server book matches under its sole sync owner, preserving native captures and reconciling uncertain results after restart; validated against a fake server with account and edition isolation.

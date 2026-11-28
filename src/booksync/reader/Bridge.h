@@ -3,6 +3,8 @@
 #include <string>
 
 #include "Capture.h"
+#include "PageCapture.h"
+struct ReadingStatsDateTime;
 namespace ReadingSessionJournal {
 struct Record;
 }
@@ -14,6 +16,16 @@ class Bridge {
   Bridge();
   const Sample& lastObservation() const { return capture_.lastSample(); }
   void open(std::string_view path, uint16_t format);
+  void startPage(const ReadingStatsDateTime&, uint8_t utcOffset, uint32_t spine, uint32_t page, uint32_t pages,
+                 uint32_t fraction, uint32_t scale);
+  bool needsPageLocation(uint32_t spine, uint32_t page, uint32_t pages) const {
+    return pages_.needsLocation(spine, page, pages);
+  }
+  void locatePage(uint32_t spine, uint32_t page, uint32_t pages, uint32_t fraction, uint32_t scale, uint32_t offset = 0,
+                  bool hasOffset = false) {
+    pages_.locate(spine, page, pages, fraction, scale, offset, hasOffset);
+  }
+  void acceptPage(const ReadingStatsDateTime&, uint8_t utcOffset, uint32_t seconds);
   void observeSession(const ReadingSessionJournal::Record& record);
   void observe(Sample sample, const std::string& cache, bool closed = false);
   // Exact, bounded native artifact snapshot. Parts reference the first journal
@@ -24,5 +36,7 @@ class Bridge {
 
  private:
   Capture capture_;
+  PageCapture pages_;
+  uint8_t pageOffset_ = 255;
 };
 }  // namespace booksync::reader
