@@ -8,7 +8,7 @@
 namespace booksync {
 // Presentation values, never wire IDs, credentials or mutable store handles.
 // Identity bytes come from F08 evidence; unknown values remain explicit.
-enum class Availability : uint8_t { NotSaved, Ready, Unsupported, Unavailable };
+enum class Availability : uint8_t { NotSaved, Ready, Unsupported, Unavailable, Off };
 struct Snapshot {
   Availability catalog = Availability::NotSaved;
   uint32_t generation = 0;
@@ -47,15 +47,19 @@ enum class WindowSource : uint8_t {
   Random,
   FinishedYear,
   PickBackUp,
+  AlsoReading,
+  AllFinished,
   Unknown
 };
+enum class WindowPresentation : uint8_t { Full, Preview };
 struct WindowRequest {
   uint32_t offset = 0;
   uint16_t limit = 12;
   uint32_t bytes = LibraryBytes;
   WindowSource source = WindowSource::OnDevice;
+  WindowPresentation presentation = WindowPresentation::Full;
   bool operator==(WindowRequest other) const {
-    if (source != other.source || offset != other.offset) return false;
+    if (source != other.source || presentation != other.presentation || offset != other.offset) return false;
     return limit == other.limit ? bytes == other.bytes : false;
   }
 };
@@ -71,9 +75,10 @@ struct WindowBatchRequest {
 };
 struct WindowSpan {
   WindowRequest request{};
-  uint32_t total = 0, bytes = 0;
+  uint32_t total = 0, bytes = 0, ageDays = 0;
   uint16_t first = 0, count = 0;
   Availability availability = Availability::NotSaved;
+  bool stale = false, ageKnown = false;
 };
 struct BookRow {
   BookKey key{};

@@ -198,13 +198,13 @@ TEST(WidgetHost, ShelfHitSelectsTheDisplayedBookWithoutAnotherRead) {
   }
   h.pollWidgets();
   const WidgetBox box{450, 180, 24, false, true};
-  EXPECT_EQ(h.widgetRows(0, box), 3);
+  EXPECT_EQ(h.widgetRows(0, box), 4);
   WidgetCell cell;
   ASSERT_TRUE(h.widgetCell(0, box, 1, cell));
   EXPECT_GE(cell.width, 50);
   EXPECT_GE(cell.height, 50);
   const auto row = h.hitWidgetRow(0, box, cell.x + cell.width / 2, cell.y + cell.height / 2);
-  EXPECT_EQ(row, 1);
+  EXPECT_EQ(row, 2);
   EXPECT_EQ(h.dispatchWidget(0, row), CommandStatus::Accepted);
   EXPECT_EQ(f.opened.ordinal, 21u);
   EXPECT_EQ(h.hitWidgetRow(0, box, 20, 5), 255);

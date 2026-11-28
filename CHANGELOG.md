@@ -20,6 +20,7 @@
 
 - BookSync Home adds compact When you read and Reading records widgets on X4 Pro and Classic, with local-hour history and explicit per-record source availability.
 - BookSync can publish daily native saved highlights through Library without changing original clipping files; incomplete, scoped and oversized captures stay explicit.
+- BookSync Book list uses the approved compact nine-preset previews and top-right All counts on X4; the saved-source list keeps paging, Back and unavailable actions offline. X3 retains its text Home.
 
 - BookSync publishes timezone-aware clock and date values only after live or retained clock provenance is known; a persisted expiry floor cannot produce a Home clock.
 - BookSync adds compact Series pages and exact next-1–10 download review on X4 Pro touch, X4 Classic buttons and X3, with offline/Back behavior, frozen file choices and restart-safe account-scoped queues through Library.
@@ -30,6 +31,8 @@
 - BookSync adds Settings → Reminders with local bedtime and eye-rest editors, explicit Save/Back controls, and unknown-clock or storage recovery states on Pro, Classic and X3.
 
 - BookSync adds the approved compact Library and scoped/grouped lists on touch, buttons and X3 text, with explicit offline download consent, cached file choices, cancel/resume states and Back restoration. The live catalog/download facade remains a separate integration.
+
+- BookSync prepares bounded Book list previews for all nine presets, preserving saved ordering/counts and year/account evidence; new compact widget presentation remains a separate increment.
 
 - BookSync adds shared position conflict, reset, override and decline policy with durable account/edition isolation and stale-answer rejection; late consent uses the existing one-draw reading exception. Live transport and reader presentation remain deferred.
 - BookSync adds account-isolated authenticated catalog transport behind Library, with bounded response spooling and rejection of incomplete or revoked responses; automatic sync scheduling follows separately.

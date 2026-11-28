@@ -17,7 +17,11 @@ enum class Label : uint8_t {
   FinishDayText,
   SavedAge,
   SavedUnknown,
-  OversizedData
+  OversizedData,
+  ShelfTitle,
+  AllBooks,
+  EmptyShelf,
+  BookProgress
 };
 struct Box {
   int x = 0, y = 0, w = 0, h = 0;

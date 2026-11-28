@@ -3,6 +3,7 @@ add_executable(CatalogJobsTest CatalogJobsTest.cpp
   ${REPO_ROOT}/src/booksync/services/CatalogSource.cpp
   ${REPO_ROOT}/src/booksync/services/Delivery.cpp
   ${REPO_ROOT}/src/booksync/services/ReadModel.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/BookList.cpp
   ${REPO_ROOT}/src/booksync/services/widgets/Continue.cpp
   ${REPO_ROOT}/src/booksync/storage/ProjectionStore.cpp
   ${REPO_ROOT}/src/booksync/storage/Index.cpp

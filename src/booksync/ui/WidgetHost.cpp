@@ -39,7 +39,7 @@ bool WidgetHost::pollWidgets() {
         continue;
       }
       batch_.windows[i] = p.kind == WidgetKind::Continue ? widgets::Continue::request()
-                          : p.kind == WidgetKind::Shelf  ? widgets::Shelf::request(p.source)
+                          : p.kind == WidgetKind::Shelf  ? widgets::Shelf::request(p.source, page_.textOnly)
                                                          : widgets::Browse::request();
     }
     // Unsupported/summary placeholders reserve one descriptor row, but do not
@@ -90,6 +90,7 @@ WidgetView boundedWidget(const LibraryWindow& batchValue, const WindowSpan& span
     return {WidgetState::Error};
   if (span.availability == Availability::Unavailable) return {WidgetState::Error};
   if (span.availability == Availability::Unsupported) return {WidgetState::Unsupported};
+  if (span.availability == Availability::Off) return {WidgetState::Off};
   if (span.availability == Availability::NotSaved) return {WidgetState::NotSaved};
   for (uint16_t i = 0; i < span.count; ++i) {
     bool terminated = false;
@@ -100,8 +101,13 @@ WidgetView boundedWidget(const LibraryWindow& batchValue, const WindowSpan& span
       }
     if (!terminated) return {WidgetState::Error};
   }
-  return {span.count ? WidgetState::Known : WidgetState::Empty, span.count ? &batchValue.rows[span.first] : nullptr,
-          span.total, span.count, batchValue.stale};
+  return {span.count ? WidgetState::Known : WidgetState::Empty,
+          span.count ? &batchValue.rows[span.first] : nullptr,
+          span.total,
+          span.count,
+          batchValue.stale || span.stale,
+          span.ageDays,
+          span.ageKnown};
 }
 WidgetView WidgetHost::view(uint8_t widget) const {
   if (widget >= page_.count) return {WidgetState::Error};
@@ -177,21 +183,26 @@ bool WidgetHost::widgetCell(uint8_t widget, WidgetBox itemBox, uint8_t itemIndex
 uint8_t WidgetHost::widgetRows(uint8_t widget, WidgetBox itemBox) const {
   if (widget >= page_.count) return 0;
   const auto viewValue = view(widget);
-  if (page_.widgets[widget].kind != WidgetKind::Shelf || viewValue.viewState != WidgetState::Known) return 1;
+  if (page_.widgets[widget].kind != WidgetKind::Shelf) return 1;
+  if (!page_.textOnly && viewValue.viewState == WidgetState::Empty) return 1;
+  if (viewValue.viewState != WidgetState::Known) return 1;
   WidgetCell itemCell;
   uint8_t rows = 0;
   while (rows < viewValue.count && widgetCell(widget, itemBox, rows, itemCell)) ++rows;
-  return rows;
+  return rows + (page_.textOnly ? 0 : 1);
 }
 uint8_t WidgetHost::hitWidgetRow(uint8_t widget, WidgetBox itemBox, int x, int y) const {
   if (widget >= page_.count) return 255;
   if (page_.widgets[widget].kind != WidgetKind::Shelf) return 0;
   const auto viewValue = view(widget);
+  if (!page_.textOnly && (viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty) &&
+      x >= itemBox.width - 140 && x < itemBox.width - 4 && y >= 0 && y < 50)
+    return 0;
   WidgetCell itemCell;
   for (uint8_t itemIndex = 0; itemIndex < viewValue.count && widgetCell(widget, itemBox, itemIndex, itemCell);
        ++itemIndex)
     if (x >= itemCell.x && x < itemCell.x + itemCell.width && y >= itemCell.y && y < itemCell.y + itemCell.height)
-      return itemIndex;
+      return itemIndex + (page_.textOnly ? 0 : 1);
   return 255;
 }
 bool WidgetHost::retryWidget(uint8_t widget) {
@@ -203,6 +214,14 @@ bool WidgetHost::retryWidget(uint8_t widget) {
 CommandStatus WidgetHost::dispatchWidget(uint8_t widget, uint8_t itemIndex) {
   if (pending_ || widget >= page_.count) return CommandStatus::Unavailable;
   const auto viewValue = view(widget);
+  const auto kind = page_.widgets[widget].kind;
+  const bool saved = viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty;
+  if (kind == WidgetKind::Browse && saved) return page_.textOnly ? library_.submit(Intent::BrowseOnDevice) : library_.browseSource(WindowSource::OnDevice);
+  if (kind == WidgetKind::Shelf && !page_.textOnly && saved) {
+    if (!itemIndex) return library_.browseSource(page_.widgets[widget].source);
+    --itemIndex;
+    if (page_.widgets[widget].style == 1 && itemIndex >= 3) return CommandStatus::Unavailable;
+  }
   if (viewValue.viewState != WidgetState::Known || itemIndex >= viewValue.count) return CommandStatus::Unavailable;
   if (page_.widgets[widget].kind == WidgetKind::Continue) return library_.submit(Intent::OpenLastBook);
   if (page_.widgets[widget].kind == WidgetKind::Shelf) return library_.open(viewValue.rows[itemIndex].key);

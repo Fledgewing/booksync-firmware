@@ -2,6 +2,7 @@
 #pragma once
 #include "HistorySource.h"
 #include "booksync/storage/Index.h"
+#include "widgets/BookList.h"
 namespace booksync {
 struct PersonalCard;
 enum class Invalidation { Files, Capture, Generation, Account };
@@ -13,6 +14,14 @@ class ReadModel {
   bool materialize(WindowRequest request);
   void setContinue(const BookRow& row, bool available, const PersonalCard* resolved = nullptr);
   void copyWindow(LibraryWindow& out) const { out = window_; }
+  void setBookListScratch(BookListProjection* scratch) { bookListScratch_ = scratch; }
+  // Borrowed frozen selection, retired before its owner is released. Only the
+  // normalized source owner supplies membership/order/year and saved age.
+  void setBookListSource(BookListSource source, ReadingScope scope, uint16_t year) {
+    bookListSource_ = source;
+    bookListScope_ = scope;
+    bookListYear_ = year;
+  }
   bool materializeBatch(const WindowBatchRequest& batch);
   static bool accepts(const WindowBatchRequest& batch);
   Availability availability() const { return window_.availability; }
@@ -37,6 +46,11 @@ class ReadModel {
   storage::Index& index_;
   LibraryWindow window_{};
   BookRow continue_{};
+  BookListProjection* bookListScratch_ = nullptr;  // Optional X4 worker lifetime, owned by facade.
+  BookListSource bookListSource_{};
+  ReadingScope bookListScope_{};
+  uint16_t bookListYear_ = 0;
+  bool materializeList(WindowSpan&);
   bool continueAvailable_ = false, continueProgressResolved_ = false;
   inline static uint64_t nextPublication_ = 0;
   void publishChanged() {

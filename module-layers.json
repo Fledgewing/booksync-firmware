@@ -14686,6 +14686,8 @@
         "../../test/simulator/AccountScenario.h",
         "../../test/simulator/AccountSurfaceScenario.h",
         "../../test/simulator/ActivationScenario.h",
+        "../../test/simulator/BookListProjectionScenario.h",
+        "../../test/simulator/BookListScenario.h",
         "../../test/simulator/CalendarWidgetScenario.h",
         "../../test/simulator/CatalogJobsScenario.h",
         "../../test/simulator/CatalogScenario.h",
@@ -16374,6 +16376,34 @@
     "src/booksync/ui/CompactGrid.h": {
       "role": "ui",
       "rationale": "F40w compact six-row geometry preserves stored grids and reserves the shared footer once on both X4 profiles; pure Library presentation values only."
+    },
+    "src/booksync/services/widgets/BookList.h": {
+      "role": "services",
+      "rationale": "F40w Book list worker projection: at most four frozen indexed records, independent preset order/count/year/scope evidence, fixed caller-owned output and no UI, transport, allocation or writer."
+    },
+    "src/booksync/services/widgets/BookList.cpp": {
+      "role": "services",
+      "rationale": "F40w Book list worker projection: at most four frozen indexed records, independent preset order/count/year/scope evidence, fixed caller-owned output and no UI, transport, allocation or writer."
+    },
+    "src/booksync/ui/catalog/SourceList.h": {
+      "role": "ui",
+      "rationale": "F40w approved compact Book list and shared saved-source destination; bounded Library values/intents only, no transport, filesystem or source selection in UI."
+    },
+    "src/booksync/ui/catalog/SourceList.cpp": {
+      "role": "ui",
+      "rationale": "F40w approved compact Book list and shared saved-source destination; bounded Library values/intents only, no transport, filesystem or source selection in UI."
+    },
+    "src/booksync/system/ArtworkCache.h": {
+      "role": "system",
+      "rationale": "F40w foreground native paint/input glue for approved source lists and thumbnails; X4 PSRAM cache is fallible, page bounded and prepared after paint, with no additional framebuffer or reader policy."
+    },
+    "src/booksync/system/SourceListScreen.h": {
+      "role": "system",
+      "rationale": "F40w foreground native paint/input glue for approved source lists and thumbnails; X4 PSRAM cache is fallible, page bounded and prepared after paint, with no additional framebuffer or reader policy."
+    },
+    "src/booksync/system/SourceListScreen.cpp": {
+      "role": "system",
+      "rationale": "F40w foreground native paint/input glue for approved source lists and thumbnails; X4 PSRAM cache is fallible, page bounded and prepared after paint, with no additional framebuffer or reader policy."
     }
   }
 }

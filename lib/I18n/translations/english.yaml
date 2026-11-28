@@ -1533,3 +1533,11 @@ STR_HOME_PERCENT_FORMAT: "%lu%%"
 STR_HOME_SAVED_DATA: "Saved data"
 STR_HOME_SOURCE_UNSUPPORTED: "Unavailable from this source."
 STR_HOME_WIDGET_DATA_UNAVAILABLE: "Could not show this widget’s data."
+STR_HOME_ALL_BOOKS_FORMAT: "All (%lu) ›"
+STR_HOME_ALSO_READING: "Also reading"
+STR_HOME_ALL_FINISHED: "All finished"
+STR_HOME_SOURCE_COUNT_FORMAT: "%lu books"
+
+STR_HOME_UP_NEXT_IN_SERIES: "Up next in series"
+
+STR_HOME_UNOPENED_WIDGET: "Unopened"

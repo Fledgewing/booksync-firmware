@@ -4,6 +4,7 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/storage/Identity.cpp
   ${REPO_ROOT}/src/booksync/services/DeviceIndex.cpp
   ${REPO_ROOT}/src/booksync/services/ReadModel.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/BookList.cpp
   ${REPO_ROOT}/src/booksync/services/widgets/Continue.cpp
   ${REPO_ROOT}/src/booksync/reader/Capture.cpp
   ${REPO_ROOT}/src/booksync/reader/CaptureBinding.cpp
