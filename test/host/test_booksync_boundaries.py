@@ -109,6 +109,15 @@ class Boundaries(unittest.TestCase):
                        'struct Bad { CoverBitmap& out; };', 'bool copy(Secret& out);'):
             self.assertTrue(boundary.ui_source_errors('src/booksync/interface/Probe.h', source))
 
+    def test_reminder_value_references_do_not_admit_handles(self):
+        for source in ('void copy(ReminderList& out);', 'bool due(ReminderDue& out);',
+                       'bool mutate(const ReminderMutation&);',
+                       'bool claim(const ReminderDue&, uint64_t);'):
+            self.assertFalse(boundary.ui_source_errors('src/booksync/interface/Probe.h', source))
+        for source in ('ReminderList* handle;', 'ReminderDue& member;',
+                       'const ReminderMutation& member;', 'bool claim(const ReminderDue*&);'):
+            self.assertTrue(boundary.ui_source_errors('src/booksync/interface/Probe.h', source))
+
     def test_build_hook_outside_script_directory_is_inventoried(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

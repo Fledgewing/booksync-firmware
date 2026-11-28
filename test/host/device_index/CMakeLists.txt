@@ -15,6 +15,8 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/services/Queries.cpp
   ${REPO_ROOT}/src/booksync/storage/ProjectionStore.cpp
   ${REPO_ROOT}/src/booksync/services/Library.cpp
+  ${REPO_ROOT}/src/booksync/services/Reminders.cpp
+  ${REPO_ROOT}/src/booksync/services/RemindersFacade.cpp
   ${REPO_ROOT}/src/booksync/services/SdIndexSource.cpp)
 target_include_directories(BookSyncIndexTest PRIVATE ../file_publish/stubs ${REPO_ROOT}/src ${REPO_ROOT}/lib/Memory)
 target_link_libraries(BookSyncIndexTest PRIVATE crosspoint_test_common GTest::gtest_main)

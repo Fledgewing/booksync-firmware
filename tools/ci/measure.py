@@ -62,6 +62,15 @@ def main():
             frames.append(path.read_text())
     out.mkdir(parents=True, exist_ok=True)
     (out / 'reading-stack-usage.txt').write_text(''.join(frames))
+    reminder_frames = []
+    for area, name in (('services', 'Reminders'), ('services', 'RemindersFacade'),
+                       ('storage', 'RemindersStore'), ('system', 'RemindersRuntime')):
+        paths = list((build / 'src/booksync' / area).glob(name + '*.su'))
+        if not paths:
+            raise SystemExit(f'missing reminder stack evidence: {name}')
+        for path in paths:
+            reminder_frames.append(path.read_text())
+    (out / 'reminders-stack-usage.txt').write_text(''.join(reminder_frames))
     validate_partition_binary(build / 'partitions.bin', config)
     subprocess.run([sys.executable, str(root / 'tools/test/test-home-map.py'),
                     str(build / 'firmware.map')], check=True)

@@ -20,3 +20,15 @@ def finish_frames(node_env, node):
 
 env.AddBuildMiddleware(finish_frames, "*/Finish.cpp")
 env.AddBuildMiddleware(finish_frames, "*/SyncOwner.cpp")
+
+def bounded_reminder_frame(node_env, node):
+    # R1 permits one rollback/codec record, never a list/schedule temporary.
+    return node_env.Object(node, CCFLAGS=node_env["CCFLAGS"] + [
+        "-fstack-usage", "-Wstack-usage=1024", "-Werror=stack-usage=1024",
+    ])
+
+
+env.AddBuildMiddleware(bounded_reminder_frame, "*/Reminders.cpp")
+env.AddBuildMiddleware(bounded_reminder_frame, "*/RemindersFacade.cpp")
+env.AddBuildMiddleware(bounded_reminder_frame, "*/RemindersStore.cpp")
+env.AddBuildMiddleware(bounded_reminder_frame, "*/RemindersRuntime.cpp")

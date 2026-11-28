@@ -15,7 +15,7 @@ struct FakeCard {
   std::vector<std::string> events;
   int stop = -1, fail = -1, readOnlyAt = -1;
   int cutWrite = -1, prefix = 0, writes = 0;
-  bool readOnly = false, full = false, eager = false, dead = false;
+  bool readOnly = false, full = false, eager = false, dead = false, present = true;
   int handles = 0, maxHandles = 0;
   size_t reportedSize = 0;
   bool event(const std::string& name) {
@@ -108,6 +108,7 @@ class HalFile {
 using FsFile = HalFile;
 class HalStorage {
  public:
+  bool ready() const { return card.present; }
   bool mkdir(const char*) { return true; }
   bool ensureDirectoryExists(const char* path) {
     return card.event(std::string("mkdir:") + path) && !card.readOnly && !card.full;
