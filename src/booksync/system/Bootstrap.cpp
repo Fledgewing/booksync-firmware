@@ -92,8 +92,14 @@ HomeSettingsActivity* homeSettingsScene = nullptr;
 #endif
 class HomeSettingsActivity final : public Activity {
   uint8_t focus = 0;
+  const bool returnEditor;
+  void leaveSettings() {
+    if (returnEditor) finish();
+    else activityManager.goHome();
+  }
  public:
-  HomeSettingsActivity(GfxRenderer& renderer, MappedInputManager& input) : Activity("Settings", renderer, input) {}
+  HomeSettingsActivity(GfxRenderer& renderer, MappedInputManager& input, bool returnEditor = false)
+      : Activity("Settings", renderer, input), returnEditor(returnEditor) {}
   void selectRemindersEntry() { showReminderSettings(renderer, mappedInput); }
   void onEnter() override {
     Activity::onEnter();
@@ -110,7 +116,7 @@ class HomeSettingsActivity final : public Activity {
   }
   void loop() override {
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-      activityManager.goHome();
+      leaveSettings();
     } else {
       if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Down)) ||
           mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Up))) { focus ^= 1; requestUpdate(); }
@@ -120,14 +126,17 @@ class HomeSettingsActivity final : public Activity {
         const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
         const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
         const int top = header.y + header.height + renderer.getLineHeight(UI_10_FONT_ID) + 32;
-        if (x < safe.x + 100 && y < safe.y + 40) { activityManager.goHome(); return; }
+        if (x < safe.x + 100 && y < safe.y + 40) { leaveSettings(); return; }
         if (x >= safe.x + 24 && x < safe.x + safe.width - 24 && y >= top && y < top + 112) {
           focus = (y - top) / 56; activate = true;
         }
       }
       if (activate) {
         if (focus == 1) selectRemindersEntry();
-        else {
+        else if (returnEditor) {
+          setResult(OptionSelectionResult{0});
+          finish();
+        } else {
           auto editor = createHomeEditor(renderer, mappedInput);
           if (editor) startActivityForResult(std::move(editor), [](const ActivityResult&) {});
         }
@@ -1423,7 +1432,24 @@ class ShellActivity final : public Activity {
       if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Right)) ||
           (tapped && x >= header.x + header.width - homeSettingsActionWidth() && y >= header.y && y < header.y + header.height)) {
 #if CROSSINK_APP_CAP_REMINDERS || CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
-        showHomeSettings(renderer, mappedInput);
+        if (widgets->page().textOnly) {
+          showHomeSettings(renderer, mappedInput);
+        } else {
+          // Keep this Home and its Library owned by the activity stack. The
+          // menu returns an action; it never substitutes the default Library.
+          auto settings = makeUniqueNoThrow<HomeSettingsActivity>(renderer, mappedInput, true);
+          if (!settings) {
+            LOG_ERR("BSH", "Cannot allocate Home settings");
+            return true;
+          }
+          startActivityForResult(std::move(settings), [this](const ActivityResult& result) {
+            const auto* selected = std::get_if<OptionSelectionResult>(&result.data);
+            if (!result.isCancelled && selected && selected->index == 0) {
+              editor.enter();
+              requestUpdate();
+            }
+          });
+        }
 #else
         editor.enter();
 #endif
