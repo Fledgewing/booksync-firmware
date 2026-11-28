@@ -54,6 +54,7 @@
 #include "../../test/simulator/NativePersonalScenario.h"
 #include "../../test/simulator/DeviceBridgeScenario.h"
 #include "booksync/reader/ChapterCapture.h"
+#include "../../test/simulator/LookupPoolScenario.h"
 
 #include <Epub.h>
 #include <Epub/WordSpacing.h>
@@ -12251,6 +12252,7 @@ void prepareSimulatorSmokeState() {
   runClockProvenanceScenario();
   runDeviceBridgeScenario();
   runRemindersScenario();
+  runLookupPoolScenario();
   runLookupCaptureScenario();
   runVersionScenario();
   runUpdateScenario();

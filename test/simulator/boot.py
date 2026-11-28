@@ -128,4 +128,6 @@ subprocess.run([sys.executable, "test/simulator/native_personal.py", profile], c
 subprocess.run([sys.executable, "test/simulator/device_bridge.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/reminder_ui.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/lookup_capture.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable,"test/simulator/lookup_capture.py",profile],cwd=root,env=env,check=True)
+subprocess.run([sys.executable, 'test/simulator/lookup_pool.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

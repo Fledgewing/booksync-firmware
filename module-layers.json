@@ -10568,6 +10568,24 @@
       "role": "services",
       "rationale": "F40w Word prerequisite: bounded read-only capture of saved native lookup records, UTF-8/framing validation, <=256-byte worker steps and explicit missing/partial/changed/oversize errors; no UI, repair, network or second vocabulary writer."
     },
+    "src/booksync/services/LookupPool.cpp": {
+      "role": "services",
+      "includes": [
+        "Logging.h",
+        "LookupPool.h",
+        "Memory.h",
+        "cstring"
+      ],
+      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O."
+    },
+    "src/booksync/services/LookupPool.h": {
+      "role": "services",
+      "includes": [
+        "LookupHistorySource.h",
+        "memory"
+      ],
+      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O."
+    },
     "src/booksync/services/NativeHistory.cpp": {
       "role": "services",
       "rationale": "F13 read-only F07/F09 journal cursor and native sample decoding; no journal mutation or transport."
@@ -10663,6 +10681,23 @@
     "src/booksync/services/RemindersFormat.h": {
       "role": "services",
       "rationale": "R1 bounded reminder presentation through Library; no data I/O, transport or native reader policy in UI."
+    },
+    "src/booksync/services/SavedLookupPoolSource.cpp": {
+      "role": "services",
+      "includes": [
+        "SavedLookupPoolSource.h",
+        "cstdio",
+        "cstring"
+      ],
+      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O."
+    },
+    "src/booksync/services/SavedLookupPoolSource.h": {
+      "role": "services",
+      "includes": [
+        "HalStorage.h",
+        "LookupPool.h"
+      ],
+      "rationale": "Worker-only bounded exact-word aggregation over original native lookup captures; directory and content handles close before the next tick, with no new writer or UI I/O."
     },
     "src/booksync/services/SavedNativePassages.cpp": {
       "role": "services",
@@ -13569,6 +13604,7 @@
         "../../test/simulator/LiveAdapterScenario.h",
         "../../test/simulator/LocatorScenario.h",
         "../../test/simulator/LookupCaptureScenario.h",
+        "../../test/simulator/LookupPoolScenario.h",
         "../../test/simulator/NativeApplicationScenario.h",
         "../../test/simulator/NativeEvidenceScenario.h",
         "../../test/simulator/NativePersonalScenario.h",
