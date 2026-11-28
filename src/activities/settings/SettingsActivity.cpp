@@ -28,6 +28,8 @@
 #include "FilenameFontSystem.h"
 #include "FontSelectionActivity.h"
 #include "HyphenationManagerActivity.h"
+#include "booksync/system/Bootstrap.h"
+#include "booksync/system/ReminderSettingsScreen.h"
 #include "util/PluginEvents.h"
 #if CROSSINK_SCALABLE_FONTS
 #include "TtfRenderOptionsActivity.h"
@@ -87,8 +89,13 @@ StrId uiFontErrorString(const FontLoadError error) {
 #endif
 }  // namespace
 
-const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
-                                                              StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
+const StrId SettingsActivity::categoryNames[categoryMenuCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
+                                                                  StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM
+#if CROSSINK_APP_CAP_REMINDERS
+                                                                  ,
+                                                                  StrId::STR_REMINDERS
+#endif
+};
 
 namespace {
 constexpr int systemVersionFooterSideMargin = 20;
@@ -509,6 +516,10 @@ void SettingsActivity::setCurrentSettingsForCategory() {
 }
 
 void SettingsActivity::enterCategory(int categoryIndex) {
+  if (CROSSINK_APP_CAP_REMINDERS && categoryIndex == categoryCount) {
+    booksync::showReminderSettings(renderer, mappedInput);
+    return;
+  }
   selectedCategoryIndex = categoryIndex;
   activeSubmenu = SettingAction::None;
   parentSubmenu = SettingAction::None;
@@ -1073,7 +1084,7 @@ void SettingsActivity::onEnter() {
 void SettingsActivity::onTabEvent(const fui::ActionEvent& event, void* user) {
   auto* self = static_cast<SettingsActivity*>(user);
   if (self->optionPopup.isActive()) return;
-  if (event.value < 0 || event.value >= categoryCount) return;
+  if (event.value < 0 || event.value >= categoryMenuCount) return;
   self->selectedSettingIndex = 0;
   self->enterCategory(event.value);
   self->topIndex = 0;
@@ -1242,7 +1253,7 @@ void SettingsActivity::loop() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     showSettingSelection = true;
     if (!isFileBrowserView() && selectedSettingIndex == 0) {
-      enterCategory((selectedCategoryIndex < categoryCount - 1) ? (selectedCategoryIndex + 1) : 0);
+      enterCategory((selectedCategoryIndex < categoryMenuCount - 1) ? (selectedCategoryIndex + 1) : 0);
       hasChangedCategory = true;
       requestUpdate();
     } else {
@@ -1350,8 +1361,8 @@ void SettingsActivity::loop() {
     const auto changeCategory = [this, &hasChangedCategory](const bool forward) {
       hasChangedCategory = true;
       showSettingSelection = true;
-      enterCategory(forward ? ButtonNavigator::nextIndex(selectedCategoryIndex, categoryCount)
-                            : ButtonNavigator::previousIndex(selectedCategoryIndex, categoryCount));
+      enterCategory(forward ? ButtonNavigator::nextIndex(selectedCategoryIndex, categoryMenuCount)
+                            : ButtonNavigator::previousIndex(selectedCategoryIndex, categoryMenuCount));
       requestUpdate();
     };
     if (classicNavigation) {
@@ -1885,18 +1896,18 @@ void SettingsActivity::buildSettingsScreen(UiApp::ScreenType& screen) {
 
   // Category tabs. The selected pill dims to a dither when the selection is
   // down in the list (the legacy focused/unfocused tab distinction).
-  fui::TabItem tabs[categoryCount];
-  for (int i = 0; i < categoryCount; i++) {
+  fui::TabItem tabs[categoryMenuCount];
+  for (int i = 0; i < categoryMenuCount; i++) {
     tabs[i].label = I18N.get(categoryNames[i]);
     tabs[i].value = static_cast<int16_t>(i);
     tabs[i].selected = selectedCategoryIndex == i;
   }
   fui::TabBarProps tabProps;
   tabProps.tabs = tabs;
-  tabProps.count = categoryCount;
+  tabProps.count = categoryMenuCount;
   tabProps.action = ACTION_TAB;
   tabProps.inputMask = fui::InputTouch;
-  // Small text: four category labels share the band, the body font truncates.
+  // Small text: five category labels share the band, the body font truncates.
   tabProps.text = screen.theme().smallText;
   // Pill wraps the label with real padding; the band grows with the scaled
   // font when the theme's tabBarHeight is too short for it. Keep the horizontal
@@ -1957,9 +1968,9 @@ void SettingsActivity::buildSettingsScreen(UiApp::ScreenType& screen) {
     const fui::Rect body = screen.body();
     const int16_t railWidth = static_cast<int16_t>(body.width / 4);
     int16_t tabY = body.y;
-    for (int i = 0; i < categoryCount; ++i) {
+    for (int i = 0; i < categoryMenuCount; ++i) {
       const int16_t tabHeight =
-          static_cast<int16_t>(i == categoryCount - 1 ? body.bottom() - tabY : body.height / categoryCount);
+          static_cast<int16_t>(i == categoryMenuCount - 1 ? body.bottom() - tabY : body.height / categoryMenuCount);
       const fui::Rect tabRect{body.x, tabY, railWidth, tabHeight};
       fui::TabBarProps railProps = tabProps;
       railProps.tabs = &tabs[i];
@@ -2074,7 +2085,7 @@ void SettingsActivity::render(RenderLock&&) {
 
   const auto confirmLabel =
       (!isFileBrowserView() && selectedSettingIndex == 0)
-          ? I18N.get(categoryNames[(selectedCategoryIndex + 1) % categoryCount])
+          ? I18N.get(categoryNames[(selectedCategoryIndex + 1) % categoryMenuCount])
           : (selectedSettingIndex > 0 &&
                      (currentSettingUsesOptionMenu((*currentSettings)[selectedSettingIndex - 1]) ||
                       (*currentSettings)[selectedSettingIndex - 1].type == SettingType::SUBMENU ||

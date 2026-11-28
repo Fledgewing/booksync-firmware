@@ -70,3 +70,5 @@ env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Records.cpp")
 
 env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Goal.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Forecast.cpp")
+env.AddBuildMiddleware(bounded_reminder_frame, "*/ReminderSettingsScreen.cpp")
+env.AddBuildMiddleware(bounded_reminder_frame, "*/ui/reminders/Settings.cpp")
