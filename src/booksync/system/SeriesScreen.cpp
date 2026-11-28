@@ -438,25 +438,29 @@ class SeriesActivity final : public Activity {
     if (series_.scene() == SeriesScene::Count) return 2;
     return series_.scene() == SeriesScene::Page ? series_.members().count + 2 : rowCount() + actionCount();
   }
-  bool focusable(uint8_t control) const {
-    if (control >= controlCount()) return false;
-    if (series_.scene() == SeriesScene::Page || series_.scene() == SeriesScene::Count || control >= rowCount())
-      return true;
-    return series_.scene() == SeriesScene::Files ||
-           (series_.scene() == SeriesScene::Queue && series_.flow().queue.items[control].cancelable);
-  }
+  // Read-only rows remain navigable so button users can scroll every item.
+  // activate() and the controller independently reject disabled row actions.
+  bool focusable(uint8_t control) const { return control < controlCount(); }
   uint8_t firstFocus() const {
     if (series_.scene() == SeriesScene::Page) return series_.members().count ? 1 : 0;
-    for (uint8_t i = 0; i < controlCount(); ++i)
-      if (focusable(i)) return i;
+    if (series_.scene() == SeriesScene::Preview || series_.scene() == SeriesScene::Review) return rowCount();
+    if (series_.scene() == SeriesScene::Queue) {
+      for (uint8_t i = 0; i < rowCount(); ++i)
+        if (series_.flow().queue.items[i].cancelable) return i;
+      return rowCount();
+    }
     return 0;
   }
+  void alignFocusScroll() {
+    if (focus_ < rowCount()) {
+      if (focus_ < scroll_) scroll_ = focus_;
+      if (focus_ >= scroll_ + visibleRows()) scroll_ = focus_ - visibleRows() + 1;
+    }
+  }
   void moveFocus(int direction) {
-    for (int i = int(focus_) + direction; i >= 0 && unsigned(i) < controlCount(); i += direction)
-      if (focusable(i)) {
-        focus_ = i;
-        break;
-      }
+    const int next = int(focus_) + direction;
+    if (next >= 0 && unsigned(next) < controlCount()) focus_ = next;
+    alignFocusScroll();
   }
   void activate(uint8_t control) {
     const auto count = rowCount();
@@ -833,10 +837,6 @@ class SeriesActivity final : public Activity {
             changed = true;
           }
       }
-      if (focus_ < rowCount()) {
-        if (focus_ < scroll_) scroll_ = focus_;
-        if (focus_ >= scroll_ + visibleRows()) scroll_ = focus_ - visibleRows() + 1;
-      }
     }
 #if CROSSINK_APP_CAP_TOUCH
     if (series_.scene() != SeriesScene::Page && series_.scene() != SeriesScene::Count) {
@@ -856,6 +856,7 @@ class SeriesActivity final : public Activity {
         (series_.scene() == SeriesScene::Files && previousFile != series_.flow().fileRow)) {
       focus_ = firstFocus();
       scroll_ = 0;
+      alignFocusScroll();
       changed = true;
     }
     if (!series_.live())
@@ -864,8 +865,21 @@ class SeriesActivity final : public Activity {
       requestUpdate();
   }
 #ifdef SIMULATOR
-  bool scenarioInvariant() const {
+  bool scenarioInvariant() {
     if (!focusable(focus_)) return false;
+    if (series_.scene() == SeriesScene::Files && focus_ != 0) return false;
+    if ((series_.scene() == SeriesScene::Preview || series_.scene() == SeriesScene::Review) &&
+        rowCount() > visibleRows()) {
+      const auto savedFocus = focus_, savedScroll = scroll_;
+      focus_ = rowCount();
+      moveFocus(-1);
+      bool reached = focus_ == rowCount() - 1 && focus_ >= scroll_ && focus_ < scroll_ + visibleRows();
+      while (focus_) moveFocus(-1);
+      reached = reached && scroll_ == 0;
+      focus_ = savedFocus;
+      scroll_ = savedScroll;
+      if (!reached) return false;
+    }
     auto ink = [&](Rect r) {
       for (int y = r.y; y < r.y + r.height; ++y)
         for (int x = r.x; x < r.x + r.width; ++x)
@@ -908,6 +922,7 @@ class SeriesActivity final : public Activity {
     }
     focus_ = firstFocus();
     scroll_ = 0;
+    alignFocusScroll();
     requestUpdate();
   }
 #endif
