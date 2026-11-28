@@ -929,7 +929,7 @@ TEST(LayoutGeometry, CompactStatsHaveOnlyTheirApprovedMainSize) {
 }
 
 TEST(LayoutEditor, NewStatsAreHiddenOnX3) {
-  for (auto kind : {WidgetKind::Week, WidgetKind::Streak}) {
+  for (auto kind : {WidgetKind::Week, WidgetKind::Streak, WidgetKind::Year, WidgetKind::Monthly}) {
     card = {};
     storage::LayoutStore store(paths, "x4");
     ASSERT_EQ(store.load(), storage::LayoutSource::Default);
@@ -945,7 +945,7 @@ TEST(LayoutEditor, NewStatsAreHiddenOnX3) {
     HomePage after;
     ASSERT_TRUE(store.project(0, after));
     ASSERT_EQ(after.count, before.count + 1);
-    EXPECT_EQ(after.widgets[after.count - 1].w, 1);
+    EXPECT_EQ(after.widgets[after.count - 1].w, kind == WidgetKind::Year || kind == WidgetKind::Monthly ? 2 : 1);
     EXPECT_EQ(after.widgets[after.count - 1].h, 1);
     storage::LayoutStore x3(paths, "x3");
     ASSERT_EQ(x3.load(), storage::LayoutSource::Current);
@@ -961,10 +961,15 @@ TEST(LayoutEditor, NewStatsAreHiddenOnX3) {
       const auto& tile = after.widgets[i];
       move.geometry[i] = {tile.x, tile.y, tile.w, tile.h};
     }
+    const bool wide = kind == WidgetKind::Year || kind == WidgetKind::Monthly;
     move.geometry[move.index].x = 1;
+    if (wide) {
+      EXPECT_NE(store.edit(worker, move), LayoutEditStatus::Saved);
+      move.geometry[move.index].x = 0;
+    }
     ASSERT_EQ(store.edit(worker, move), LayoutEditStatus::Saved);
     ASSERT_TRUE(store.project(0, after));
-    EXPECT_EQ(after.widgets[after.count - 1].x, 1);
+    EXPECT_EQ(after.widgets[after.count - 1].x, wide ? 0 : 1);
     LayoutEdit remove;
     remove.kind = LayoutEditKind::Remove;
     remove.revision = after.revision;
@@ -973,4 +978,14 @@ TEST(LayoutEditor, NewStatsAreHiddenOnX3) {
     ASSERT_TRUE(store.project(0, after));
     EXPECT_EQ(after.count, before.count);
   }
+}
+
+TEST(LayoutGeometry, CalendarSizesMatchApproval) {
+  EXPECT_TRUE(supportedGeometry(WidgetKind::Year, 2, 1));
+  EXPECT_TRUE(supportedGeometry(WidgetKind::Year, 2, 2));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Year, 1, 1));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Year, 2, 3));
+  EXPECT_TRUE(supportedGeometry(WidgetKind::Monthly, 2, 1));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Monthly, 1, 1));
+  EXPECT_FALSE(supportedGeometry(WidgetKind::Monthly, 2, 2));
 }

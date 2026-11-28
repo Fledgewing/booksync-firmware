@@ -345,16 +345,18 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
       if (!removed) return LayoutEditStatus::Invalid;
     } else {
       if (page.count >= HomeWidgets || p.instanceCount_ >= 128) return LayoutEditStatus::NoSpace;
-      const char* widget = edit.widget == WidgetKind::Continue ? "continue-reading"
-                           : edit.widget == WidgetKind::Shelf  ? "booklist"
-                           : edit.widget == WidgetKind::Browse ? "library"
-                           : edit.widget == WidgetKind::Week   ? "this-week"
-                           : edit.widget == WidgetKind::Streak ? "reading-streak"
-                                                               : nullptr;
+      const char* widget = edit.widget == WidgetKind::Continue  ? "continue-reading"
+                           : edit.widget == WidgetKind::Shelf   ? "booklist"
+                           : edit.widget == WidgetKind::Browse  ? "library"
+                           : edit.widget == WidgetKind::Week    ? "this-week"
+                           : edit.widget == WidgetKind::Streak  ? "reading-streak"
+                           : edit.widget == WidgetKind::Year    ? "year-in-reading"
+                           : edit.widget == WidgetKind::Monthly ? "monthly-reading"
+                                                                : nullptr;
       if (!widget) return LayoutEditStatus::Invalid;
       if (!std::strcmp(device, "x3") && isStatsWidget(edit.widget)) return LayoutEditStatus::Invalid;
       const uint8_t h = edit.widget == WidgetKind::Browse || isStatsWidget(edit.widget) ? 1 : 2;
-      const uint8_t w = isStatsWidget(edit.widget) ? 1 : 2;
+      const uint8_t w = edit.widget == WidgetKind::Week || edit.widget == WidgetKind::Streak ? 1 : 2;
       uint8_t xs[3]{}, ys[3]{};
       static constexpr const char* classes[] = {"android-tablet", "x4", "x3"};
       for (unsigned i = 0; i < 3; ++i) {

@@ -28,6 +28,8 @@ class WidgetHost {
   auto pollWidgets() -> bool;  // Main loop under RenderLock, outside paint.
   WidgetView view(uint8_t widget) const;
   const StatsCard* statsCard(uint8_t widget) const;
+  const StatsYear* statsYear(uint8_t widget) const;
+  const StatsMonths* statsMonths(uint8_t widget) const;
   auto widgetCell(uint8_t widget, WidgetBox itemBox, uint8_t itemIndex, WidgetCell& itemCell) const -> bool;
   uint8_t widgetRows(uint8_t widget, WidgetBox itemBox) const;
   uint8_t hitWidgetRow(uint8_t widget, WidgetBox itemBox, int x, int y) const;
@@ -45,6 +47,6 @@ class WidgetHost {
   uint8_t wanted_ = 0;
   bool pending_ = true, accepted_ = false;
 };
-static_assert(sizeof(WidgetHost) <= 7 * 1024);
+static_assert(sizeof(WidgetHost) <= 9 * 1024);
 WidgetView boundedWidget(const LibraryWindow&, const WindowSpan&, WindowRequest);
 }  // namespace booksync

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include "Calendar.h"
 #include "Streak.h"
 #include "Week.h"
 #include "booksync/services/ServerAdapter.h"
@@ -27,5 +28,5 @@ class StatsWorker {
   static bool split(void*, uint64_t, StatsDaySlice&);
   void publish();
 };
-static_assert(sizeof(StatsWorker) <= 28 * 1024);
+static_assert(sizeof(StatsWorker) <= 30 * 1024);
 }  // namespace booksync

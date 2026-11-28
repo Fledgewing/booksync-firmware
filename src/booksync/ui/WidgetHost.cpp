@@ -34,7 +34,7 @@ bool WidgetHost::pollWidgets() {
     for (uint8_t i = 0; i < page_.count; ++i) {
       const auto& p = page_.widgets[i];
       if (isStatsWidget(p.kind) && !page_.textOnly) {
-        batch_.statsWidgets |= statsWidgetBit(p.kind == WidgetKind::Week ? StatsWidget::Week : StatsWidget::Streak);
+        batch_.statsWidgets |= statsWidgetBit(statsWidgetKind(p.kind));
         batch_.windows[i] = {0, 1, LibraryBytes, WindowSource::Unknown};
         continue;
       }
@@ -131,7 +131,7 @@ WidgetView WidgetHost::view(uint8_t widget) const {
 }
 const StatsCard* WidgetHost::statsCard(uint8_t widget) const {
   if (widget >= page_.count || page_.textOnly || !isStatsWidget(page_.widgets[widget].kind)) return nullptr;
-  const auto id = page_.widgets[widget].kind == WidgetKind::Week ? StatsWidget::Week : StatsWidget::Streak;
+  const auto id = statsWidgetKind(page_.widgets[widget].kind);
   if (!(stats_.requested & statsWidgetBit(id))) return nullptr;
   return &stats_.cards[unsigned(id)];
 }
@@ -173,5 +173,16 @@ CommandStatus WidgetHost::dispatchWidget(uint8_t widget, uint8_t itemIndex) {
   if (page_.widgets[widget].kind == WidgetKind::Continue) return library_.submit(Intent::OpenLastBook);
   if (page_.widgets[widget].kind == WidgetKind::Shelf) return library_.open(viewValue.rows[itemIndex].key);
   return library_.submit(Intent::BrowseLibrary);
+}
+}  // namespace booksync
+
+namespace booksync {
+const StatsYear* WidgetHost::statsYear(uint8_t widget) const {
+  return widget < page_.count && page_.widgets[widget].kind == WidgetKind::Year && statsCard(widget) ? &stats_.year
+                                                                                                     : nullptr;
+}
+const StatsMonths* WidgetHost::statsMonths(uint8_t widget) const {
+  return widget < page_.count && page_.widgets[widget].kind == WidgetKind::Monthly && statsCard(widget) ? &stats_.months
+                                                                                                        : nullptr;
 }
 }  // namespace booksync
