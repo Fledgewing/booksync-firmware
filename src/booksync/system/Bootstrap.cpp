@@ -266,7 +266,7 @@ class ShellActivity final : public Activity {
                   (unsigned long long)(yearTile ? statsValue.best.value : statsValue.hours));
     paintStatText(BITTER_14_FONT_ID, r.x + 10, r.y + line + 2, text, summaryWidth, 288 * std::min(r.height, 108) / 108);
     if (!expandedYear)
-      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 2 * line + 10,
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 52 * std::min(r.height, 108) / 108,
                     yearTile ? tr(STR_HOME_STATS_DAYS_READ) : tr(STR_HOME_STATS_KNOWN_TOTAL), summaryWidth,
                     metadataScale);
     if (expandedYear && widgets->statsYear(index))
@@ -283,7 +283,8 @@ class ShellActivity final : public Activity {
       const int width = std::min(r.width * 2 / 3 - 20, renderer.getTextWidth(UI_10_FONT_ID, text) * 160 / 256 + 12);
       paintStatText(UI_10_FONT_ID, r.x + r.width - 10 - width, r.y + line + 12, text, width, 160);
     } else
-      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 3 * line + 10, text, summaryWidth, metadataScale);
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 74 * std::min(r.height, 108) / 108, text,
+                    summaryWidth + (yearTile ? 0 : 8), yearTile ? metadataScale : metadataScale * 9 / 10);
     if (statsValue.stale) {
       std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_SAVED_AGE_FORMAT), (unsigned long long)statsValue.ageDays);
       if (expandedYear)
