@@ -3,6 +3,7 @@ add_executable(LifecycleAnnotationsTest LifecycleAnnotationsTest.cpp
   ${REPO_ROOT}/src/booksync/server/bookorbit/LifecycleMatch.cpp
   ${REPO_ROOT}/src/booksync/server/bookorbit/Auth.cpp
   ${REPO_ROOT}/src/booksync/services/Account.cpp
+  ${REPO_ROOT}/src/booksync/services/Finish.cpp
   ${REPO_ROOT}/src/booksync/services/SyncOwner.cpp
   ${REPO_ROOT}/src/booksync/storage/Identity.cpp
   ${REPO_ROOT}/src/booksync/storage/LifecycleJournal.cpp

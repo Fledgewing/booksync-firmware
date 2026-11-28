@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 BASELINE = Path(__file__).with_name('size.baseline.json')
 PIPELINE = ('booksync::legacy::Activation::boot(', '__wrap_nvs_flash_init', 'microlink_init', 'wolfSSL_connect', 'booksync::reader::Bridge::open(',
             'booksync::reader::Capture::update(', 'booksync::storage::LifecycleJournal::recover(',
+            'booksync_finish_link_anchor', 'booksync::Finish::enqueue(', 'booksync::Finish::undo(',
             'booksync::SyncOwner::activate()', 'booksync::SyncOwner::deactivate()', 'booksync::SyncOwner::step()',
             'booksync::CredentialCapture::capture(', 'booksync::Account::signIn(',
             'booksync::Account::signOut(', 'booksync::Account::snapshot() const',

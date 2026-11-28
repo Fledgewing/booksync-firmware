@@ -8,6 +8,7 @@
 
 namespace booksync {
 class SyncOwner;
+struct FinishRequest;
 class CatalogSource;
 class DownloadSource;
 struct RemoteReadingStats;
@@ -52,6 +53,7 @@ class ServerAdapter : public AuthAdapter {
   virtual CatalogSource* catalogSource() { return nullptr; }
   virtual DownloadSource* downloadSource() { return nullptr; }
   virtual PhaseOutcome syncPhase(const SyncWriterToken&, const PhaseRequest&) { return PhaseOutcome::Unavailable; }
+  virtual PhaseOutcome finishPhase(const SyncWriterToken&, const FinishRequest&) { return PhaseOutcome::Unavailable; }
   virtual CommandStatus deliver(const SyncWriterToken& token, Intent intent) = 0;
 };
 

@@ -1,4 +1,5 @@
 add_executable(SyncOwnerTest SyncOwnerTest.cpp
+  ${REPO_ROOT}/src/booksync/services/Finish.cpp
   ${REPO_ROOT}/src/booksync/services/SyncOwner.cpp
   ${REPO_ROOT}/src/booksync/storage/LifecycleJournal.cpp
   ${REPO_ROOT}/src/booksync/storage/FilePublish.cpp)

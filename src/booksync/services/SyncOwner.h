@@ -5,6 +5,7 @@
 #include "ServerAdapter.h"
 
 namespace booksync {
+class Finish;
 enum class SyncResult : uint8_t {
   Ready,
   Busy,
@@ -32,7 +33,7 @@ class SyncOwner final {
                                          storage::LifecycleJournal::MaxCheckpoint;
   SyncOwner(storage::LifecycleJournal& journal, ServerAdapter& adapter, std::string_view adapterId,
             std::string_view account, char* scratch, size_t capacity, SyncObserver observer = nullptr,
-            void* context = nullptr);
+            void* context = nullptr, Finish* finish = nullptr);
   ~SyncOwner();
   SyncOwner(const SyncOwner&) = delete;
   SyncOwner& operator=(const SyncOwner&) = delete;
@@ -49,6 +50,7 @@ class SyncOwner final {
   size_t capacity_;
   SyncObserver observer_;
   void* context_;
+  Finish* finish_;
   void observe(SyncCheckpoint point, uint64_t id = 0, unsigned phase = 0) const;
 };
 }  // namespace booksync
