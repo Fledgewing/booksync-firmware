@@ -952,7 +952,6 @@ void ActivityManager::notifyInputLockChanged(const bool locked) {
 }
 
 void ActivityManager::notifyUserInput() {
-  booksync::reminderInput();
   if (currentActivity) currentActivity->onUserInput();
 }
 

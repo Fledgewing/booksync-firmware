@@ -3600,7 +3600,6 @@ void EpubReaderActivity::loop() {
     }
 
     if ((millis() - lastPageTurnTime) >= pageTurnDuration) {
-      activityManager.notifyReminderReadingInput();
       pageTurn(true, "auto");
       return;
     }
@@ -6311,6 +6310,8 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn, const char* source) {
     return;
   }
   pageLoadRetryCount = 0;
+  if (!source || strcmp(source, "auto") != 0) activityManager.notifyReminderReadingInput();
+  markReminderFrameBlocked();
   if (activeFootnotePreview) {
     if (isForwardTurn) {
       if (section && section->currentPage < section->pageCount - 1) {

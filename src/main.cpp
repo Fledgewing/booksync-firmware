@@ -2057,6 +2057,14 @@ void loop() {
   if (userInputReceived) {
     activityManager.notifyUserInput();
   }
+  // Reminder activity is a fresh interaction, not the release half of a
+  // dismissal, a held contact, sensor polling or arriving background work.
+  bool reminderFreshInput = gpio.wasAnyPressed();
+#if CROSSINK_APP_CAP_TOUCH
+  float reminderTouchX = 0.0f, reminderTouchY = 0.0f;
+  reminderFreshInput = reminderFreshInput || gpio.wasTouchDown(reminderTouchX, reminderTouchY) || gpio.wasHomeKeyPressed();
+#endif
+  if (reminderFreshInput) booksync::reminderInput();
 
   // Let wake continue as soon as its hold has been verified. The release can
   // arrive after setup, so consume that one input frame rather than making it

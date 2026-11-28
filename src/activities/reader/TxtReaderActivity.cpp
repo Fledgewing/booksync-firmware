@@ -361,6 +361,8 @@ void TxtReaderActivity::requestPageTurn(const bool previous, const bool next) {
     } else {
       return;
     }
+    activityManager.notifyReminderReadingInput();
+    markReminderFrameBlocked();
   }
   requestUpdate();
 }

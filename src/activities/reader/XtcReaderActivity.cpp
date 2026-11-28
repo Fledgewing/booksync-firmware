@@ -540,6 +540,10 @@ void XtcReaderActivity::loop() {
       needsUpdate = true;
     }
   }
+  if (needsUpdate) {
+    activityManager.notifyReminderReadingInput();
+    markReminderFrameBlocked();
+  }
   if (goHome) {
     onGoHome();
   } else if (needsUpdate) {

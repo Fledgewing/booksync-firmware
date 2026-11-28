@@ -15,6 +15,7 @@ bool takeReminderSleep();
 #ifdef SIMULATOR
 #include "booksync/interface/Library.h"
 namespace booksync {
+uint64_t reminderSceneInputCount();
 void paintReminderScene(GfxRenderer&, Library&, unsigned state);
 bool inputReminderScene(GfxRenderer&, MappedInputManager&, Library&, unsigned state);
 }  // namespace booksync

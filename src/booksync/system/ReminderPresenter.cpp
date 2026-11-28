@@ -28,6 +28,9 @@
 #include "fontIds.h"
 namespace booksync {
 namespace {
+#ifdef SIMULATOR
+uint64_t sceneInputCount = 0;
+#endif
 struct Presenter {
   explicit Presenter(Library& library) : sheet(library) {}
   ReminderDueSheet sheet;
@@ -223,8 +226,9 @@ void inputs(Presenter& p, GfxRenderer& renderer, MappedInputManager& input) {
   }
 }
 // Keep the due-value workspace off the durable worker call chain.
-[[gnu::noinline]] bool updateReminderSheet(Presenter& p, RemindersFacade& facade, Library& library, GfxRenderer& renderer,
-                         MappedInputManager& input, std::optional<RenderLock>& claimLock) {
+[[gnu::noinline]] bool updateReminderSheet(Presenter& p, RemindersFacade& facade, Library& library,
+                                           GfxRenderer& renderer, MappedInputManager& input,
+                                           std::optional<RenderLock>& claimLock) {
   const bool hadFrame = p.frame.load();
   if (!p.now.visible || p.now.sleeping || p.now.modal) {
     if (hadFrame || p.claiming) reminderNavigation();
@@ -318,6 +322,9 @@ void reminderNavigation() {
   reportActivity(false);
 }
 void reminderInput() {
+#ifdef SIMULATOR
+  ++sceneInputCount;
+#endif
   presenter().input = true;
   reportActivity(true);
 }
@@ -393,6 +400,7 @@ bool reminderLoop(GfxRenderer& renderer, MappedInputManager& input, bool page, b
 }  // namespace booksync
 #ifdef SIMULATOR
 namespace booksync {
+uint64_t reminderSceneInputCount() { return sceneInputCount; }
 void paintReminderScene(GfxRenderer& renderer, Library& library, unsigned state) {
   ReminderDueSheet sheet{library};
   ReminderPresentation value{};
