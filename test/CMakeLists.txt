@@ -279,3 +279,4 @@ add_subdirectory(host/catalog)
 
 add_subdirectory(host/lifecycle_match)
 add_subdirectory(host/widget_host)
+add_subdirectory(host/import_identity)

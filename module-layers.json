@@ -15247,6 +15247,27 @@
     "src/booksync/ui/widgets/Continue.h": {
       "role": "ui",
       "rationale": "F34 bounded public Home placement values and Library-only immutable widget views; no storage, protocol, jobs or paint I/O."
+    },
+    "src/booksync/import/Identity.h": {
+      "role": "import",
+      "rationale": "F26c: read-only NVS identity retention evidence; fixed legacy key types, no transport, mutation, key derivation or activation.",
+      "includes": [
+        "array",
+        "cstdint"
+      ]
+    },
+    "src/booksync/import/Identity.cpp": {
+      "role": "import",
+      "rationale": "F26c: read-only NVS identity retention evidence; fixed legacy key types, no transport, mutation, key derivation or activation.",
+      "includes": [
+        "CommonCrypto/CommonDigest.h",
+        "Identity.h",
+        "Logging.h",
+        "cstring",
+        "mbedtls/sha256.h",
+        "nvs.h",
+        "openssl/sha.h"
+      ]
     }
   },
   "generators": {

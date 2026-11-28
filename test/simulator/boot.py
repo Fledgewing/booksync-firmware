@@ -16,6 +16,7 @@ subprocess.run([sys.executable, 'tools/ci/retired_writers.py', str(root / '.pio/
 subprocess.run([sys.executable, 'test/simulator/admission.py', profile], cwd=root, check=True)
 # F10 probes run exactly once; a failing synthetic reconnect stops this profile.
 subprocess.run([sys.executable, 'test/simulator/tailnet.py', profile], cwd=root, check=True)
+subprocess.run([sys.executable, 'test/simulator/identity_import.py', profile], cwd=root, check=True)
 out = root / 'reports' / profile
 out.mkdir(parents=True, exist_ok=True)
 env = os.environ.copy()
