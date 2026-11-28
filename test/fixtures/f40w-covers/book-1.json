@@ -1,5 +1,12 @@
 {
-  "reference": "f40w-widgets--05-recently-added.png",
+  "reference": "f40w-widgets--37-finished.png",
+  "referenceSha256": "0430bd8e0b066b6414f8c769834182251cff173ef78329eaee3a3025f3a91aa7",
+  "referenceTileCrop": [
+    27,
+    160,
+    437,
+    362
+  ],
   "normalizedTile": [
     456,
     224
@@ -10,8 +17,10 @@
     224,
     196
   ],
+  "resample": "LANCZOS",
+  "threshold": 160,
   "width": 128,
   "height": 180,
   "blackBit": 0,
-  "sha256": "5b035489b1aa93831e30dbeaa3db787e84c1cac4a5bdcd7e53c32ce5b3d5d450"
+  "sha256": "ddccd102d4ab23ea2753d43b7b1ed2de45f438f17433e213b488e17eb772cc53"
 }
