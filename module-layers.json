@@ -13336,6 +13336,7 @@
         "../../test/simulator/QueriesScenario.h",
         "../../test/simulator/ReaderCaptureScenario.h",
         "../../test/simulator/RemindersScenario.h",
+        "../../test/simulator/SeriesPlanScenario.h",
         "../../test/simulator/SleepScenario.h",
         "../../test/simulator/SyncOwnerScenario.h",
         "../../test/simulator/UpdateInstallScenario.h",
@@ -15781,6 +15782,18 @@
     "src/booksync/system/SleepRuntime.cpp": {
       "role": "system",
       "rationale": "F42 bounded main-loop sleep pass, immutable Library-only cached presentation and safe ownership retirement; no transport, extra framebuffer or new artwork."
+    },
+    "src/booksync/interface/Series.h": {
+      "role": "interface",
+      "rationale": "F36c immutable bounded Series request/member/preview values; no service, store or mutable handles."
+    },
+    "src/booksync/services/SeriesPlan.h": {
+      "role": "services",
+      "rationale": "F36c worker-only two-pass contextual Series selection over F22 neutral cursors and scoped active-job revisions. Fixed workspace; no transport or UI policy."
+    },
+    "src/booksync/services/SeriesPlan.cpp": {
+      "role": "services",
+      "rationale": "F36c bounded worker projection and exact-selection preview token. No heap allocation, UI, transport or catalog mutation."
     }
   },
   "generators": {

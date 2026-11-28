@@ -13,6 +13,7 @@
 #include "booksync/interface/Queries.h"
 #include "booksync/interface/Reminders.h"
 #include "booksync/interface/Sleep.h"
+#include "booksync/interface/Series.h"
 
 namespace booksync {
 // UI reads bounded published values. No scans, writes, parsing or transport in
@@ -56,6 +57,13 @@ class Library {
   virtual CommandStatus cancelDownload(uint64_t) { return CommandStatus::Unavailable; }
   virtual bool requestQuery(const QueryRequest&) { return false; }
   virtual void readQuery(QueryResult& out) const {
+    out.clear();
+    out.availability = Availability::Unsupported;
+  }
+  // Worker-owned next-N selection. Unregistered providers fail closed; callers
+  // never reconstruct selection by scanning their partial visible windows.
+  virtual bool requestSeries(SeriesRequest) { return false; }
+  virtual void readSeries(SeriesPlanView& out) const {
     out.clear();
     out.availability = Availability::Unsupported;
   }
