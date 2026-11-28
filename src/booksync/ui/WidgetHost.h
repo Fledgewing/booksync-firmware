@@ -2,7 +2,7 @@
 #pragma once
 #include "booksync/interface/Library.h"
 namespace booksync {
-enum class WidgetState : uint8_t { Loading, Known, Empty, NotSaved, Unsupported, Error, Oversize };
+enum class WidgetState : uint8_t { Loading, Known, Empty, NotSaved, Unsupported, Error, Oversize, Off };
 struct WidgetView {
   WidgetState viewState = WidgetState::Loading;
   const BookRow* rows = nullptr;
@@ -27,6 +27,7 @@ class WidgetHost {
   auto enter(uint8_t page = 0) -> void;
   auto pollWidgets() -> bool;  // Main loop under RenderLock, outside paint.
   WidgetView view(uint8_t widget) const;
+  const StatsCard* statsCard(uint8_t widget) const;
   auto widgetCell(uint8_t widget, WidgetBox itemBox, uint8_t itemIndex, WidgetCell& itemCell) const -> bool;
   uint8_t widgetRows(uint8_t widget, WidgetBox itemBox) const;
   uint8_t hitWidgetRow(uint8_t widget, WidgetBox itemBox, int x, int y) const;
@@ -38,10 +39,12 @@ class WidgetHost {
   Library& library_;
   HomePage page_{};
   LibraryWindow data_{};
+  StatsWidgetBatch stats_{};
+  DeliveryTicket statsAccount_{};
   WindowBatchRequest batch_{};
   uint8_t wanted_ = 0;
   bool pending_ = true, accepted_ = false;
 };
-static_assert(sizeof(WidgetHost) <= 6 * 1024);
+static_assert(sizeof(WidgetHost) <= 7 * 1024);
 WidgetView boundedWidget(const LibraryWindow&, const WindowSpan&, WindowRequest);
 }  // namespace booksync

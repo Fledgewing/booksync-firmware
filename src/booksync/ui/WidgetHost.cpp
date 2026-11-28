@@ -18,19 +18,44 @@ bool WidgetHost::pollWidgets() {
   if (!layout.revision || layout.page != wanted_ || layout.count > HomeWidgets || !layout.cols || !layout.rows ||
       layout.cols > 12 || layout.rows > 12 || layout.title.back())
     return false;
+  const auto accountTicket = library_.accountView().ticket;
+  if (batch_.statsWidgets &&
+      (accountTicket.owner != statsAccount_.owner || accountTicket.epoch != statsAccount_.epoch)) {
+    pending_ = true;
+    stats_.requested = 0;
+  }
   bool changed = false;
   if (pending_ || layout.revision != page_.revision || layout.page != page_.page) {
     page_ = layout;
+    statsAccount_ = accountTicket;
     batch_ = {};
+    stats_.requested = 0;
+    for (auto& statsValue : stats_.cards) statsValue.clear();
     for (uint8_t i = 0; i < page_.count; ++i) {
       const auto& p = page_.widgets[i];
+      if (isStatsWidget(p.kind) && !page_.textOnly) {
+        batch_.statsWidgets |= statsWidgetBit(p.kind == WidgetKind::Week ? StatsWidget::Week : StatsWidget::Streak);
+        batch_.windows[i] = {0, 1, LibraryBytes, WindowSource::Unknown};
+        continue;
+      }
       batch_.windows[i] = p.kind == WidgetKind::Continue ? widgets::Continue::request()
                           : p.kind == WidgetKind::Shelf  ? widgets::Shelf::request(p.source)
                                                          : widgets::Browse::request();
-      // Fair independent itemIndex shares; aggregate remains within the C3 window.
-      const uint16_t share = LibraryRows / page_.count;
-      if (batch_.windows[i].limit > share) batch_.windows[i].limit = share;
     }
+    // Unsupported/summary placeholders reserve one descriptor row, but do not
+    // count as book consumers when sharing the remaining C3 publication budget.
+    uint8_t bookConsumers = 0, placeholderRows = 0;
+    for (uint8_t i = 0; i < page_.count; ++i) {
+      if (batch_.windows[i].source == WindowSource::Unknown) {
+        batch_.windows[i].limit = 1;
+        ++placeholderRows;
+      } else
+        ++bookConsumers;
+    }
+    const uint16_t share = bookConsumers ? (LibraryRows - placeholderRows) / bookConsumers : 0;
+    for (uint8_t i = 0; i < page_.count; ++i)
+      if (batch_.windows[i].source != WindowSource::Unknown && batch_.windows[i].limit > share)
+        batch_.windows[i].limit = share;
     batch_.count = page_.count;
     data_.publication = library_.subscribe().sequence;
     accepted_ = !batch_.count || library_.requestBatch(batch_);
@@ -43,6 +68,15 @@ bool WidgetHost::pollWidgets() {
   const auto publication = library_.subscribe().sequence;
   if (accepted_ && publication != data_.publication) {
     library_.readWindow(data_);
+    if (batch_.statsWidgets) {
+      library_.readStatsWidgets(stats_);
+      for (auto& statsValue : stats_.cards) {
+        if (statsValue.source == StatsCardSource::Account &&
+            (statsValue.provenance.owner != statsAccount_.owner ||
+             statsValue.provenance.accountEpoch != statsAccount_.epoch))
+          statsValue.clear();
+      }
+    }
     return true;
   }
   return changed;
@@ -73,12 +107,33 @@ WidgetView WidgetHost::view(uint8_t widget) const {
   if (widget >= page_.count) return {WidgetState::Error};
   if (!accepted_) return {WidgetState::Error};
   if (data_.windowCount > LibraryBatchRequests) return {WidgetState::Error};
+  if (isStatsWidget(page_.widgets[widget].kind)) {
+    const auto* statsValue = statsCard(widget);
+    if (!statsValue) return {};
+    const auto state = statsValue->bytes > sizeof(StatsCard)    ? StatsCardState::Oversize
+                       : statsValue->bytes != sizeof(StatsCard) ? StatsCardState::Unavailable
+                                                                : statsValue->state;
+    const auto mapped = state == StatsCardState::Ready         ? WidgetState::Known
+                        : state == StatsCardState::Empty       ? WidgetState::Empty
+                        : state == StatsCardState::Off         ? WidgetState::Off
+                        : state == StatsCardState::Unsupported ? WidgetState::Unsupported
+                        : state == StatsCardState::Oversize    ? WidgetState::Oversize
+                        : state == StatsCardState::Unavailable ? WidgetState::Error
+                                                               : WidgetState::NotSaved;
+    return {mapped, nullptr, 0, 0, statsValue->stale};
+  }
   if (widget >= data_.windowCount) return {};
   const auto viewValue = boundedWidget(data_, data_.windows[widget], batch_.windows[widget]);
   const auto kind = page_.widgets[widget].kind;
   return kind == WidgetKind::Continue ? widgets::Continue::view(viewValue)
          : kind == WidgetKind::Shelf  ? widgets::Shelf::view(viewValue)
                                       : widgets::Browse::view(viewValue);
+}
+const StatsCard* WidgetHost::statsCard(uint8_t widget) const {
+  if (widget >= page_.count || page_.textOnly || !isStatsWidget(page_.widgets[widget].kind)) return nullptr;
+  const auto id = page_.widgets[widget].kind == WidgetKind::Week ? StatsWidget::Week : StatsWidget::Streak;
+  if (!(stats_.requested & statsWidgetBit(id))) return nullptr;
+  return &stats_.cards[unsigned(id)];
 }
 bool WidgetHost::widgetCell(uint8_t widget, WidgetBox itemBox, uint8_t itemIndex, WidgetCell& itemCell) const {
   if (widget >= page_.count || page_.widgets[widget].kind != WidgetKind::Shelf) return false;

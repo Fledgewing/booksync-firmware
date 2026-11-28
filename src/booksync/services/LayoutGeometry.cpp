@@ -6,10 +6,15 @@ namespace {
 struct Size {
   uint8_t w, h;
 };
+static constexpr Size compact[] = {{1, 1}};
 static constexpr Size hero[] = {{1, 2}, {2, 3}, {2, 2}};
 static constexpr Size shelf[] = {{2, 2}, {1, 3}, {1, 2}, {2, 3}, {2, 4}, {2, 1}};
 static constexpr Size browse[] = {{2, 3}, {1, 2}, {2, 1}, {1, 1}, {2, 2}};
 const Size* sizes(WidgetKind kind, unsigned& count) {
+  if (isStatsWidget(kind)) {
+    count = 1;
+    return compact;
+  }
   if (kind == WidgetKind::Continue) {
     count = 3;
     return hero;

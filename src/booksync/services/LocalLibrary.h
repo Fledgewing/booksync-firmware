@@ -7,7 +7,8 @@ void bindReminders(RemindersFacade&);
 // Composition root publishes small cached values and a private checkpoint port.
 // No storage access occurs through Library snapshot/paint.
 void publishUpgradeState(bool pending, bool recovery, bool (*dismiss)());
-void enterLocalLibrary();
+class ServerAdapter;
+void enterLocalLibrary(ServerAdapter* savedStatsSource = nullptr);
 void leaveLocalLibrary();
 void workLocalLibrary();
 void invalidateLocalCapture();

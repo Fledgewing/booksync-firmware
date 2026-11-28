@@ -1,3 +1,4 @@
+#include "booksync/interface/StatsWidgets.h"
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <gtest/gtest.h>
 
@@ -546,4 +547,20 @@ TEST_F(IndexTest, QuerySnapshotUsesLibrarySubscriptionAndDoesNoPaintIo) {
   leaveLocalLibrary();
   library.readQuery(result);
   EXPECT_EQ(result.availability, Availability::NotSaved);
+}
+
+TEST(ReadModel, StatsBatchChargesItsFixedPayloadAndRejectsUnknownKinds) {
+  WindowBatchRequest batch;
+  batch.count = 1;
+  batch.rows = 1;
+  batch.windows[0].limit = 1;
+  const uint32_t metadata = sizeof(LibraryWindow) - sizeof(BookRow) * LibraryRows;
+  batch.bytes = metadata + sizeof(BookRow);
+  EXPECT_TRUE(ReadModel::accepts(batch));
+  batch.statsWidgets = statsWidgetBit(StatsWidget::Week);
+  EXPECT_FALSE(ReadModel::accepts(batch));
+  batch.bytes += sizeof(StatsWidgetBatch);
+  EXPECT_TRUE(ReadModel::accepts(batch));
+  batch.statsWidgets = 1u << StatsWidgetCount;
+  EXPECT_FALSE(ReadModel::accepts(batch));
 }

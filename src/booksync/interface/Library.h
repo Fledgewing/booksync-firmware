@@ -15,6 +15,7 @@
 #include "booksync/interface/Sleep.h"
 #include "booksync/interface/Series.h"
 #include "booksync/interface/SeriesFlow.h"
+#include "booksync/interface/StatsWidgets.h"
 
 namespace booksync {
 // UI reads bounded published values. No scans, writes, parsing or transport in
@@ -83,6 +84,13 @@ class Library {
   virtual CommandStatus open(BookKey) { return CommandStatus::Unavailable; }
   virtual LibraryWindow window() const { return {}; }
   virtual void readWindow(LibraryWindow& out) const { out = window(); }
+  virtual void readStatsWidgets(StatsWidgetBatch& out) const {
+    out.requested = (1u << StatsWidgetCount) - 1;
+    for (unsigned i = 0; i < StatsWidgetCount; ++i) {
+      out.cards[i].clear();
+      out.cards[i].state = StatsCardState::Unsupported;
+    }
+  }
   virtual HomePage homePage() const { return {}; }
   virtual bool requestHomePage(uint8_t) { return false; }
   virtual CommandStatus editLayout(LayoutEdit) { return CommandStatus::Unavailable; }

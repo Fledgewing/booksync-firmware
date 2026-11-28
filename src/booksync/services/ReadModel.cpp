@@ -2,12 +2,17 @@
 #include "ReadModel.h"
 
 #include <Logging.h>
+
+#include "booksync/interface/StatsWidgets.h"
 namespace booksync {
 bool ReadModel::accepts(const WindowBatchRequest& batch) {
   constexpr uint32_t Metadata = sizeof(LibraryWindow) - sizeof(BookRow) * LibraryRows;
   if (!batch.count || batch.count > LibraryBatchRequests || !batch.rows || batch.rows > LibraryRows ||
       batch.bytes > LibraryBytes || batch.bytes < Metadata)
     return false;
+  constexpr uint16_t StatsMask = (1u << StatsWidgetCount) - 1;
+  if (batch.statsWidgets & ~StatsMask) return false;
+  const uint32_t statsBytes = batch.statsWidgets ? sizeof(StatsWidgetBatch) : 0;
   uint32_t rows = 0;
   for (unsigned i = 0; i < batch.count; ++i) {
     const auto request = batch.windows[i];
@@ -16,7 +21,7 @@ bool ReadModel::accepts(const WindowBatchRequest& batch) {
       return false;
     rows += request.limit;
   }
-  return rows <= batch.rows && Metadata + rows * sizeof(BookRow) <= batch.bytes;
+  return rows <= batch.rows && Metadata + rows * sizeof(BookRow) + statsBytes <= batch.bytes;
 }
 bool ReadModel::materialize(WindowRequest request) {
   WindowBatchRequest

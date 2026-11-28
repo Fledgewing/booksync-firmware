@@ -387,3 +387,20 @@ TEST(LayoutProjection, KeepsPageNameAndShelfPresentationOverride) {
   EXPECT_EQ(page.widgets[1].style, 1);
   EXPECT_EQ(page.widgets[1].source, WindowSource::Recent);
 }
+
+TEST(LayoutProjection, CompactStatsStayOffOnX3AndRetainTheirCells) {
+  Layout parser;
+  HomePage page;
+  const auto defaults = Layout::defaults();
+  for (const char* id : {"this-week", "reading-streak"}) {
+    std::string raw(defaults.bytes, '\0');
+    ASSERT_TRUE(defaults.read(defaults.context, 0, raw.data(), raw.size()));
+    raw.replace(raw.find("\"widget\":\"booklist\""), 19, std::string("\"widget\":\"") + id + "\"");
+    ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
+    ASSERT_EQ(page.count, 3);
+    EXPECT_TRUE(isStatsWidget(page.widgets[1].kind));
+    ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x3", 0, page));
+    EXPECT_EQ(page.count, 2);
+    EXPECT_NE(page.reserved[2], 0);
+  }
+}

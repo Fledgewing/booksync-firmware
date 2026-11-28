@@ -39,3 +39,7 @@ env.AddBuildMiddleware(bounded_reading_frame, "*/SeriesQueueStore.cpp")
 
 env.AddBuildMiddleware(bounded_reading_frame, "*/SeriesFlow.cpp")
 env.AddBuildMiddleware(bounded_reading_frame, "*/Series.cpp")
+# F40w projections share the same small-frame requirement as their F39 source.
+env.AddBuildMiddleware(bounded_reading_frame, "*/widgets/StatsWorker.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Week.cpp")
+env.AddBuildMiddleware(bounded_reading_frame, "*/services/widgets/Streak.cpp")

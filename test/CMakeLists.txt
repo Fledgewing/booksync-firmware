@@ -315,3 +315,4 @@ add_subdirectory(host/series_plan)
 add_subdirectory(host/series_queue)
 
 add_subdirectory(host/series_ui)
+add_subdirectory(host/stats_widgets)

@@ -328,6 +328,9 @@ TEST(LayoutEditor, RemovesFirstMiddleLastAndAllWithoutChangingOtherBytes) {
 }
 TEST(LayoutEditor, MissingOverrideGroupsAndGeneratedIdCollision) {
   auto raw = original();
+  // This fixture intentionally exercises an existing seven-row custom layout.
+  const std::string grid = R"("x4":{"cols":2,"rows":6})";
+  raw.replace(raw.find(grid), grid.size(), R"("x4":{"cols":2,"rows":7})");
   const auto start = raw.find("\"overrides\":");
   raw.replace(start, raw.size() - start, "\"overrides\":{}} ");
   // Without class reflow the 4-column hero does not fit, so use a common 2-column base.
@@ -359,6 +362,9 @@ TEST(LayoutEditor, BrokenSourceReadAndRevisionExhaustionCannotPublish) {
 }
 TEST(LayoutEditor, UnknownInstancesReserveCellsAndSurviveKnownRemoval) {
   auto raw = original();
+  // This fixture intentionally exercises an existing seven-row custom layout.
+  const std::string grid = R"("x4":{"cols":2,"rows":6})";
+  raw.replace(raw.find(grid), grid.size(), R"("x4":{"cols":2,"rows":7})");
   const std::string unknown =
       R"({"instance":"future","widget":"future-widget","version":99,"x":2,"y":6,"w":2,"h":1,"settings":{"opaque":[null,{"keep":"exact"}]}})";
   raw.insert(raw.find("\"placements\":[") + 14, unknown + ",");
@@ -912,4 +918,59 @@ TEST(LayoutPages, FirstWidgetNamesNewPageButManualNamesStay) {
   raw = bytes(editor.output());
   ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 1, page));
   EXPECT_STREQ(page.title.data(), "My shelves");
+}
+
+TEST(LayoutGeometry, CompactStatsHaveOnlyTheirApprovedMainSize) {
+  for (auto kind : {WidgetKind::Week, WidgetKind::Streak}) {
+    EXPECT_TRUE(supportedGeometry(kind, 1, 1));
+    EXPECT_FALSE(supportedGeometry(kind, 2, 1));
+    EXPECT_FALSE(supportedGeometry(kind, 2, 2));
+  }
+}
+
+TEST(LayoutEditor, NewStatsAreHiddenOnX3) {
+  for (auto kind : {WidgetKind::Week, WidgetKind::Streak}) {
+    card = {};
+    storage::LayoutStore store(paths, "x4");
+    ASSERT_EQ(store.load(), storage::LayoutSource::Default);
+    HomePage before;
+    ASSERT_TRUE(store.project(0, before));
+    LayoutEdit edit;
+    edit.kind = LayoutEditKind::Add;
+    edit.widget = kind;
+    edit.revision = before.revision;
+    edit.page = 0;
+    LayoutEditor worker;
+    ASSERT_EQ(store.edit(worker, edit), LayoutEditStatus::Saved);
+    HomePage after;
+    ASSERT_TRUE(store.project(0, after));
+    ASSERT_EQ(after.count, before.count + 1);
+    EXPECT_EQ(after.widgets[after.count - 1].w, 1);
+    EXPECT_EQ(after.widgets[after.count - 1].h, 1);
+    storage::LayoutStore x3(paths, "x3");
+    ASSERT_EQ(x3.load(), storage::LayoutSource::Current);
+    HomePage text;
+    ASSERT_TRUE(x3.project(0, text));
+    EXPECT_EQ(text.count, 3);
+    LayoutEdit move;
+    move.kind = LayoutEditKind::Geometry;
+    move.revision = after.revision;
+    move.count = after.count;
+    move.index = after.count - 1;
+    for (unsigned i = 0; i < after.count; ++i) {
+      const auto& tile = after.widgets[i];
+      move.geometry[i] = {tile.x, tile.y, tile.w, tile.h};
+    }
+    move.geometry[move.index].x = 1;
+    ASSERT_EQ(store.edit(worker, move), LayoutEditStatus::Saved);
+    ASSERT_TRUE(store.project(0, after));
+    EXPECT_EQ(after.widgets[after.count - 1].x, 1);
+    LayoutEdit remove;
+    remove.kind = LayoutEditKind::Remove;
+    remove.revision = after.revision;
+    remove.index = after.count - 1;
+    ASSERT_EQ(store.edit(worker, remove), LayoutEditStatus::Saved);
+    ASSERT_TRUE(store.project(0, after));
+    EXPECT_EQ(after.count, before.count);
+  }
 }
