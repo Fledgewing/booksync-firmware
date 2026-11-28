@@ -132,8 +132,7 @@ bool DownloadJobs::save() {
   storage::FilePublish publish(journal_, recordValid);
   return publish.begin(JournalBytes) && publish.write(buffer_.data(), JournalBytes) && publish.finish();
 }
-bool DownloadJobs::setPaths() {
-  const auto& s = record_.spec;
+bool DownloadJobs::accepts(const DownloadSpec& s) const {
   if (!text(s.server) || !text(s.account) || !text(s.book) || !text(s.file) || !text(s.variant, false) ||
       !text(s.path) || !storage::valid(s.identity) || (s.sizeKnown && (!s.bytes || s.bytes > MaxBytes)))
     return false;
@@ -149,6 +148,12 @@ bool DownloadJobs::setPaths() {
   if (n < 5 || std::strcmp(p + n - 5, ".epub")) return false;
   if (!std::strcmp(p, journal_.current) || !std::strcmp(p, journal_.staging) || !std::strcmp(p, journal_.backup))
     return false;
+  return true;
+}
+bool DownloadJobs::setPaths(const DownloadSpec& s) {
+  if (!accepts(s)) return false;
+  const char* p = s.path.data();
+  const size_t n = std::strlen(p);
   std::memcpy(staging_.data(), p, n);
   std::memcpy(staging_.data() + n, ".tmp", 5);
   std::memcpy(backup_.data(), p, n);
@@ -178,8 +183,8 @@ bool DownloadJobs::recover(storage::ScopeView scope, DeliveryTicket current) {
     }
     const bool read = file.read(buffer_.data(), JournalBytes) == static_cast<int>(JournalBytes);
     const bool closed = file.close();
-    if (!read || !closed || !codec(false) || !setPaths() || !text(record_.validator, false) || !record_.id ||
-        record_.canceled > 1 || !scopeMatches(record_.spec, scope)) {
+    if (!read || !closed || !codec(false) || !setPaths(record_.spec) || !text(record_.validator, false) ||
+        !record_.id || record_.canceled > 1 || !scopeMatches(record_.spec, scope)) {
       LOG_ERR("BSD", "Download journal scope/record rejected");
       return false;
     }
@@ -276,28 +281,30 @@ uint64_t DownloadJobs::start(const DownloadSpec& spec, DownloadSource& source, D
   // Never replace a paused run implicitly. Resume must name that run.
   if (status_.id && sameSelection(record_.spec, spec) && status_.state != DownloadState::Canceled) return status_.id;
   if (status_.id && status_.state != DownloadState::Complete && status_.state != DownloadState::Canceled) return 0;
-  if (!text(spec.server) || !text(spec.account) || spec.server != record_.spec.server ||
-      spec.account != record_.spec.account || record_.id == std::numeric_limits<uint64_t>::max())
+  if (!accepts(spec) || spec.server != record_.spec.server || spec.account != record_.spec.account ||
+      record_.id == std::numeric_limits<uint64_t>::max()) {
+    LOG_ERR("BSD", "Invalid download selection rejected");
     return 0;
+  }
   if (!admit()) return 0;
+  setPaths(spec);
+  // A rejected request never claims another file's staging or poisons the last
+  // job. Keep its identity and allow a different resolved destination to retry.
+  if (Storage.exists(staging_.data()) || Storage.exists(backup_.data())) {
+    LOG_ERR("BSD", "Unowned download staging/backup retained");
+    setPaths(record_.spec);
+    settle(status_.state);
+    return 0;
+  }
   const auto id = record_.id + 1;
   record_ = {};
   record_.id = id;
   record_.spec = spec;
   status_ = {};
   status_.id = id;
-  if (!setPaths() || !ports_.freeBytes || !ports_.link) {
-    fail(DownloadError::Invalid);
-    return 0;
-  }
-  // A new journal must not claim an unrelated pre-existing staging/backup file.
-  if (Storage.exists(staging_.data()) || Storage.exists(backup_.data())) {
-    fail(DownloadError::StorageFailure);
-    return 0;
-  }
   if (!save()) {
     fail(DownloadError::StorageFailure);
-    return 0;
+    return id;
   }
   begin(source);
   return id;
@@ -357,7 +364,7 @@ bool DownloadJobs::begin(DownloadSource& source) {
   }
   status_.received = reply_.offset;
   status_.totalKnown = record_.spec.sizeKnown || reply_.sizeKnown;
-  status_.total = record_.spec.sizeKnown ? record_.spec.bytes : reply_.bytes;
+  status_.total = record_.spec.sizeKnown ? record_.spec.bytes : (reply_.sizeKnown ? reply_.bytes : 0);
   const auto remaining = status_.totalKnown
                              ? (status_.received <= status_.total ? status_.total - status_.received : MaxBytes + 1)
                              : Chunk;
@@ -367,6 +374,10 @@ bool DownloadJobs::begin(DownloadSource& source) {
     return false;
   }
   record_.validator = reply_.validator;
+  if (!record_.spec.sizeKnown && reply_.sizeKnown) {
+    record_.spec.bytes = reply_.bytes;
+    record_.spec.sizeKnown = true;
+  }
   if (!save()) {
     fail(DownloadError::StorageFailure);
     return false;

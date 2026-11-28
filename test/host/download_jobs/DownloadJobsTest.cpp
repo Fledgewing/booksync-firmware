@@ -27,7 +27,7 @@ struct DownloadTest : testing::Test {
     DownloadSpec selected{};
     uint64_t position = 0, requested = 0;
     unsigned opens = 0, reads = 0;
-    bool wrongEdition = false, decline = false, badRange = false, badDigest = false, authorized = true;
+    bool wrongEdition = false, decline = false, badRange = false, badDigest = false, authorized = true, known = true;
     bool open(const DownloadSpec& s, uint64_t offset, const char*, DownloadReply& r) override {
       ++opens;
       selected = s;
@@ -38,7 +38,7 @@ struct DownloadTest : testing::Test {
       if (wrongEdition) ++r.identity.edition.bytes[0];
       r.offset = badRange ? offset + 1 : position;
       r.bytes = 3;
-      r.sizeKnown = true;
+      r.sizeKnown = known;
       std::strcpy(r.validator.data(), "strong-revision");
       return authorized;
     }
@@ -115,6 +115,23 @@ TEST_F(DownloadTest, PausedCancellationDoesNoStorageWorkWhileReading) {
   admission.setReading(false);
   j.cancel(id, owner);
   EXPECT_EQ(j.result(id, owner), DeliveryResult::Canceled);
+}
+TEST_F(DownloadTest, InvalidSelectionAndUnownedStagingDoNotPoisonRetry) {
+  DownloadJobs j(journal, admission, ports);
+  ASSERT_TRUE(j.recover(scope, owner));
+  std::strcpy(spec.path.data(), "/books/../book.epub");
+  EXPECT_EQ(j.start(spec, source, owner), 0u);
+  EXPECT_EQ(source.opens, 0u);
+  std::strcpy(spec.path.data(), "/books/book.epub");
+  card.files["/books/book.epub.tmp"] = "unrelated";
+  EXPECT_EQ(j.start(spec, source, owner), 0u);
+  EXPECT_EQ(source.opens, 0u);
+  EXPECT_EQ(card.files["/books/book.epub.tmp"], "unrelated");
+  std::strcpy(spec.path.data(), "/books/other.epub");
+  const auto id = j.start(spec, source, owner);
+  ASSERT_NE(id, 0u);
+  complete(j);
+  EXPECT_EQ(j.result(id, owner), DeliveryResult::Ready);
 }
 TEST_F(DownloadTest, WrongDigestNeverPublishes) {
   source.badDigest = true;
@@ -276,11 +293,26 @@ TEST_F(DownloadTest, MidStreamSpaceAndShortWriteRetainRecoverablePartial) {
 TEST_F(DownloadTest, UnknownLengthReportsBytesWithoutInventedTotal) {
   spec.sizeKnown = false;
   spec.bytes = 0;
+  source.known = false;
   DownloadJobs j(journal, admission, ports);
   ASSERT_TRUE(j.recover(scope, owner));
   auto id = j.start(spec, source, owner);
+  j.tick(owner);
+  EXPECT_FALSE(j.status(owner).totalKnown);
+  EXPECT_EQ(j.status(owner).received, 1u);
   complete(j);
   EXPECT_EQ(j.result(id, owner), DeliveryResult::Ready);
+}
+TEST_F(DownloadTest, CancelAfterPublishPreservesCompleteBytesWithoutOpening) {
+  DownloadJobs j(journal, admission, ports);
+  ASSERT_TRUE(j.recover(scope, owner));
+  const auto id = j.start(spec, source, owner);
+  for (unsigned i = 0; i < 4; ++i) j.tick(owner);
+  ASSERT_EQ(j.status(owner).state, DownloadState::Linking);
+  j.cancel(id, owner);
+  EXPECT_EQ(j.result(id, owner), DeliveryResult::Canceled);
+  EXPECT_EQ(card.files[spec.path.data()], "abc");
+  EXPECT_EQ(links, 0u);
 }
 TEST_F(DownloadTest, ForeignScopeAndTraversalAreRejected) {
   {
@@ -367,7 +399,7 @@ namespace {
 struct HttpDownloadTest : DownloadTest {
   struct Transport : booksync::server::DownloadTransport {
     booksync::server::DownloadHeaders headers{};
-    unsigned closes = 0;
+    unsigned closes = 0, opens = 0;
     bool finishOk = true;
     bool resolve(const DownloadSpec& spec, booksync::server::DownloadTarget& out) override {
       out.identity = spec.identity;
@@ -375,6 +407,7 @@ struct HttpDownloadTest : DownloadTest {
       return true;
     }
     bool open(const char*, uint64_t, const char*, booksync::server::DownloadHeaders& out) override {
+      ++opens;
       out = headers;
       return true;
     }
@@ -404,6 +437,18 @@ TEST_F(HttpDownloadTest, ExactRangeAndStrongValidatorRequired) {
   std::strcpy(transport.headers.contentRange.data(), "bytes 1-2/3");
   std::strcpy(transport.headers.etag.data(), "W/\"revision\"");
   EXPECT_FALSE(source.open(spec, 1, "\"revision\"", reply));
+}
+TEST_F(HttpDownloadTest, CompleteStagingUsesFreshExactResolutionWithoutBody) {
+  booksync::server::Download source(transport);
+  DownloadReply reply;
+  ASSERT_TRUE(source.open(spec, 3, "\"revision\"", reply));
+  EXPECT_EQ(transport.opens, 0u);
+  EXPECT_EQ(reply.offset, 3u);
+  char byte;
+  EXPECT_EQ(source.read(&byte, 1), 0);
+  EXPECT_TRUE(source.finish());
+  source.close();
+  EXPECT_FALSE(source.finish());
 }
 TEST_F(HttpDownloadTest, RedirectAuthAndMalformedRangesRejected) {
   booksync::server::Download source(transport);

@@ -39,6 +39,6 @@ class Download final : public DownloadSource {
   DownloadTarget target_{};
   DownloadHeaders headers_{};
   uint64_t expected_ = 0, received_ = 0;
-  bool opened_ = false, known_ = false;
+  bool opened_ = false, known_ = false, metadataOnly_ = false;
 };
 }  // namespace booksync::server

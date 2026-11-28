@@ -48,6 +48,17 @@ bool Download::open(const DownloadSpec& spec, uint64_t offset, const char* valid
   if (path[0] != '/' || path[1] == '/' || std::strchr(path, '\\') || std::strchr(path, '#')) return false;
   for (const auto* p = path; *p; ++p)
     if (static_cast<unsigned char>(*p) <= 0x20 || *p == 0x7f) return false;
+  // A fully retained, worker-hashed staging file needs fresh exact-selection
+  // authorization, not an impossible Range starting one byte past EOF.
+  if (spec.sizeKnown && offset && offset == spec.bytes && strong(validator, 128)) {
+    metadataOnly_ = true;
+    reply.identity = target_.identity;
+    reply.offset = offset;
+    reply.bytes = spec.bytes;
+    reply.sizeKnown = true;
+    std::memcpy(reply.validator.data(), validator, std::strlen(validator) + 1);
+    return true;
+  }
   if (offset && !strong(validator, 128)) offset = 0;
   opened_ = true;  // Failed opens may still own a client.
   if (!transport_.open(path, offset, offset ? validator : "", headers_)) {
@@ -83,6 +94,7 @@ bool Download::open(const DownloadSpec& spec, uint64_t offset, const char* valid
   return true;
 }
 int Download::read(void* bytes, size_t capacity) {
+  if (metadataOnly_) return 0;
   if (!opened_) return -1;
   const int n = transport_.read(bytes, capacity);
   if (n < 0 || n > int(capacity) || (known_ && (received_ > expected_ || uint64_t(n) > expected_ - received_)))
@@ -90,10 +102,13 @@ int Download::read(void* bytes, size_t capacity) {
   received_ += n;
   return n;
 }
-bool Download::finish() { return opened_ && (!known_ || received_ == expected_) && transport_.finish(); }
+bool Download::finish() {
+  return metadataOnly_ || (opened_ && (!known_ || received_ == expected_) && transport_.finish());
+}
 void Download::close() {
   if (opened_) transport_.close();
   opened_ = false;
+  metadataOnly_ = false;
 }
 }  // namespace booksync::server
 extern "C" bool booksync_download_adapter_link_anchor(booksync::server::Download& source,

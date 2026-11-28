@@ -63,7 +63,8 @@ class DownloadJobs {
   bool begin(DownloadSource&);
   bool verify(FsFile&);
   bool verifyPath(const char*);
-  bool setPaths();
+  bool accepts(const DownloadSpec&) const;
+  bool setPaths(const DownloadSpec&);
   void settle(DownloadState, DownloadError = DownloadError::None);
   void fail(DownloadError);
   static bool recordValid(FsFile&, void*);

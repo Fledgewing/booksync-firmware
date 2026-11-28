@@ -27,7 +27,9 @@ must use bounded I/O timeouts and be drained before display ownership is returne
 
 Boot recovery only reads. A run pauses until explicit Resume, keeping the same
 path and canonical selection. A strong validator permits exact-offset recovery;
-a full response restarts staging. Link retry reuses complete verified bytes.
+a full response restarts staging. A fully retained verified staging file only
+revalidates the exact selection instead of requesting a Range past EOF. Link
+retry reuses complete verified bytes.
 Cancel durably revokes the intent before removing only staging. Completion races
 with Cancel leave a saved complete file but never authorize opening it.
 
