@@ -74,7 +74,10 @@ void CoverJobs::settle(bool ready) {
   if (source_) source_->close();
   source_ = nullptr;
   if (file_) {
-    if (!file_.close()) ready = false;
+    if (!file_.close()) {
+      LOG_ERR("BSC", "Cover staging close failed");
+      ready = false;
+    }
   }
   cache_[slot_].ready = ready;
   pending_ = false;
@@ -158,6 +161,7 @@ void CoverJobs::tick(DeliveryTicket t) {
   // borrows one reused JPEGDEC workspace; no framebuffer/whole image allocation.
   const bool flushed = file_.sync();
   const bool closed = file_.close();
+  if (!flushed || !closed) LOG_ERR("BSC", "Cover staging flush/close failed");
   const bool decoded =
       flushed && closed &&
       decoder_.decode(

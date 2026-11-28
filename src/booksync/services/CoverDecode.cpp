@@ -93,7 +93,7 @@ bool CoverDecode::decode(const char* path, CoverBitmap& out, bool (*permitted)(v
   const auto size = file.fileSize();
   if (!size || size > MaxInput || !baseline(file, static_cast<uint32_t>(size))) {
     file.close();
-    LOG_ERR("BSC", "Cover input size rejected");
+    LOG_ERR("BSC", "Cover input/header rejected");
     return false;
   }
   const bool opened = decoder_.open(&file, static_cast<int>(size), closeJpeg, readJpeg, seekJpeg, draw);
