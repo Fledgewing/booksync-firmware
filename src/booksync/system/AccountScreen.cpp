@@ -21,7 +21,7 @@ class ServiceChoiceActivity final : public Activity {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
     const int height = renderer.getLineHeight(UI_10_FONT_ID) * 2 + 28;
-    return {safe.x + 20, header.y + header.height + 110 + index * (height + 12), safe.width - 40, height};
+    return Rect{safe.x + 20, header.y + header.height + 110 + index * (height + 12), safe.width - 40, height};
   }
   const char* label(uint8_t index) const {
     if (index == 0) return choice.view().serviceLabel[0] ? choice.view().serviceLabel.data() : tr(STR_HOME_UNAVAILABLE);
