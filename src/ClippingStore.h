@@ -201,6 +201,13 @@ class ClippingStore {
   static bool acknowledgeDeletions(const std::string& path, const std::string& scope);
   static bool mergeFromSync(const std::string& path, const Clipping& clipping, const std::string& text,
                             const std::string& key, bool deleted, bool* full = nullptr);
+  // Closed-file worker transaction. Caller excludes the reader and proves the
+  // exact source/account. Only an already scoped exact key can match; legacy
+  // records/deletions are preserved. NP1: keys occupy a distinct namespace from
+  // old connector keys. No producer observation or upload binding.
+  // barrier must durably flush the parent directory/volume, including renames.
+  static bool applyProjection(const std::string& path, const Clipping&, const std::string& text, const std::string& key,
+                              bool deleted, bool (*barrier)(const char*));
   static bool hasAnyClippings();
   static bool getAllClippedBooks(std::vector<ClippedBookEntry>& out);
   enum class ClippedBookStep : uint8_t { Book, Skip, Done, Error };
@@ -248,6 +255,8 @@ class ClippingStore {
     const std::string* key = nullptr;
     const std::string* sourcePath = nullptr;
     UploadBinding* binding = nullptr;
+    bool notify = true;
+    bool (*barrier)(const char*) = nullptr;
   };
   bool writeToFile(const Rewrite& rewrite);
 };

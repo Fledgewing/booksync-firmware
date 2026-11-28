@@ -42,12 +42,30 @@ struct AnnotationCapture {
   bool enabled = true, legacyEnabled = true;
   bool native = false, closed = false, present = false, syncKnown = false;
 };
+// Frozen SD captures can contain large values and a complete 1024-key set.
+// at(0) rewinds; later reads are sequential. One record is reused and its views
+// survive only until the next at(). Arrays remain supported for small sources.
+class AnnotationRowReader {
+ public:
+  virtual ~AnnotationRowReader() = default;
+  virtual const AnnotationRow* at(size_t index) = 0;
+};
+class AnnotationKeyReader {
+ public:
+  virtual ~AnnotationKeyReader() = default;
+  virtual const AnnotationKey* at(size_t index) = 0;
+};
 struct AnnotationBatch {
   const AnnotationRow* changes = nullptr;
   size_t count = 0;
   const AnnotationKey* keys = nullptr;
   size_t keyCount = 0;
   bool last = true;
+  AnnotationRowReader* rowReader = nullptr;
+  AnnotationKeyReader* keyReader = nullptr;
+  // Distinguish a known-empty first snapshot from omitted keys on a later
+  // exchange round, including when there were no outgoing rows to move cursor.
+  bool keysIncluded = true;
 };
 // Large server push-downs are spooled/decoded through one reusable record.
 // at(0) rewinds; subsequent calls are sequential. No full response allocation.

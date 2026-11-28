@@ -31,7 +31,8 @@ if 'simulator' not in env['PIOENV']:
     env.Append(LINKFLAGS=['-Wl,--undefined=booksync_update_pick_link',
                           '-Wl,--undefined=booksync_position_link',
                           '-Wl,--undefined=booksync_native_evidence_link',
-                          '-Wl,--undefined=booksync_native_application_link'])
+                          '-Wl,--undefined=booksync_native_application_link',
+                          '-Wl,--undefined=booksync_annotation_application_link'])
 if tag:
     # Artifact copying only. This hook has no release/feed publishing capability.
     import shutil

@@ -826,6 +826,91 @@ bool ClippingStore::mergeFromSync(const std::string& path, const Clipping& clipp
   return store.writeToFile({.index = store.clippings.size() - 1, .text = &text, .key = &key});
 }
 
+bool ClippingStore::applyProjection(const std::string& path, const Clipping& clipping, const std::string& text,
+                                    const std::string& key, const bool deleted, bool (*barrier)(const char*)) {
+  if (path.empty() || path.front() != '/' || path.size() > 1024 || path.find('\0') != path.npos || !barrier ||
+      !key.starts_with("NP1:") || key.size() <= SCOPE_BYTES || key.size() > SCOPE_BYTES + MAX_ID_BYTES ||
+      key.find('\0') != key.npos ||
+      (!deleted && (!clippingHasSourceRange(clipping) || text.size() > CLIPPING_TEXT_MAX))) {
+    LOG_ERR("CLIP", "Invalid closed projection");
+    return false;
+  }
+  // Native reading owns old-format upgrades. In particular, v5 deletion IDs
+  // have no owner and its normal reader loader intentionally discards them;
+  // projection must never trigger that migration or reinterpret those bytes.
+  const auto destination = storeFilePathForBook(path, "epub");
+  const auto candidate = Storage.exists(destination.c_str()) ? destination : destination + ".bak";
+  if (Storage.exists(candidate.c_str())) {
+    FsFile existing;
+    if (!Storage.openFileForRead("CLIP", candidate, existing)) return false;
+    uint8_t version = 0;
+    const bool current = serialization::tryReadPod(existing, version) && version == VERSION;
+    const bool closed = existing.close();
+    if (!current || !closed) {
+      LOG_ERR("CLIP", "Projection defers native format migration");
+      return false;
+    }
+  }
+  ClippingStore store;
+  if (!loadForSync(path, store, !deleted)) return false;
+  size_t match = SIZE_MAX;
+  // One reader handle, closed before publication. Never consult legacy IDs or
+  // passage matching: equal text cannot acquire ownership of a native record.
+  FsFile source;
+  if (!store.clippings.empty() && !Storage.openFileForRead("CLIP", store.storeFilePath, source)) return false;
+  std::string saved;
+  bool valid = true;
+  for (size_t i = 0; i < store.clippings.size(); ++i) {
+    const auto& row = store.clippings[i];
+    if (!row.scoped) continue;
+    if (!readStoredKey(source, row, saved)) {
+      valid = false;
+      break;
+    }
+    if (saved != key) continue;
+    if (match != SIZE_MAX) {
+      valid = false;  // Ambiguity never authorizes a destructive update.
+      break;
+    }
+    match = i;
+  }
+  source.close();
+  if (!valid) {
+    LOG_ERR("CLIP", "Ambiguous or unreadable closed projection key");
+    return false;
+  }
+  if (deleted) {
+    if (match == SIZE_MAX) return barrier(store.storeFilePath.c_str());
+    store.clippings.erase(store.clippings.begin() + match);
+    return store.writeToFile({.notify = false, .barrier = barrier});
+  }
+  if (match == SIZE_MAX && (text.empty() || store.clippings.size() == CLIPPING_MAX_PER_BOOK)) {
+    LOG_ERR("CLIP", "Closed projection has no passage or record capacity");
+    return false;
+  }
+  auto next = clipping;
+  next.scoped = next.uploaded = true;
+  next.layoutSignature = 0;
+  next.tableSelection = UINT16_MAX;
+  next.chapterTitle[CLIPPING_CHAPTER_TITLE_MAX - 1] = '\0';
+  if (match != SIZE_MAX) {
+    const auto& previous = store.clippings[match];
+    next.textOffset = previous.textOffset;
+    next.textLength = text.empty() ? previous.textLength : static_cast<uint16_t>(text.size());
+    next.syncKeyLength = previous.syncKeyLength;
+    store.clippings[match] = next;
+  } else {
+    next.textLength = static_cast<uint16_t>(text.size());
+    match = store.clippings.size();
+    if (!store.clippings.push_back(next)) {
+      LOG_ERR("CLIP", "Cannot allocate closed projection index");
+      return false;
+    }
+  }
+  return store.writeToFile(
+      {.index = match, .text = text.empty() ? nullptr : &text, .key = &key, .notify = false, .barrier = barrier});
+}
+
 bool ClippingStore::writeToFile(const Rewrite& rewrite) {
   if (storeFilePath.empty() || bookTitle.size() > MAX_HEADER_FIELD_BYTES ||
       bookAuthor.size() > MAX_HEADER_FIELD_BYTES || bookFilePath.size() > MAX_HEADER_FIELD_BYTES) {
@@ -964,6 +1049,10 @@ bool ClippingStore::writeToFile(const Rewrite& rewrite) {
   }
   if (source) source.close();
 
+  if (rewrite.barrier && !rewrite.barrier(storeFilePath.c_str())) {
+    LOG_ERR("CLIP", "Projection staging barrier failed");
+    return false;
+  }
   const bool replacingDestination = Storage.exists(storeFilePath.c_str());
   if (replacingDestination && !Storage.rename(storeFilePath.c_str(), backupPath.c_str())) {
     LOG_ERR("CLIP", "Failed to back up clipping file: %s", storeFilePath.c_str());
@@ -976,15 +1065,27 @@ bool ClippingStore::writeToFile(const Rewrite& rewrite) {
     if (replacingDestination) Storage.rename(backupPath.c_str(), storeFilePath.c_str());
     return false;
   }
+  if (rewrite.barrier && !rewrite.barrier(storeFilePath.c_str())) {
+    LOG_ERR("CLIP", "Projection publication barrier failed; backup retained");
+    return false;
+  }
   if (replacingDestination && Storage.exists(backupPath.c_str())) {
-    Storage.remove(backupPath.c_str());
+    const bool retired = Storage.remove(backupPath.c_str());
+    if (rewrite.barrier && !retired) {
+      LOG_ERR("CLIP", "Projection backup retirement failed");
+      return false;
+    }
+  }
+  if (rewrite.barrier && !rewrite.barrier(storeFilePath.c_str())) {
+    LOG_ERR("CLIP", "Projection retirement barrier failed");
+    return false;
   }
   for (uint16_t i = 0; i < count; ++i) {
     clippings[i].textOffset = newTextOffsets[i];
     if (rewrite.binding && needsSyncKey(clippings[i])) clippings[i].scoped = clippings[i].uploaded = true;
     clippings[i].syncKeyLength = newKeyLengths[i];
   }
-  native_reader_observer::published("highlights", bookFilePath, storeFilePath.c_str());
+  if (rewrite.notify) native_reader_observer::published("highlights", bookFilePath, storeFilePath.c_str());
   return true;
 }
 

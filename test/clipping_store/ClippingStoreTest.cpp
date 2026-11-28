@@ -6,6 +6,7 @@
 #include <new>
 
 #include "ClippingStore.h"
+#include "activities/reader/NativeReaderObserver.h"
 #include "activities/reader/ReadingStatsUtils.h"
 
 namespace {
@@ -40,7 +41,7 @@ std::string bytes(const std::string& name) {
   return {v.begin(), v.end()};
 }
 std::string fixture(uint8_t version = 7, uint16_t count = 2, uint32_t sourceStart = UINT32_MAX,
-                    uint32_t sourceEnd = UINT32_MAX) {
+                    uint32_t sourceEnd = UINT32_MAX, bool scopedRecords = true) {
   std::string out;
   pod(out, version);
   pod(out, count);
@@ -62,8 +63,8 @@ std::string fixture(uint8_t version = 7, uint16_t count = 2, uint32_t sourceStar
       pod(out, sourceEnd);
     }
     if (version >= 5) {
-      string(out, version >= 6 ? "0123456789abcdefexisting" : "legacy");
-      pod(out, uint8_t(version >= 6 ? 3 : 1));
+      string(out, version >= 6 && scopedRecords ? "0123456789abcdefexisting" : "legacy");
+      pod(out, uint8_t(version >= 6 && scopedRecords ? 3 : 1));
     }
     out.append(CLIPPING_CHAPTER_TITLE_MAX, '\0');
     if (version == 1)
@@ -93,6 +94,76 @@ void cannotMutate(const std::string& original) {
 }
 }  // namespace
 int main() {
+  const auto barrier = +[](const char*) { return true; };
+  // Closed-file projections are exact-key transactions. Legacy records and
+  // deletion queues are preserved, never adopted by matching passage text.
+  {
+    reset();
+    fake::add(path(), fixture(7, 1, UINT32_MAX, UINT32_MAX, false));
+    unsigned notifications = 0;
+    static unsigned* observed = nullptr;
+    observed = &notifications;
+    native_reader_observer::artifact = [](std::string_view, std::string_view, const char*, bool) { ++*observed; };
+    Clipping incoming{};
+    incoming.sourceStart = 20;
+    incoming.sourceEnd = 40;
+    incoming.timestamp = 1700000000;
+    const std::string key = "NP1:opaque-account-one:row-one";
+    assert(ClippingStore::applyProjection(BOOK, incoming, "passage", key, false, barrier));
+    assert(notifications == 0);
+    assert(load() && store.clippingCount() == 2);
+    assert(!store.clippingAt(0)->scoped && store.clippingAt(1)->scoped);
+    const auto first = bytes(path());
+    store.unload();
+    assert(ClippingStore::applyProjection(BOOK, incoming, "passage", key, false, barrier));
+    assert(bytes(path()) == first);
+    incoming.sourceStart = 25;
+    incoming.sourceEnd = 45;
+    assert(ClippingStore::applyProjection(BOOK, incoming, "changed", key, false, barrier));
+    assert(load() && store.clippingCount() == 2);
+    std::string text;
+    assert(store.readClippingText(0, text) && text == "passage");
+    assert(store.readClippingText(1, text) && text == "changed");
+    assert(store.clippingAt(1)->sourceStart == 25);
+    store.unload();
+    std::string deletion;
+    bool done = false;
+    assert(ClippingStore::readDeletionForUpload(BOOK, 0, deletion, done) && !done &&
+           deletion == "0123456789abcdefdeleted");
+    assert(ClippingStore::applyProjection(BOOK, incoming, "", key, true, barrier));
+    assert(ClippingStore::applyProjection(BOOK, incoming, "", key, true, barrier));
+    assert(load() && store.clippingCount() == 1 && !store.clippingAt(0)->scoped);
+    assert(notifications == 0);
+    store.unload();
+    const auto before = bytes(path());
+    failArray = true;
+    assert(!ClippingStore::applyProjection(BOOK, incoming, "new", key, false, barrier));
+    assert(bytes(path()) == before);
+    assert(!ClippingStore::applyProjection(BOOK, incoming, "new", "", false, barrier));
+    assert(!ClippingStore::applyProjection(BOOK, incoming, "new", std::string(256, 'x'), false, barrier));
+    assert(!ClippingStore::applyProjection(BOOK, incoming, "new", std::string("a\0b", 3), false, barrier));
+    assert(!ClippingStore::applyProjection(BOOK, incoming, "new", "0123456789abcdefexisting", false, barrier));
+    assert(!ClippingStore::applyProjection(BOOK, incoming, "new", key, false, nullptr));
+    for (unsigned failure : {1u, 2u, 3u}) {
+      reset();
+      fake::add(path(), fixture(7, 1, UINT32_MAX, UINT32_MAX, false));
+      static unsigned at = 0, failAt = 0;
+      at = 0;
+      failAt = failure;
+      const auto failBarrier = +[](const char*) { return ++at != failAt; };
+      assert(!ClippingStore::applyProjection(BOOK, incoming, "new", key, false, failBarrier));
+      assert(ClippingStore::applyProjection(BOOK, incoming, "new", key, false, barrier));
+      assert(load() && store.clippingCount() == 2);
+      store.unload();
+    }
+    native_reader_observer::artifact = nullptr;
+    reset();
+    const auto old = fixture(5, 1);
+    fake::add(path(), old);
+    assert(!ClippingStore::applyProjection(BOOK, incoming, "new", key, false, barrier));
+    assert(bytes(path()) == old);
+    reset();
+  }
   // Every readable version still loads and rewrites in CrossInk's v7 format.
   for (uint8_t version = 1; version <= 7; ++version) {
     reset();

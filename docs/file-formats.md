@@ -22,8 +22,44 @@ Nearby. Existing stats/cache versions stay unchanged; no cache reset is needed.
 
 ## Bookmark file safety
 
-Bookmark files under `/.crosspoint/bookmarks/` retain their existing binary
-versions (2–5). No format bump or cache reset is required.
+Bookmark files under `/.crosspoint/bookmarks/` read versions 2–6. Version 6
+retains the version 5 fields, adds an eight-byte native mutation version to
+the header, then appends a 16-byte opaque row UUID to each record. No EPUB cache reset is required. Older readers that
+do not understand version 6 refuse the file rather than migrate it backwards.
+
+The header is one version byte, a little-endian `uint16_t` count, then title,
+author and book path as three length-prefixed strings (`uint32_t` byte length),
+then a little-endian `uint64_t` native mutation version. Bound native user writes
+advance this version, saturating at its maximum; remote projections preserve it.
+A tracked store retains an empty count-zero file after deletion, so replay can
+detect a later native deletion even when no rows remain. These markers are hidden
+from bookmark lists and do not consume the active-book scan limit. The in-memory
+record buffer does not grow. Unbound stores retain their existing deletion behavior.
+Version 6 records are 140 bytes:
+
+| Offset | Bytes | Value |
+|---:|---:|---|
+| 0 | 2 | Native spine index |
+| 2 | 4 | Native progress float |
+| 6 | 4 | Existing timestamp field, with unchanged semantics |
+| 10 | 48 | Native chapter title |
+| 58 | 2 | Native paragraph anchor |
+| 60 | 64 | Native snippet |
+| 124 | 16 | Opaque row UUID; all zero means unbound |
+
+An optional bound-session issuer supplies independent UUIDs only for new native
+actions. A missing or failed issuer leaves the new row local. Existing version 5
+files are not rewritten merely by loading; an explicit native mutation writes
+version 6 and preserves old rows as zero UUIDs. Loading older versions retains
+their existing native migration behavior. Equal coordinates or text never mint
+ownership. Removing and re-adding the same visible bookmark creates a new UUID.
+Native saves and four-source rename/rollback retain existing UUID bytes.
+
+Loaded records remain 128 bytes: the two existing alignment gaps hold a 32-bit
+source-file offset/tag, not an identity. The UUID stays on SD and is copied using
+one reusable source reader during publication. A successful write updates offsets;
+a failed write retains the original offsets and recoverable source generation.
+Neither these offsets nor the native file's path/hash are identity evidence.
 
 Writes go to `<file>.tmp`, are checked, synced and closed, then replace the
 primary through the shared atomic-file publisher. `<file>.bak` retains the
@@ -2977,3 +3013,74 @@ Both new codecs and BPS1/BPS2 have an owned read-only inspector at
 integrity/structure and emits only format/size metadata. Original records are
 never rewritten or repaired. The existing F18 checkpoint capacity is unchanged;
 unpersistable phase replies remain pending without truncation or acknowledgement.
+
+## BookSync private annotation record (`BAR1`)
+
+`BAR1` is bounded record framing for immutable native captures, staged remote
+rows and local receipts. Its containing store must separately prove the full
+account/source/entry tuple. A row UUID, origin flag, checksum or local receipt
+does not prove a remote commit or grant ownership of an unbound native row.
+
+All integers are little-endian. The 80-byte header is followed by twelve raw
+byte fields in the order listed below; the total record is at most 32 KiB.
+
+| Offset | Bytes | Value |
+|---:|---:|---|
+| 0 | 4 | `BAR1` |
+| 4 | 4 | Complete record byte length |
+| 8 | 4 | FNV-1a 32-bit checksum of bytes 12 through EOF |
+| 12 | 8 | Server row ID; zero remains unresolved |
+| 20 | 8 | Server version |
+| 28 | 4 | Page value |
+| 32 | 2 | Raw field-presence bitmap, including unknown bits |
+| 34 | 1 | Operation: add 0, edit 1, delete 2 |
+| 35 | 1 | Bit 0: verification pending; other bits reserved |
+| 36 | 16 | Opaque native row UUID; zero remains unbound |
+| 52 | 24 | Twelve `uint16_t` raw field lengths |
+| 76 | 1 | Origin: unknown 0, native 1, remote 2 |
+| 77 | 1 | Bit 0: locally applied; bit 1: verified (requires bit 0) |
+| 78 | 2 | Reserved, zero |
+
+Body fields and maximum byte lengths are datetime 19, updated 19, start 4000,
+end 4000, format 32, drawer 32, color 32, text 10000, note 5000, chapter 500,
+title 500 and key 32. Raw bytes, including unknown locator bytes, are retained
+without conversion. Empty values remain empty; presence flags are independent.
+Delivery and native projection validate supported semantics separately.
+
+Encoding rejects overlapping input/output storage. Decoding rejects truncation,
+trailing bytes, invalid lengths/flags, contradictory receipts and unknown format
+versions without changing its destination. Both borrow caller-owned reusable
+storage rather than allocating raw payloads on task frames. The owned read-only
+inspector at `src/booksync/server/bookorbit/recovery.py` validates this framing
+and reports size metadata without printing raw fields or changing files.
+
+## Frozen annotation captures and complete replies
+
+Private `BAF1` captures and `BAP1` reply spools are immutable, create-only files.
+They are source/account scoped by the complete entry tuple, including independently
+issued book/edition IDs, full source SHA-256, delivery entry, native open, exact
+bound `BSO2` payload and document. Framing never supplies source authority: the
+owner must separately admit the current closed source and account under the sole
+worker's reader/writer exclusion.
+
+The 136-byte little-endian header contains magic (0), total bytes (4), FNV-1a
+checksum over byte 12 onward (8), flags (12, two bytes), annotation kind (14),
+reserved zero (15), entry (16), native open (24), exchange round (32), outgoing
+cursor (40), next cursor (44), row count (48), key count (52), book UUID (56),
+edition UUID (72), revision (88), four string lengths (120, two bytes each), and
+native user mutation version (128). Flag bits 0–5 retain capture policy and bit 6
+is next-done. Kind 0 is highlights; kind 1 is bookmarks.
+
+The body is the server token, account token, bound payload and document, followed
+by complete `BAR1` records and then 51-byte keys (32 lowercase hexadecimal bytes
+and a 19-byte datetime). Captures permit 1,024 rows/keys; replies permit 600 rows
+and no keys. Cursor movement is at most 16, and exchange round is independent of
+cursor so empty outgoing batches can still receive successive replies. One
+caller-owned 32 KiB record workspace is reused. Every record and the whole file
+are validated before publication; no staging file is replay authority. A damaged
+current file does not select a previous backup. The read-only recovery inspector
+streams these files without printing content, identities or scope.
+
+Spool publication is local evidence only. It does not prove a remote commit,
+native application or acknowledgement. Per-row durable projection receipts and
+post-ack cursor retirement belong to the workspace layered above this format.
