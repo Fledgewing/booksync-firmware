@@ -7,6 +7,8 @@
 #include <Logging.h>
 #ifndef SIMULATOR
 #include <Preferences.h>
+#include <esp_attr.h>
+#include <esp_system.h>
 // Suppress ESP-IDF's legacy inline aliases so the core-locked handoff below
 // can call the raw, synchronous lwIP sntp_stop rather than its queued wrapper.
 #define ESP_NETIF_COMPONENT_BUILD
@@ -58,6 +60,46 @@ std::mutex persistedFloorLock;
 std::mutex syncLock;
 int64_t ramFloor = 0;
 portMUX_TYPE ramFloorLock = portMUX_INITIALIZER_UNLOCKED;
+ClockProvenance provenance;
+bool provenanceBooted = false;
+bool syncFloorPending = false;
+#ifndef SIMULATOR
+RTC_DATA_ATTR ClockMarker retainedClock;
+RTC_DATA_ATTR uint32_t retainedClockCheck = 0;
+#else
+ClockMarker retainedClock;
+uint32_t retainedClockCheck = 0;
+#endif
+uint32_t markerCheck(ClockMarker marker) {
+  const auto epoch = static_cast<uint64_t>(marker.verifiedAt);
+  return 0x4253434cu ^ static_cast<uint32_t>(epoch) ^ static_cast<uint32_t>(epoch >> 32) ^
+         (static_cast<uint32_t>(marker.source) * 0x9e3779b9u);
+}
+// Called under ramFloorLock. Only reset cause plus a validated RTC-memory marker
+// can establish retained proof; NVS floor and historical sync flags are excluded.
+void bootProvenance(int64_t running) {
+  if (provenanceBooted) return;
+  bool deepSleep = false;
+#ifndef SIMULATOR
+  deepSleep = esp_reset_reason() == ESP_RST_DEEPSLEEP;
+#endif
+  const bool valid = retainedClockCheck == markerCheck(retainedClock);
+  provenance.boot(deepSleep && valid, retainedClock, running);
+  provenanceBooted = true;
+  retainedClock = provenance.marker();
+  retainedClockCheck = markerCheck(retainedClock);
+}
+void recordSource(bool rtc, int64_t epoch) {
+  portENTER_CRITICAL(&ramFloorLock);
+  bootProvenance(epoch);
+  if (rtc)
+    provenance.rtc(true, epoch);
+  else
+    provenance.sntp(true, epoch);
+  retainedClock = provenance.marker();
+  retainedClockCheck = markerCheck(retainedClock);
+  portEXIT_CRITICAL(&ramFloorLock);
+}
 
 // Raises the in-RAM floor to `value` if higher; returns the resulting floor.
 int64_t raiseFloor(const int64_t value) {
@@ -91,7 +133,14 @@ void writeFloor(int64_t) {}
 #endif
 
 // SNTP sync callback (lwIP task context; Preferences/NVS is mutex-guarded).
-void onTimeSynced(struct timeval*) { note(); }
+void onTimeSynced(struct timeval* synced) {
+  if (synced) recordSource(false, static_cast<int64_t>(synced->tv_sec));
+  // The network callback publishes proof only. Floor persistence is drained by
+  // the foreground runtime or the existing explicit sleep/sync checkpoint.
+  portENTER_CRITICAL(&ramFloorLock);
+  syncFloorPending = true;
+  portEXIT_CRITICAL(&ramFloorLock);
+}
 
 #ifndef SIMULATOR
 esp_err_t clearDnsCache(void*) {
@@ -123,6 +172,7 @@ void configureSntp() {
 
 void init() {
   std::lock_guard<std::mutex> lock(persistedFloorLock);
+  (void)clockStatus();  // Inspect the running clock before any stale floor restore.
   sntp_set_time_sync_notification_cb(&onTimeSynced);
   const int64_t floor = readFloor();
   if (floor < MIN_VALID_EPOCH) return;
@@ -136,6 +186,25 @@ void init() {
 #endif
     LOG_DBG("TIME", "Clock restored to persisted floor");
   }
+}
+
+ClockSource clockStatus() {
+  const int64_t running = static_cast<int64_t>(time(nullptr));
+  portENTER_CRITICAL(&ramFloorLock);
+  bootProvenance(running);
+  const auto source = provenance.status(running);
+  retainedClock = provenance.marker();
+  retainedClockCheck = markerCheck(retainedClock);
+  portEXIT_CRITICAL(&ramFloorLock);
+  return source;
+}
+
+void processSync() {
+  portENTER_CRITICAL(&ramFloorLock);
+  const bool pending = syncFloorPending;
+  syncFloorPending = false;
+  portEXIT_CRITICAL(&ramFloorLock);
+  if (pending) note();
 }
 
 void note() {
@@ -164,9 +233,11 @@ void adopt(const int64_t epoch) {
   if (candidate < raiseFloor(0)) return;  // never rewind below a time we already trust
   raiseFloor(candidate);
   timeval tv = {static_cast<time_t>(candidate), 0};
+  bool adopted = true;
 #ifndef SIMULATOR
-  settimeofday(&tv, nullptr);
+  adopted = settimeofday(&tv, nullptr) == 0;
 #endif
+  if (adopted && epoch >= stored) recordSource(true, candidate);
   if (candidate - readFloor() >= MIN_ADVANCE_SECS) writeFloor(candidate);
 }
 
@@ -203,6 +274,7 @@ bool syncNow(const uint32_t timeoutMs) {
     LOG_ERR("TIME", "NTP sync failed: sync=%s DNS=%s", esp_err_to_name(syncResult), esp_err_to_name(clearResult));
     return false;
   }
+  recordSource(false, static_cast<int64_t>(time(nullptr)));
   note();
   return true;
 #else
@@ -213,7 +285,10 @@ bool syncNow(const uint32_t timeoutMs) {
     delay(100);
   }
   const bool synced = sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED;
-  if (synced) note();
+  if (synced) {
+    recordSource(false, static_cast<int64_t>(time(nullptr)));
+    note();
+  }
   return synced;
 #endif
 }

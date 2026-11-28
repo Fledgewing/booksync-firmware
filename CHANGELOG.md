@@ -4,6 +4,7 @@
 
 - BookSync admits verified updates only at Home after reading, activation recovery and network/display ownership are clear; local boot receipts prove completion or interruption, and previous-version returns require current durable-state compatibility proof. The installer remains offline with fake ports.
 - BookSync Home can create, name and reorder pages on X4 Pro touch and Classic buttons with revision checks and atomic saves. The Pro naming keyboard stays docked at the bottom; X3 page editing remains disabled.
+- BookSync distinguishes live synchronized, accepted RTC and validated deep-sleep time from a stale persisted expiry floor, so bedtime scheduling can wait for a known clock.
 
 - BookSync selects saved personal reading records with stable provider precedence and deterministic picks, and projects local/account reading statistics with explicit coverage and overlap-safe Today watermarks.
 - BookSync Home supports snapped widget movement, supported-size cycling and cancelable carry/drop on X4 Pro touch and Classic buttons, saved as one revision-checked atomic edit.

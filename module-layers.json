@@ -5014,7 +5014,7 @@
     },
     "lib/TrustedTime/TrustedTime.cpp": {
       "role": "retained-library",
-      "rationale": "Native engine/support library; exact include edges retained, not a product-layer escape.",
+      "rationale": "Native engine/support library; exact include edges retained, not a product-layer escape. R1 records live clock proof at the existing SNTP/RTC seam and validates RTC-memory retention against deep-sleep reset cause; no new task, NVS or UI path.",
       "includes": [
         "Arduino.h",
         "Logging.h",
@@ -5023,9 +5023,11 @@
         "cstdio",
         "cstdlib",
         "ctime",
+        "esp_attr.h",
         "esp_netif.h",
         "esp_netif_sntp.h",
         "esp_sntp.h",
+        "esp_system.h",
         "freertos/FreeRTOS.h",
         "lwip/apps/sntp.h",
         "lwip/dns.h",
@@ -5034,8 +5036,9 @@
     },
     "lib/TrustedTime/TrustedTime.h": {
       "role": "retained-library",
-      "rationale": "Native engine/support library; exact include edges retained, not a product-layer escape.",
+      "rationale": "Native engine/support library; exact include edges retained, not a product-layer escape. R1 records live clock proof at the existing SNTP/RTC seam and validates RTC-memory retention against deep-sleep reset cause; no new task, NVS or UI path.",
       "includes": [
+        "ClockProvenance.h",
         "cstdint"
       ]
     },
@@ -7061,7 +7064,7 @@
     },
     "src/activities/ActivityManager.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owns boot/Home routing and offline Home regression coverage; F05 retires native writers while retaining local capture; F06 retains isolated publication probes. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission.",
+      "rationale": "F04 owns boot/Home routing and offline Home regression coverage; F05 retires native writers while retaining local capture; F06 retains isolated publication probes. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission. R1 publishes already established clock provenance before foreground work; no I/O or draw is introduced.",
       "includes": [
         "ActivityManager.h",
         "CrossInkHalFrontlight.h",
@@ -7086,6 +7089,7 @@
         "Xtc.h",
         "algorithm",
         "booksync/system/Bootstrap.h",
+        "booksync/system/ClockRuntime.h",
         "booksync/system/NetworkPhase.h",
         "boot_sleep/SleepActivity.h",
         "components/TouchRegistry.h",
@@ -13301,13 +13305,14 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F35a adds isolated editor HAL/interaction scenario coverage. F18d exercises private state checkpoints, native writeback and durable fake-server restart scenarios. F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change. F23 invokes the opt-in synthetic download/fault/restart scenario before normal boot. F18c adds only the synthetic durable annotation lifecycle scenario entry point. F22 adds offline neutral queries over committed synthetic catalog generations, restart/paging and unsupported coverage. F39 invokes bounded offline personal/stats scenarios with saved page history and normalized fake account snapshots. F37a adds the synthetic account surface paint/epoch/retirement scenario. F18e invokes only the synthetic progress checkpoint/reconciliation scenario under F17 and F15; no native reader change. F24 invokes opt-in real EPUB copy replacement and publication-cut recovery before the unchanged native F08 reflow/reopen harness. B2 synthetic notice capture and neutral dispatch scenario only. F25 adds synthetic bounded cover acquisition and retired-view probes, with no live transport or product presentation.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F35a adds isolated editor HAL/interaction scenario coverage. F18d exercises private state checkpoints, native writeback and durable fake-server restart scenarios. F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change. F23 invokes the opt-in synthetic download/fault/restart scenario before normal boot. F18c adds only the synthetic durable annotation lifecycle scenario entry point. F22 adds offline neutral queries over committed synthetic catalog generations, restart/paging and unsupported coverage. F39 invokes bounded offline personal/stats scenarios with saved page history and normalized fake account snapshots. F37a adds the synthetic account surface paint/epoch/retirement scenario. F18e invokes only the synthetic progress checkpoint/reconciliation scenario under F17 and F15; no native reader change. F24 invokes opt-in real EPUB copy replacement and publication-cut recovery before the unchanged native F08 reflow/reopen harness. B2 synthetic notice capture and neutral dispatch scenario only. F25 adds synthetic bounded cover acquisition and retired-view probes, with no live transport or product presentation. R1 adds an opt-in synthetic clock-proof scenario, never changing the host clock.",
       "includes": [
         "../../test/simulator/AccountScenario.h",
         "../../test/simulator/AccountSurfaceScenario.h",
         "../../test/simulator/ActivationScenario.h",
         "../../test/simulator/CatalogJobsScenario.h",
         "../../test/simulator/CatalogScenario.h",
+        "../../test/simulator/ClockScenario.h",
         "../../test/simulator/CopyJobsScenario.h",
         "../../test/simulator/CoverJobsScenario.h",
         "../../test/simulator/CredentialsScenario.h",
@@ -15605,6 +15610,25 @@
     "src/booksync/services/CoverSource.h": {
       "role": "services",
       "rationale": "F25 bounded post-paint cover acquisition and reusable JPEG decode; public values are path-free, worker selections are scoped and transport remains private to the adapter."
+    },
+    "lib/TrustedTime/ClockProvenance.h": {
+      "role": "retained",
+      "rationale": "R1 pure wall-clock provenance policy; fixed tiny state distinguishes live SNTP/RTC/deep-sleep proof from the retained expiry floor. No product UI, storage or transport dependency.",
+      "includes": [
+        "cstdint"
+      ]
+    },
+    "src/booksync/interface/Clock.h": {
+      "role": "interface",
+      "rationale": "R1 immutable wall-clock provenance published through Library on the main loop. No UI, network callback presentation, storage, timer task or expiry-floor inference."
+    },
+    "src/booksync/system/ClockRuntime.cpp": {
+      "role": "system",
+      "rationale": "R1 immutable wall-clock provenance published through Library on the main loop. No UI, network callback presentation, storage, timer task or expiry-floor inference."
+    },
+    "src/booksync/system/ClockRuntime.h": {
+      "role": "system",
+      "rationale": "R1 immutable wall-clock provenance published through Library on the main loop. No UI, network callback presentation, storage, timer task or expiry-floor inference."
     }
   },
   "generators": {

@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "ClockProvenance.h"
+
 // A monotonic floor under the system clock, for loan-expiry enforcement.
 //
 // The ESP32-C3 keeps time through deep sleep but loses it on power-off, so a
@@ -22,6 +24,13 @@ namespace trustedtime {
 // Restore the persisted floor into the system clock. Call once at boot,
 // before anything reads time().
 void init();
+
+// Wall-clock provenance for reminder scheduling. Independent of trustedNow()'s
+// monotonic expiry floor. Unknown after cold loss until accepted RTC or SNTP.
+ClockSource clockStatus();
+
+// Drain coalesced SNTP floor persistence from the main loop, outside paint.
+void processSync();
 
 // Seed the system clock from a battery-backed RTC epoch. Call at boot, before
 // init(), so init()'s floor restore can veto a lagging RTC. Deep sleep keeps
