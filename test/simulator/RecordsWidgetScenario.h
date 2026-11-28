@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include "booksync/ui/EditorAddRemove.h"
 #include <Logging.h>
 
 #include <cstdio>
@@ -135,6 +136,11 @@ inline bool tick() {
       mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Down));
   }
   if (scene == 11 && !fixture.page.textOnly) {
+    // Add positions differ from persisted kind IDs once legacy Browse is replaced.
+    EditorAddRemove menu(fixture);
+    uint8_t target = 0;
+    while (target < uint8_t(WidgetKind::Count) && menu.editorAddKind(target) != WidgetKind::Records) ++target;
+    if (target == uint8_t(WidgetKind::Count)) std::_Exit(9);
     if (frame == 10)
       mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Right));
     if (frame == 12) {
@@ -153,7 +159,7 @@ inline bool tick() {
     }
     if (frame == 14 || frame == 16)
       mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Down));
-    if (frame >= 22 && frame < 22 + 2 * uint8_t(WidgetKind::Records) && frame % 2 == 0) {
+    if (frame >= 22 && frame < 22 + 2 * target && frame % 2 == 0) {
 #if CROSSINK_APP_CAP_TOUCH
       if (mappedInputManager.hasTouch()) {
         mappedInputManager.simulatorInjectTouchDown(renderer.getScreenWidth() / 2, renderer.getScreenHeight() * 3 / 5);
