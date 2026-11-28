@@ -49,6 +49,10 @@ class FilePublish {
   // Still requires the serialized writer and full validator; true confirms both
   // current bytes and directory durability, without renaming/deleting anything.
   bool confirm();
+  // Restore a complete retained file to a missing native filename after a cut.
+  // Caller holds the same serialized writer/reader exclusion as publication.
+  // Never overwrite an existing destination or remove staging/sidecars.
+  static bool restoreBackup(PublishPaths paths, FileValidator validator, void* context = nullptr);
   static PublishedFile select(PublishPaths paths, FileValidator validator, void* context = nullptr);
 
  private:

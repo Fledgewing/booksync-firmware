@@ -27,6 +27,9 @@ tailnet_service_lease_t tailnet_service_prepare(tailnet_service_job_t job);
 bool tailnet_service_activate(tailnet_service_lease_t lease, bool display_released);
 void tailnet_service_deactivate(tailnet_service_lease_t lease);
 bool tailnet_service_permitted(void);
+// Local recovery gate: no reading, prepared lease or active service. Read-only;
+// the main-loop caller still owns storage/reader-open exclusion.
+bool tailnet_service_idle(void);
 bool tailnet_display_park(void);
 void tailnet_display_unpark(void);
 tailnet_service_job_t tailnet_service_job(void);

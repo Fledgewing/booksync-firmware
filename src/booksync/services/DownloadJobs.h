@@ -15,6 +15,10 @@ struct DownloadPorts {
   // Durable, idempotent identity/path registration. False retains the completed
   // file for explicit link retry without network or another download.
   bool (*link)(void*, const DownloadSpec&);
+  // Mandatory for replacement, ignored for first acquisition. A main-loop
+  // lifetime check, including a loaded book beneath Home/panels. Must perform no
+  // I/O or painting. Caller also excludes reader opens during publication.
+  bool (*replacementClosed)(void*, const char* path) = nullptr;
 };
 class DownloadJobs {
  public:
@@ -35,8 +39,17 @@ class DownloadJobs {
   bool busy() const { return running_ || draining_; }
 
  private:
+  friend class CopyJobs;
+  uint64_t startImpl(const DownloadSpec&, storage::Revision previous, DownloadSource&, DeliveryTicket);
+  bool restoreReplacement(DeliveryTicket);
+  bool restorePrevious();
+  bool retireReplacementBackup();
+  bool replacementClosed() const;
+  bool permitted() const;
+  bool canRecover() const;
   struct Record {
     DownloadSpec spec{};
+    storage::Revision previous{};  // Nonzero only for a verified in-place copy update.
     uint64_t id = 0;
     std::array<char, 128> validator{};
     uint8_t canceled = 0;
@@ -57,14 +70,14 @@ class DownloadJobs {
   uint64_t flushed_ = 0;
   bool artifactOpen_ = false;
   bool running_ = false, draining_ = false, scoped_ = false;
-  static constexpr size_t JournalBytes = 911;
+  static constexpr size_t JournalBytes = 943;
   static_assert(JournalBytes <= Chunk);
   bool codec(bool encode);
   bool save();
   bool same(DeliveryTicket) const;
   bool admit();
   bool begin(DownloadSource&);
-  bool verify(FsFile&);
+  bool verify(FsFile&, bool allowPrevious = false, bool offline = false);
   bool verifyPath(const char*);
   bool accepts(const DownloadSpec&) const;
   bool setPaths(const DownloadSpec&);
@@ -72,6 +85,7 @@ class DownloadJobs {
   void fail(DownloadError);
   static bool recordValid(FsFile&, void*);
   static bool artifactValid(FsFile&, void*);
+  static bool recoveryValid(FsFile&, void*);
 };
 static_assert(sizeof(DownloadJobs) <= 4096);
 }  // namespace booksync

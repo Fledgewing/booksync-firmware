@@ -24,8 +24,9 @@ void publicationCheckpoint() {
 #ifdef SIMULATOR
   // Test-only hard power loss, with no destructors/cleanup. Every publication
   // operation still uses the real simulator HAL and parent-directory barrier.
-  if (std::getenv("BOOKSYNC_ACTIVATION_SCENARIO")) {
-    const char* cut = std::getenv("BOOKSYNC_ACTIVATION_CUT");
+  if (std::getenv("BOOKSYNC_ACTIVATION_SCENARIO") || std::getenv("BOOKSYNC_COPY_JOBS_SCENARIO")) {
+    const char* cut =
+        std::getenv(std::getenv("BOOKSYNC_COPY_JOBS_SCENARIO") ? "BOOKSYNC_COPY_CUT" : "BOOKSYNC_ACTIVATION_CUT");
     if (cut && std::strtoul(cut, nullptr, 10) == checkpointCount) {
       std::fflush(nullptr);
       std::_Exit(86);
@@ -108,6 +109,25 @@ PublishedFile FilePublish::select(PublishPaths paths, FileValidator validator, v
   const bool backup = Storage.exists(paths.backup);
   if (backup && validate(paths.backup, validator, context)) return PublishedFile::Backup;
   return current || backup ? PublishedFile::Unreadable : PublishedFile::Missing;
+}
+bool FilePublish::restoreBackup(PublishPaths paths, FileValidator validator, void* context) {
+  if (!validPaths(paths) || !validator || Storage.exists(paths.current) || !Storage.exists(paths.backup) ||
+      !validate(paths.backup, validator, context)) {
+    LOG_ERR("BSP", "Backup restoration rejected");
+    return false;
+  }
+  publicationCheckpoint();
+  if (!Storage.rename(paths.backup, paths.current)) {
+    LOG_ERR("BSP", "Backup restoration rename failed");
+    return false;
+  }
+  publicationCheckpoint();
+  if (!syncDirectory(paths.current)) {
+    LOG_ERR("BSP", "Backup restoration directory sync failed");
+    return false;
+  }
+  publicationCheckpoint();
+  return true;
 }
 bool FilePublish::begin(size_t expectedBytes) {
   if (active_) {

@@ -53,6 +53,9 @@ class Admission {
   // every token. Failed teardown/restoration is retried on later main-loop ticks.
   bool finish();
   bool permitted() const { return active.load() && !reading.load() && tailnet_service_permitted(); }
+  // Main-loop local-storage check only. Caller holds SD writer/reader exclusion
+  // and shares this Admission with all jobs. Does not lease/activate networking.
+  bool storageIdle() const { return !reading.load() && !owned && tailnet_service_idle(); }
   bool displayReady() const { return !parked.load(); }
   bool busy() const { return owned; }
   bool finishing() const { return draining; }
