@@ -2,6 +2,7 @@
 #include <Logging.h>
 #include <Memory.h>
 
+#include "LayoutGeometry.h"
 #include "LocalLibrary.h"
 #include "NativeHistory.h"
 #include "OfflineLibrary.h"
@@ -42,7 +43,7 @@ struct LocalState {
 };
 static_assert(sizeof(LocalState) <= 28 * 1024);
 // One fallible allocation per Home lifetime, <=28 KiB. These codec/window/history
-// buffers and the <=3 KiB editor splice workspace exceed the task stack; releasing them before reader entry keeps C3
+// buffers and the <=4 KiB editor splice workspace exceed the task stack; releasing them before reader entry keeps C3
 // buffers out of the reader lifetime. HAL owns its bounded directory-handle allocations.
 std::unique_ptr<LocalState> local;
 bool noticeDismissalPending = false;
@@ -122,6 +123,11 @@ class OfflineLibrary final : public Library {
     local->edit = edit;
     local->editResult = {LayoutEditStatus::Pending, edit.revision};
     return CommandStatus::Accepted;
+  }
+  LayoutPreview previewLayout(HomePage draft, uint8_t index, LayoutStep step) const override {
+    if (!local || draft.revision != local->page.revision || draft.page != local->page.page)
+      return {draft, LayoutEditStatus::Stale};
+    return previewGeometry(draft, index, step);
   }
   LayoutEditResult layoutEditResult() const override { return local ? local->editResult : LayoutEditResult{}; }
   void readWindow(LibraryWindow& out) const override {

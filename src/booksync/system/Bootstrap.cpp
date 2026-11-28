@@ -58,7 +58,11 @@ class ShellActivity final : public Activity {
   Rect tileRect(uint8_t index) const {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
-    const auto& pg = widgets->page();
+    const auto& pg =
+#if CROSSINK_APP_CAP_HOME_EDITOR
+        editor.draftPage() ? *editor.draftPage() :
+#endif
+                           widgets->page();
     const auto& p = pg.widgets[index];
     const int top = header.y + header.height + 16;
     const int height = safe.y + safe.height - top - 56;
@@ -239,7 +243,8 @@ class ShellActivity final : public Activity {
   const char* editorLabel(uint8_t row) const {
     using Panel = EditorAddRemove::Panel;
     const auto panel = editor.panel();
-    if (panel == Panel::Selected) return row == 0 ? tr(STR_HOME_REMOVE_WIDGET) : tr(STR_DONE);
+    if (panel == Panel::Selected || panel == Panel::Options)
+      return row == 0 ? tr(STR_HOME_REMOVE_WIDGET) : tr(STR_DONE);
     if (panel == Panel::Reset) return row == 0 ? tr(STR_HOME_KEEP_LAYOUT) : tr(STR_HOME_RESET_LAYOUT);
     if (panel == Panel::Error) return tr(STR_BACK);
     if (panel == Panel::Add)
@@ -250,9 +255,10 @@ class ShellActivity final : public Activity {
   Rect editorHeaderButton(uint8_t index) const {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
-    const int width = (header.width - 24) / 3;
+    const int width = (header.width - 24) / (editor.panel() == EditorAddRemove::Panel::Selected ? 2 : 3);
+    const int height = renderer.getLineHeight(UI_10_FONT_ID) + 12;
     return Rect{header.x + 12 + index * width, header.y + renderer.getLineHeight(BITTER_14_FONT_ID) + 8, width - 4,
-                renderer.getLineHeight(UI_10_FONT_ID) + 12};
+                height < 50 ? 50 : height};
   }
   Rect editorRow(uint8_t index) const {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
@@ -260,6 +266,40 @@ class ShellActivity final : public Activity {
     const int line = renderer.getLineHeight(UI_10_FONT_ID);
     const int height = line + 26;
     return Rect{safe.x + 24, header.y + header.height + line * 3 + 28 + index * height, safe.width - 48, height};
+  }
+  Rect editorMoveButton(uint8_t index) const {
+    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const int width = (safe.width - 16) / 7;
+    return Rect{safe.x + 8 + index * width, safe.y + safe.height - 54,
+                (index == 4 ? safe.width - 16 - index * width : width) - 2, 52};
+  }
+  void paintEditorMoveBar() const {
+    if (mappedInput.hasTouch()) {
+      for (uint8_t i = 0; i < 5; ++i) {
+        const auto r = editorMoveButton(i);
+        renderer.drawRect(r.x, r.y, r.width, r.height, 1, true);
+        if (i < 4) {
+          const int dx = i == 0 ? -1 : i == 3 ? 1 : 0;
+          const int dy = i == 1 ? -1 : i == 2 ? 1 : 0;
+          const int cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+          renderer.drawLine(cx - dx * 10, cy - dy * 10, cx + dx * 10, cy + dy * 10, 2, true);
+          renderer.drawLine(cx + dx * 10, cy + dy * 10, cx + dx * 3 + dy * 7, cy + dy * 3 + dx * 7, 2, true);
+          renderer.drawLine(cx + dx * 10, cy + dy * 10, cx + dx * 3 - dy * 7, cy + dy * 3 - dx * 7, 2, true);
+        } else {
+          char label[48];
+          const auto& tile = editor.draftPage()->widgets[editor.selected()];
+          std::snprintf(label, sizeof(label), tr(STR_HOME_EDIT_NEXT_SIZE_FORMAT), tile.w, tile.h, editor.nextWidth(),
+                        editor.nextHeight());
+          paintFittedText(UI_10_FONT_ID, r.x + 5, r.y + 14, editor.nextWidth() ? label : tr(STR_HOME_EDIT_BLOCKED),
+                          r.width - 10);
+        }
+      }
+    } else {
+      const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+      renderer.fillRect(safe.x + 8, safe.y + safe.height - 54, safe.width - 16, 52, true);
+      renderer.drawText(UI_10_FONT_ID, safe.x + 16, safe.y + safe.height - 52, tr(STR_HOME_EDIT_CARRY_MOVE), false);
+      renderer.drawText(UI_10_FONT_ID, safe.x + 16, safe.y + safe.height - 28, tr(STR_HOME_EDIT_CARRY_DROP), false);
+    }
   }
   void paintEditor() const {
     using Panel = EditorAddRemove::Panel;
@@ -270,8 +310,22 @@ class ShellActivity final : public Activity {
       for (uint8_t i = 0; i < (panel == Panel::Selected ? 2 : 3); ++i) {
         const auto r = editorHeaderButton(i);
         const auto row = panel == Panel::Selected ? i : widgets->page().count + i;
-        renderer.drawRect(r.x, r.y, r.width, r.height, editor.focus() == row ? 3 : 1, true);
+        renderer.drawRect(r.x, r.y, r.width, r.height, panel == Panel::Select && editor.focus() == row ? 3 : 1, true);
         paintFittedText(UI_10_FONT_ID, r.x + 5, r.y + 4, editorLabel(row), r.width - 10);
+      }
+      if (panel == Panel::Selected) {
+        paintEditorMoveBar();
+        const auto& tile = editor.draftPage()->widgets[editor.selected()];
+        char size[32];
+        std::snprintf(size, sizeof(size), tr(STR_HOME_EDIT_SIZE_FORMAT), tile.w, tile.h);
+        const auto box = tileRect(editor.selected());
+        const char* tag = editor.blocked() ? tr(STR_HOME_EDIT_BLOCKED) : size;
+        const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, tag);
+        const int tagWidth = textWidth + 12 < box.width - 12 ? textWidth + 12 : box.width - 12;
+        const int tagX = box.x + box.width - tagWidth - 4;
+        renderer.fillRect(tagX, box.y + box.height - 28, tagWidth, 26, false);
+        renderer.drawRect(tagX, box.y + box.height - 28, tagWidth, 26, 1, true);
+        paintFittedText(UI_10_FONT_ID, tagX + 6, box.y + box.height - 26, tag, tagWidth - 12);
       }
       return;
     }
@@ -280,7 +334,7 @@ class ShellActivity final : public Activity {
     const char* title = panel == Panel::Add                                   ? tr(STR_HOME_ADD_WIDGET)
                         : panel == Panel::Reset                               ? tr(STR_HOME_RESET_CONFIRM)
                         : panel == Panel::Waiting                             ? tr(STR_HOME_EDIT_SAVING)
-                        : panel == Panel::Selected                            ? tr(STR_HOME_REMOVE_WIDGET)
+                        : panel == Panel::Options                             ? tr(STR_HOME_REMOVE_WIDGET)
                         : editor.editorFailure() == LayoutEditStatus::NoSpace ? tr(STR_HOME_EDIT_NO_SPACE)
                         : editor.editorFailure() == LayoutEditStatus::Stale   ? tr(STR_HOME_EDIT_STALE)
                                                                               : tr(STR_HOME_EDIT_FAILED);
@@ -342,6 +396,8 @@ class ShellActivity final : public Activity {
                            y < header.y + header.height;
     if (touchBack || mappedInput.wasReleased(MappedInputManager::Button::Back))
       editor.back();
+    else if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Right)))
+      editor.moreEditor();
     else if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Down)))
       editor.stepEditor(1);
     else if (mappedInput.wasReleased(mappedInput.menuButton(MappedInputManager::Button::Up)))
@@ -350,6 +406,18 @@ class ShellActivity final : public Activity {
       editor.activateEditor();
     else if (tapped) {
       if (editor.panel() == Panel::Select || editor.panel() == Panel::Selected) {
+        if (editor.panel() == Panel::Selected) {
+          static constexpr LayoutStep steps[] = {LayoutStep::Left, LayoutStep::Up, LayoutStep::Down, LayoutStep::Right,
+                                                 LayoutStep::Size};
+          for (uint8_t i = 0; i < 5; ++i) {
+            const auto r = editorMoveButton(i);
+            if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) {
+              editor.geometryStep(steps[i]);
+              requestUpdate();
+              return true;
+            }
+          }
+        }
         const bool selected = editor.panel() == Panel::Selected;
         for (uint8_t i = 0; i < (selected ? 2 : 3); ++i) {
           const auto r = editorHeaderButton(i);
@@ -536,6 +604,14 @@ class ShellActivity final : public Activity {
     const char* title = editing                               ? tr(STR_HOME_EDIT)
                         : widgets && widgets->page().title[0] ? widgets->page().title.data()
                                                               : tr(STR_HOME);
+#if CROSSINK_APP_CAP_HOME_EDITOR
+    if (editing && editor.draftPage()) {
+      const auto kind = editor.draftPage()->widgets[editor.selected()].kind;
+      title = kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)
+              : kind == WidgetKind::Shelf  ? tr(STR_HOME_SHELF)
+                                           : tr(STR_HOME_BROWSE);
+    }
+#endif
     int titleWidth = header.width - 24;
 #if CROSSINK_APP_CAP_HOME_EDITOR
     if (canEdit()) titleWidth -= 80;

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "booksync/services/LayoutEditor.h"
+#include "booksync/services/LayoutGeometry.h"
 #include "booksync/storage/LayoutStore.h"
 #include "booksync/ui/EditorAddRemove.h"
 using namespace booksync;
@@ -92,11 +93,23 @@ TEST(LayoutEditor, UnknownBytesAndClassOverridesSurviveEdits) {
   EXPECT_NE(changed.find(opaque), std::string::npos);
 }
 TEST(LayoutEditor, EveryEditPublicationCutRetainsACompleteLayout) {
-  for (auto kind : {LayoutEditKind::Add, LayoutEditKind::Remove, LayoutEditKind::Reset}) {
+  for (auto kind : {LayoutEditKind::Add, LayoutEditKind::Remove, LayoutEditKind::Reset, LayoutEditKind::Geometry}) {
     LayoutEditor editor;
     auto raw = original();
-    ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", request(kind)),
-              LayoutEditStatus::Saved);
+    auto edit = request(kind);
+    if (kind == LayoutEditKind::Geometry) {
+      Layout layout;
+      HomePage page;
+      ASSERT_TRUE(layout.project(Layout::defaults(), "x4", 0, page));
+      const auto moved = previewGeometry(page, 0, LayoutStep::Down);
+      ASSERT_EQ(moved.status, LayoutEditStatus::Saved);
+      edit.count = moved.page.count;
+      for (uint8_t i = 0; i < edit.count; ++i) {
+        const auto& t = moved.page.widgets[i];
+        edit.geometry[i] = {t.x, t.y, t.w, t.h};
+      }
+    }
+    ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
     const auto next = bytes(editor.output());
     auto seed = [&] {
       card = {};
@@ -130,7 +143,7 @@ TEST(LayoutEditor, EveryEditPublicationCutRetainsACompleteLayout) {
     }
   }
 }
-TEST(LayoutEditor, WorkspaceIsBoundedWithoutPayloadAllocation) { EXPECT_LE(sizeof(LayoutEditor), 3072u); }
+TEST(LayoutEditor, WorkspaceIsBoundedWithoutPayloadAllocation) { EXPECT_LE(sizeof(LayoutEditor), 4096u); }
 TEST(LayoutEditor, ProductionStoreEditsAndReadHandlesCloseBeforeRename) {
   card = {};
   card.files[paths.current] = original();
@@ -184,6 +197,10 @@ class EditorFixture final : public Library {
     ++writes;
     result.status = LayoutEditStatus::Pending;
     return CommandStatus::Accepted;
+  }
+  LayoutPreview previewLayout(HomePage draft, uint8_t index, LayoutStep step) const override {
+    if (draft.revision != page.revision) return {draft, LayoutEditStatus::Stale};
+    return previewGeometry(draft, index, step);
   }
   LayoutEditResult layoutEditResult() const override { return result; }
 };
@@ -370,4 +387,202 @@ TEST(LayoutEditor, EscapedNullCannotAliasAnInstalledWidget) {
   ASSERT_TRUE(parser.project(LayoutInput::memory(changed.data(), changed.size()), "x4", 0, page));
   ASSERT_EQ(page.count, 1);
   EXPECT_EQ(page.widgets[0].kind, WidgetKind::Browse);
+}
+
+TEST(LayoutGeometry, BandSwapResizeAndCancelValues) {
+  Layout layout;
+  HomePage page;
+  ASSERT_TRUE(layout.project(Layout::defaults(), "x4", 0, page));
+  const auto before = page;
+  auto moved = previewGeometry(page, 0, LayoutStep::Down);
+  ASSERT_EQ(moved.status, LayoutEditStatus::Saved);
+  EXPECT_EQ(moved.page.widgets[0].y, 2);
+  EXPECT_EQ(moved.page.widgets[1].y, 0);
+  EXPECT_EQ(page.widgets[0].y, before.widgets[0].y);
+  auto resized = previewGeometry(page, 0, LayoutStep::Size);
+  ASSERT_EQ(resized.status, LayoutEditStatus::Saved);
+  EXPECT_EQ(resized.page.widgets[0].w, 1);
+  EXPECT_EQ(resized.page.widgets[0].h, 2);
+  EXPECT_EQ(previewGeometry(page, 0, LayoutStep::Up).status, LayoutEditStatus::NoSpace);
+  EXPECT_EQ(previewGeometry(page, 99, LayoutStep::Size).status, LayoutEditStatus::Invalid);
+}
+TEST(LayoutEditor, GeometryTransactionIsClassLocalAndRevisionChecked) {
+  auto raw = original();
+  Layout layout;
+  HomePage page;
+  ASSERT_TRUE(layout.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
+  auto preview = previewGeometry(page, 0, LayoutStep::Down);
+  ASSERT_EQ(preview.status, LayoutEditStatus::Saved);
+  auto edit = request(LayoutEditKind::Geometry);
+  edit.count = preview.page.count;
+  for (uint8_t i = 0; i < edit.count; ++i) {
+    const auto& w = preview.page.widgets[i];
+    edit.geometry[i] = {w.x, w.y, w.w, w.h};
+  }
+  card = {};
+  card.files[paths.current] = raw;
+  card.disk = card.files;
+  LayoutEditor editor;
+  storage::LayoutStore store(paths, "x4");
+  ASSERT_EQ(store.edit(editor, edit), LayoutEditStatus::Saved);
+  ASSERT_TRUE(store.project(0, page));
+  EXPECT_EQ(page.revision, 2u);
+  EXPECT_EQ(page.widgets[0].y, 2);
+  EXPECT_EQ(page.widgets[1].y, 0);
+  HomePage other;
+  const auto changed = card.files[paths.current];
+  ASSERT_TRUE(layout.project(LayoutInput::memory(changed.data(), changed.size()), "x3", 0, other));
+  EXPECT_EQ(other.widgets[0].y, 0);
+  EXPECT_EQ(other.widgets[1].y, 2);
+  EXPECT_EQ(store.edit(editor, edit), LayoutEditStatus::Stale);
+  edit.revision = 2;
+  edit.geometry[0].y = 0;  // Collision with the moved shelf.
+  EXPECT_EQ(store.edit(editor, edit), LayoutEditStatus::Invalid);
+  EXPECT_EQ(card.files[paths.current], changed);
+  edit.geometry[0].y = 2;
+  edit.index = 99;
+  EXPECT_EQ(store.edit(editor, edit), LayoutEditStatus::Invalid);
+  EXPECT_EQ(card.files[paths.current], changed);
+  EXPECT_EQ(card.handles, 0);
+}
+
+TEST(EditorAddRemove, CarryCancelDropAndLateRevisionPreserveFocus) {
+  EditorFixture lib;
+  Layout layout;
+  ASSERT_TRUE(layout.project(Layout::defaults(), "x4", 0, lib.page));
+  EditorAddRemove ui(lib);
+  ui.enter();
+  ui.chooseEditor(0);
+  ui.geometryStep(LayoutStep::Down);
+  ASSERT_NE(ui.draftPage(), nullptr);
+  EXPECT_EQ(ui.draftPage()->widgets[0].y, 2);
+  EXPECT_EQ(lib.writes, 0u);
+  ui.back();
+  EXPECT_EQ(ui.focus(), 0);
+  EXPECT_EQ(lib.page.widgets[0].y, 0);
+  ui.chooseEditor(1);
+  ui.moreEditor();
+  EXPECT_EQ(lib.writes, 0u);
+  ui.activateEditor();
+  EXPECT_EQ(lib.writes, 1u);
+  EXPECT_EQ(lib.captured.kind, LayoutEditKind::Geometry);
+  EXPECT_EQ(lib.captured.count, lib.page.count);
+  lib.result.status = LayoutEditStatus::Saved;
+  ++lib.page.revision;
+  ASSERT_TRUE(ui.pollEditor());
+  EXPECT_EQ(ui.focus(), 1);
+  ui.activateEditor();
+  ++lib.page.revision;
+  ui.geometryStep(LayoutStep::Down);
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Error);
+  EXPECT_EQ(lib.writes, 1u);
+}
+TEST(LayoutGeometry, ReservedCellsAndInvalidBandsCannotOverlap) {
+  HomePage page;
+  page.cols = 2;
+  page.rows = 7;
+  page.count = 1;
+  page.widgets[0] = {WidgetKind::Browse, WindowSource::Recent, 0, 0, 2, 1};
+  page.reserved[1] = 3;
+  const auto blocked = previewGeometry(page, 0, LayoutStep::Down);
+  EXPECT_EQ(blocked.status, LayoutEditStatus::NoSpace);
+  EXPECT_EQ(blocked.page.widgets[0].y, 0);
+  page.reserved = {};
+  page.count = 3;
+  page.widgets[0] = {WidgetKind::Continue, WindowSource::Recent, 0, 0, 1, 2};
+  page.widgets[1] = {WidgetKind::Continue, WindowSource::Recent, 1, 0, 1, 2};
+  page.widgets[2] = {WidgetKind::Browse, WindowSource::Recent, 0, 2, 2, 1};
+  EXPECT_EQ(previewGeometry(page, 0, LayoutStep::Down).status, LayoutEditStatus::NoSpace);
+}
+TEST(LayoutGeometry, RepeatedStepsKeepEveryCellAndFocusBounded) {
+  Layout layout;
+  HomePage page;
+  ASSERT_TRUE(layout.project(Layout::defaults(), "x4", 0, page));
+  for (unsigned i = 0; i < 400; ++i) {
+    const auto trial = previewGeometry(page, i % page.count, static_cast<LayoutStep>(i % 7));
+    if (trial.status == LayoutEditStatus::Saved) page = trial.page;
+    uint16_t occupied[12]{};
+    for (unsigned j = 0; j < page.count; ++j) {
+      const auto& t = page.widgets[j];
+      ASSERT_LE(t.x + t.w, page.cols);
+      ASSERT_LE(t.y + t.h, page.rows);
+      for (unsigned y = t.y; y < t.y + t.h; ++y) {
+        const auto mask = ((1u << t.w) - 1) << t.x;
+        ASSERT_EQ(occupied[y] & mask, 0u);
+        occupied[y] |= mask;
+      }
+    }
+  }
+}
+
+TEST(LayoutEditor, SixteenPlacementsMissingOverridesEscapedIdsAndOpaqueBytes) {
+  std::string raw =
+      R"({"schemaVersion":1,"revision":1,"grids":{"android-tablet":{"cols":4,"rows":12},"x4":{"cols":4,"rows":12},"x3":{"cols":4,"rows":12}},"pages":[{"id":"home","tab":"Home","placements":[)";
+  for (unsigned i = 0; i < HomeWidgets; ++i) {
+    if (i) raw += ',';
+    raw += "{\"instance\":\"tile-" + std::to_string(i) + R"(-\"\u0000\\","widget":"library","version":1,"x":)" +
+           std::to_string(i % 4) + ",\"y\":" + std::to_string(i / 4) +
+           R"(,"w":1,"h":1,"settings":{"future":[null,true,1.0]}})";
+  }
+  raw += R"(]}],"overrides":{"future":{"orphan":{"payload":"keep exact"}}},"unknown":[1.0,null]})";
+  const auto before = raw;
+  Layout layout;
+  HomePage page;
+  ASSERT_TRUE(layout.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
+  ASSERT_EQ(page.count, HomeWidgets);
+  LayoutEditor editor;
+  auto edit = request(LayoutEditKind::Geometry);
+  edit.count = page.count;
+  for (uint8_t i = 0; i < edit.count; ++i) {
+    const auto& t = page.widgets[i];
+    edit.geometry[i] = {t.x, static_cast<uint8_t>(t.y + 1), t.w, t.h};
+  }
+  for (unsigned revision = 1; revision <= 2; ++revision) {
+    edit.revision = revision;
+    for (uint8_t i = 0; i < edit.count; ++i) edit.geometry[i].y = i / 4 + revision;
+    ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+    raw = bytes(editor.output());
+    ASSERT_TRUE(layout.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
+    ASSERT_EQ(page.count, HomeWidgets);
+    for (unsigned i = 0; i < page.count; ++i) EXPECT_EQ(page.widgets[i].y, i / 4 + revision);
+    EXPECT_NE(raw.find(R"("future":{"orphan":{"payload":"keep exact"}})"), std::string::npos);
+    EXPECT_NE(raw.find(R"("unknown":[1.0,null])"), std::string::npos);
+    EXPECT_NE(raw.find(R"(-\"\u0000\\")"), std::string::npos);
+    ASSERT_TRUE(layout.project(LayoutInput::memory(raw.data(), raw.size()), "x3", 0, page));
+    EXPECT_EQ(page.widgets[0].y, 0);
+  }
+  edit.revision = 3;
+  edit.geometry[0].w = 12;
+  EXPECT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Invalid);
+  EXPECT_EQ(editor.output().bytes, 0u);
+  --edit.count;
+  EXPECT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Invalid);
+}
+
+TEST(EditorAddRemove, ConcurrentRevisionAndRemovalKeepFocusOnAVisibleStop) {
+  EditorFixture lib;
+  Layout layout;
+  ASSERT_TRUE(layout.project(Layout::defaults(), "x4", 0, lib.page));
+  EditorAddRemove ui(lib);
+  ui.enter();
+  ui.chooseEditor(2);
+  lib.page.count = 1;
+  ++lib.page.revision;
+  ui.back();
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Select);
+  EXPECT_EQ(ui.focus(), 0);
+  EXPECT_LT(ui.focus(), ui.rows());
+  ui.activateEditor();
+  lib.page.count = 0;
+  ++lib.page.revision;
+  ASSERT_TRUE(ui.pollEditor());
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Error);
+  EXPECT_EQ(ui.editorFailure(), LayoutEditStatus::Stale);
+  EXPECT_EQ(ui.focus(), 0);
+  EXPECT_LT(ui.focus(), ui.rows());
+  ui.back();
+  EXPECT_EQ(ui.panel(), EditorAddRemove::Panel::Select);
+  EXPECT_EQ(ui.focus(), 0);  // Empty page: Add remains reachable.
+  EXPECT_LT(ui.focus(), ui.rows());
+  EXPECT_EQ(lib.writes, 0u);
 }

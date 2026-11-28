@@ -3,6 +3,7 @@
 ### Added
 
 - BookSync selects saved personal reading records with stable provider precedence and deterministic picks, and projects local/account reading statistics with explicit coverage and overlap-safe Today watermarks.
+- BookSync Home supports snapped widget movement, supported-size cycling and cancelable carry/drop on X4 Pro touch and Classic buttons, saved as one revision-checked atomic edit.
 
 - BookSync captures bounded timestamped reading-page history and checkpoints stats batches through its sole sync owner, retaining explicit coverage gaps and reconciling uncertain uploads without counting reading time twice; live delivery remains deferred.
 - BookSync Home supports local add/remove/reset widget edits on X4 Pro and Classic, with revision checks and atomic saves. The X3 Settings-list editor remains pending design approval.

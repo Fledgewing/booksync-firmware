@@ -5,14 +5,21 @@
 
 #include <cstdio>
 #include <cstring>
+
+#include "LayoutGeometry.h"
 namespace booksync {
 bool LayoutEditor::patch(uint32_t begin, uint32_t end, const char* text) {
   const size_t n = std::strlen(text);
-  if (count_ == 4 || used_ + n > sizeof(inserted_) || end < begin || end > input_.bytes) return false;
+  if (count_ == 68 || used_ + n > sizeof(inserted_) || end < begin || end > input_.bytes) return false;
   auto& p = patches_[count_++];
-  p = {begin, end, used_, static_cast<uint16_t>(n)};
+  p = {begin, end, used_, static_cast<uint16_t>(n), UINT32_MAX};
   std::memcpy(inserted_ + used_, text, n);
   used_ += n;
+  return true;
+}
+bool LayoutEditor::patchSource(uint32_t at, uint32_t begin, uint32_t end) {
+  if (count_ == 68 || end < begin || end - begin > UINT16_MAX) return false;
+  patches_[count_++] = {at, at, 0, static_cast<uint16_t>(end - begin), begin};
   return true;
 }
 bool LayoutEditor::read(size_t offset, void* output, size_t bytes) {
@@ -36,7 +43,10 @@ bool LayoutEditor::read(size_t offset, void* output, size_t bytes) {
   };
   for (unsigned i = 0; i < count_; ++i) {
     const auto& p = patches_[i];
-    if (!segment(p.begin - source, nullptr, source) || !segment(p.bytes, inserted_ + p.offset, 0)) return false;
+    if (!segment(p.begin - source, nullptr, source) ||
+        !segment(p.bytes, p.source == UINT32_MAX ? inserted_ + p.offset : nullptr,
+                 p.source == UINT32_MAX ? 0 : p.source))
+      return false;
     source = p.end;
   }
   return segment(input_.bytes - source, nullptr, source) && bytes == 0;
@@ -89,6 +99,77 @@ bool LayoutEditor::freeCell(Layout::Span root, Layout::Span page, const char* de
     }
   return false;
 }
+bool LayoutEditor::geometry(Layout::Span root, Layout::Span pg, const char* device, const LayoutEdit& edit) {
+  auto& p = parser_;
+  if (std::strcmp(device, "x4") || edit.count != page_.count || edit.index >= page_.count) return false;
+  auto overrides = p.field(root, "overrides");
+  auto group = p.field(overrides, device);
+  auto tiles = p.field(pg, "placements");
+  uint32_t pos = tiles.begin + 1;
+  p.space(pos);
+  uint8_t installed = 0;
+  bool opened = false, appended = false;
+  while (p.at(pos) != ']') {
+    Layout::Span tile;
+    p.nodes_ = 0;
+    if (!p.value(pos, tile)) return false;
+    auto id = p.field(tile, "instance");
+    if (!p.text(id, p.text_)) return false;
+    auto over = group.type ? p.field(group, std::string_view(p.text_, p.textLength_)) : Layout::Span{};
+    Layout::Geometry old;
+    uint32_t version = 0;
+    if (!p.geometry(tile, old, false) || (over.type && !p.geometry(over, old, true)) ||
+        !p.text(p.field(tile, "widget"), p.text_) || !p.number(p.field(tile, "version"), 1, 2147483647, version))
+      return false;
+    const auto widget = std::string_view(p.text_, p.textLength_);
+    if (version == 1 && !old.hidden && (widget == "continue-reading" || widget == "booklist" || widget == "library")) {
+      if (installed >= edit.count) return false;
+      const auto& g = edit.geometry[installed];
+      const auto kind = page_.widgets[installed++].kind;
+      if (g.x != old.x || g.y != old.y || g.w != old.w || g.h != old.h) {
+        if (!supportedGeometry(kind, g.w, g.h)) return false;
+        if (over.type) {
+          static constexpr const char* keys[] = {"x", "y", "w", "h"};
+          const uint8_t values[] = {g.x, g.y, g.w, g.h};
+          uint32_t start = over.begin + 1;
+          p.space(start);
+          bool comma = p.at(start) != '}';
+          for (unsigned i = 0; i < 4; ++i) {
+            auto field = p.field(over, keys[i]);
+            if (field.type) std::snprintf(scratch_, sizeof(scratch_), "%u", values[i]);
+            if (!field.type)
+              std::snprintf(scratch_, sizeof(scratch_), "%s\"%s\":%u", comma ? "," : "", keys[i], values[i]);
+            if (!patch(field.type ? field.begin : over.end - 1, field.type ? field.end : over.end - 1, scratch_))
+              return false;
+            if (!field.type) comma = true;
+          }
+        } else {
+          const auto at = group.type ? group.end - 1 : overrides.end - 1;
+          if (!group.type && !opened) {
+            uint32_t start = overrides.begin + 1;
+            p.space(start);
+            if (!patch(at, at, p.at(start) == '}' ? "\"x4\":{" : ",\"x4\":{")) return false;
+            opened = true;
+          }
+          uint32_t start = group.begin + 1;
+          if (group.type) p.space(start);
+          if (!patch(at, at, appended || (group.type && p.at(start) != '}') ? "," : "") ||
+              !patchSource(at, id.begin, id.end))
+            return false;
+          std::snprintf(scratch_, sizeof(scratch_), ":{\"x\":%u,\"y\":%u,\"w\":%u,\"h\":%u}", g.x, g.y, g.w, g.h);
+          if (!patch(at, at, scratch_)) return false;
+          appended = true;
+        }
+      }
+    }
+    p.space(pos);
+    if (p.at(pos) != ',') break;
+    ++pos;
+    p.space(pos);
+  }
+  if (opened && !patch(overrides.end - 1, overrides.end - 1, "}")) return false;
+  return installed == edit.count && p.ok_;
+}
 LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, LayoutEdit edit) {
   bytes_ = used_ = count_ = 0;
   auto& p = parser_;
@@ -100,7 +181,8 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
   if (edit.revision >= 2147483647) return LayoutEditStatus::Invalid;
   auto& page = page_;
   if (!p.project(input, device, edit.page, page)) return LayoutEditStatus::Invalid;
-  if (edit.kind != LayoutEditKind::Add && edit.kind != LayoutEditKind::Remove && edit.kind != LayoutEditKind::Reset)
+  if (edit.kind != LayoutEditKind::Add && edit.kind != LayoutEditKind::Remove && edit.kind != LayoutEditKind::Reset &&
+      edit.kind != LayoutEditKind::Geometry)
     return LayoutEditStatus::Invalid;
   if (edit.kind == LayoutEditKind::Add) {
     for (const char* c : {"android-tablet", "x4", "x3"}) {
@@ -132,7 +214,9 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
       }
     }
     const auto tiles = p.field(pg, "placements");
-    if (edit.kind == LayoutEditKind::Remove) {
+    if (edit.kind == LayoutEditKind::Geometry) {
+      if (!geometry(root, pg, device, edit)) return LayoutEditStatus::Invalid;
+    } else if (edit.kind == LayoutEditKind::Remove) {
       if (edit.index >= page.count) return LayoutEditStatus::Invalid;
       auto over = p.field(p.field(root, "overrides"), device);
       pos = tiles.begin + 1;

@@ -581,6 +581,8 @@ bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePa
             }
           }
         }
+        if (!installed && !g.hidden)
+          for (unsigned row = g.y; row < g.y + g.h; ++row) output.reserved[row] |= ((1u << g.w) - 1) << g.x;
         space(q);
         if (at(q) != ',') break;
         ++q;

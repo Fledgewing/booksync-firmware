@@ -1,5 +1,6 @@
 add_executable(BookSyncLayoutEditorTest LayoutEditorTest.cpp
   ${REPO_ROOT}/src/booksync/services/LayoutEditor.cpp
+  ${REPO_ROOT}/src/booksync/services/LayoutGeometry.cpp
   ${REPO_ROOT}/src/booksync/services/Layout.cpp
   ${REPO_ROOT}/src/booksync/storage/LayoutStore.cpp
   ${REPO_ROOT}/src/booksync/storage/FilePublish.cpp
