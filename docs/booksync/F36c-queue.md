@@ -29,6 +29,12 @@ is deferred by the Library coordinator. Cancel is accepted as an intent, the
 active job is revoked immediately, and other cancel intents checkpoint at the
 next file yield. A foreground Library adapter retains its last published value
 when another queue's SD read is deferred; it never interprets that as failure.
+Queued rows expose cancellation independently of an engine job ID, so a future
+file can be canceled before transport starts. Engine handles increase across
+journal switches and recovered bindings; a late cancellation from a previous
+selection cannot name the newly bound transfer. Handles belong to the runtime
+owner lifetime, while durable queue/row identity survives reboot.
+
 Active queue snapshots use the record already in memory. Queue reads and actions
 are worker operations, never paint callbacks.
 

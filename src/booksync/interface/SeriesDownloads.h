@@ -11,7 +11,8 @@ struct SeriesQueueItem {
   uint64_t job = 0, bytes = 0;
   SeriesItemState state = SeriesItemState::Queued;
   DownloadError error = DownloadError::None;
-  bool sizeKnown = false, cancelWanted = false;
+  // Queue rows can be canceled before the transfer engine assigns a job.
+  bool sizeKnown = false, cancelWanted = false, cancelable = false;
   void clear() {
     key = {};
     title.fill(0);
@@ -20,7 +21,7 @@ struct SeriesQueueItem {
     job = bytes = 0;
     state = SeriesItemState::Queued;
     error = DownloadError::None;
-    sizeKnown = cancelWanted = false;
+    sizeKnown = cancelWanted = cancelable = false;
   }
 };
 struct SeriesQueueView {

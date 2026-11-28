@@ -370,4 +370,44 @@ TEST_F(SeriesQueueTest, SequenceNeverRegressesAcrossFileTransitions) {
     previous = view.sequence;
   }
 }
+TEST_F(SeriesQueueTest, FutureRowsAreCancelableBeforeAnyTransferJobExists) {
+  DownloadJobs engine(journal, admission, ports);
+  SeriesQueue q(store, engine, source, queuePorts, scope, owner, "/series-job");
+  ASSERT_TRUE(q.recover());
+  const auto id = q.start(reviewed);
+  ASSERT_TRUE(q.read(id, view));
+  ASSERT_EQ(view.items[1].job, 0u);
+  ASSERT_TRUE(view.items[1].cancelable);
+  ASSERT_TRUE(q.cancel(id, 1));
+  run(q);
+  ASSERT_TRUE(q.read(id, view));
+  EXPECT_EQ(view.items[1].state, SeriesItemState::Canceled);
+  EXPECT_FALSE(view.items[1].cancelable);
+  EXPECT_EQ(source.opens, 2u);
+  EXPECT_FALSE(card.files.count(reviewed.books[1].file.path.data()));
+}
+TEST_F(SeriesQueueTest, JournalSwitchNeverReusesALiveEngineHandle) {
+  DownloadJobs engine(journal, admission, ports);
+  ASSERT_TRUE(engine.recover(scope, owner));
+  const auto old = engine.start(spec, source, owner);
+  ASSERT_NE(old, 0u);
+  complete(engine);
+  ASSERT_EQ(engine.status(owner).state, DownloadState::Complete);
+  constexpr storage::PublishPaths other{"/other", "/other.tmp", "/other.bak"};
+  ASSERT_TRUE(engine.selectJournal(other, scope, owner));
+  auto next = spec;
+  std::strcpy(next.path.data(), "/books/next.epub");
+  next.identity.edition.bytes[0]++;
+  const auto current = engine.start(next, source, owner);
+  ASSERT_GT(current, old);
+  engine.cancel(old, owner);
+  EXPECT_TRUE(engine.busy());
+  complete(engine);
+  EXPECT_EQ(engine.status(owner).state, DownloadState::Complete);
+  ASSERT_TRUE(engine.selectJournal(journal, scope, owner));
+  const auto recovered = engine.status(owner).id;
+  ASSERT_GT(recovered, current);
+  engine.cancel(old, owner);
+  EXPECT_NE(engine.status(owner).state, DownloadState::Canceled);
+}
 }  // namespace

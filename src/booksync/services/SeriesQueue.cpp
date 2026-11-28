@@ -333,6 +333,7 @@ void SeriesQueue::queueState(SeriesQueueView& out) {
       row.cancelWanted = true;
       if (row.state != SeriesItemState::Running) row.state = SeriesItemState::Canceled;
     }
+    row.cancelable = !queueTerminal(row.state) && !row.cancelWanted;
     if (!queueTerminal(row.state)) {
       out.complete = false;
       if (target < 0 || !requested_[target]) {

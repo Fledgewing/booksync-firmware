@@ -262,6 +262,14 @@ bool DownloadJobs::recover(storage::ScopeView scope, DeliveryTicket current) {
     std::memcpy(record_.spec.server.data(), scope.server.data(), scope.server.size());
     std::memcpy(record_.spec.account.data(), scope.account.data(), scope.account.size());
   }
+  if (record_.id) {
+    if (record_.id <= highWater_) {
+      if (highWater_ == std::numeric_limits<uint64_t>::max()) return false;
+      record_.id = highWater_ + 1;
+      status_.id = record_.id;
+    }
+    highWater_ = record_.id;
+  }
   scoped_ = true;
   return true;
 }
@@ -355,7 +363,7 @@ uint64_t DownloadJobs::startImpl(const DownloadSpec& spec, storage::Revision pre
   if (status_.id && sameSelection(record_.spec, spec) && status_.state != DownloadState::Canceled) return status_.id;
   if (status_.id && status_.state != DownloadState::Complete && status_.state != DownloadState::Canceled) return 0;
   if (!accepts(spec) || spec.server != record_.spec.server || spec.account != record_.spec.account ||
-      record_.id == std::numeric_limits<uint64_t>::max()) {
+      highWater_ == std::numeric_limits<uint64_t>::max()) {
     LOG_ERR("BSD", "Invalid download selection rejected");
     return 0;
   }
@@ -389,7 +397,7 @@ uint64_t DownloadJobs::startImpl(const DownloadSpec& spec, storage::Revision pre
     settle(status_.state);
     return 0;
   }
-  const auto id = record_.id + 1;
+  const auto id = ++highWater_;
   record_ = {};
   record_.id = id;
   record_.spec = spec;

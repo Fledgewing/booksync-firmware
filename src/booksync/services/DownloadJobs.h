@@ -71,7 +71,9 @@ class DownloadJobs {
   std::array<uint8_t, Chunk> buffer_{};
   DownloadReply reply_{};
   storage::FilePublish artifact_;
-  uint64_t flushed_ = 0;
+  // Runtime handles never repeat when the single writer changes journals.
+  // A recovered descriptor receives a fresh handle on a later binding.
+  uint64_t flushed_ = 0, highWater_ = 0;
   bool artifactOpen_ = false;
   bool running_ = false, draining_ = false, scoped_ = false;
   static constexpr size_t JournalBytes = 943;
