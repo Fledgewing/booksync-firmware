@@ -49,3 +49,7 @@ Refer to https://freeink.org/llms.txt for guidance.
 
 - BookSync's legacy sync TLS policy verifies ISRG roots plus a host-scoped trusted anchor. The generic CrossInk downloader's insecure setting is not that policy.
 - `tools/e2e/kit.py` captures `Admin`/`Device` default server addresses at import. Isolated fixtures must pass `base=` explicitly to both; changing `kit.SERVER` alone does not redirect their calls.
+
+## BookSync presentation fonts
+
+- The retained 1-bit font converter defaults to 2/15 coverage, which thickens light glyph edges. Compact BookSync role faces use `--bw-threshold 8` and explicit DPI to map points to mockup pixels; do not change the default or regenerate retained reader/UI faces for a BookSync type adjustment.

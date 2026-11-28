@@ -5,9 +5,33 @@ set -e
 cd "$(dirname "$0")"
 
 case "${1:-}" in
-  ""|--ui-only) ;;
-  *) echo "Usage: $0 [--ui-only]" >&2; exit 2 ;;
+  ""|--ui-only|--booksync-only) ;;
+  *) echo "Usage: $0 [--ui-only|--booksync-only]" >&2; exit 2 ;;
 esac
+
+# FK compact UI faces reuse the retained font source/converter. These are not
+# reader-selectable families; only the BookSync presentation registers them.
+if [[ "${1:-}" == "--booksync-only" ]]; then
+  generate_booksync_face() {
+    local role="$1" size="$2" style="$3" dpi="$4"
+    local name="booksync_${role}_$(echo "$style" | tr '[:upper:]' '[:lower:]')"
+    "${PYTHON:-python3}" fontconvert.py "$name" "$size" --dpi "$dpi" --bw-threshold 8 \
+      --no-default-intervals --additional-intervals 0x0020,0x017F \
+      --additional-intervals 0x2000,0x206F \
+      "../builtinFonts/source/Inter/Inter-${style}.ttf" \
+      > "../builtinFonts/${name}.h.tmp"
+    mv "../builtinFonts/${name}.h.tmp" "../builtinFonts/${name}.h"
+  }
+  # CSS pixels: 6pt/9pt at 144 DPI are exactly 12px/18px. Retained UI
+  # fallback faces supply scripts outside this compact Latin/punctuation set.
+  generate_booksync_face caption 6 Regular 144
+  generate_booksync_face caption 6 Bold 144
+  generate_booksync_face body 9 Regular 144
+  generate_booksync_face body 9 Bold 144
+  generate_booksync_face label 8 Bold 150
+  generate_booksync_face value 7 Regular 144
+  exit 0
+fi
 
 SYMBOLS_FONT="../builtinFonts/source/NotoSymbols/NotoSansSymbols-Regular.ttf"
 PHM_FONT="../builtinFonts/source/NotoSansCJKsc/NotoSansCJKsc-Regular.otf"
