@@ -334,3 +334,7 @@ TEST(TimeHost, TooSmallGeometryHasNoInvisibleRetryTarget) {
  EXPECT_EQ(host.hitWidgetRow(0,{224,90},190,80),255);EXPECT_EQ(host.hitWidgetRow(1,{160,108},120,80),255);
  EXPECT_EQ(fixture.commands,0u);
 }
+
+TEST(TimeGeometry, ApprovedMoonUsesFullDrawingAndKeepsStaleFooterSeparate) {
+ MoonWidget value;value.status.state=TimeCardState::Ready;value.status.stale=true;widgets::TimeDrawing drawing;ASSERT_TRUE(widgets::Moon::layoutTime(value,{220,104,16,false,true},drawing));EXPECT_EQ(drawing.moon.width,54);EXPECT_EQ(drawing.moon.height,54);for(unsigned i=0;i<drawing.count;++i)EXPECT_LE(drawing.marks[i].cell.y+drawing.marks[i].cell.height,104);EXPECT_FALSE(widgets::Moon::layoutTime(value,{224,96,16,false,false},drawing));
+}

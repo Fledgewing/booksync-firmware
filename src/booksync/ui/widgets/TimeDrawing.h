@@ -40,7 +40,7 @@ inline TimeCardState boundedMoonCard(const MoonWidget& timeValue) {
 inline void timeLine(TimeDrawing& out, TimeLine line, int x, int y, int w, int h) {
   if (out.count < 7) out.marks[out.count++] = {{x, y, w, h}, line};
 }
-inline auto timeBoxFits(WidgetBox box) -> bool { return !box.textOnly && box.width >= 180 && box.height >= 96; }
+inline auto timeBoxFits(WidgetBox box) -> bool { return !box.textOnly && box.width >= 180 && box.height >= 104; }
 inline bool timeFrame(TimeCardStatus status, uint32_t bytes, WidgetBox box, TimeDrawing& out) {
   out = {};
   if (!timeBoxFits(box)) return false;
@@ -48,8 +48,10 @@ inline bool timeFrame(TimeCardStatus status, uint32_t bytes, WidgetBox box, Time
   const auto state = boundedTimeCard(status, bytes);
   if (state != TimeCardState::Ready) {
     timeLine(out, TimeLine::State, 10, 30, box.width - 20, box.height - 40);
-    if (state == TimeCardState::Oversize || state == TimeCardState::Unavailable)
+    if (state == TimeCardState::Oversize || state == TimeCardState::Unavailable) {
+      out.marks[out.count-1].cell.width=box.width-90;
       timeLine(out, TimeLine::Retry, box.width - 70, box.height - 50, 60, 50);
+    }
   }
   return true;
 }

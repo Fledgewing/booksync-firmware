@@ -189,6 +189,7 @@ class ShellActivity final : public Activity {
   bool namingAttached = false;
   mutable char defaultPageName[24]{};
 #endif
+  mutable widgets::TimeDrawing timeDrawing;  // Reused geometry keeps the renderer task frame small.
   std::string bookPath;
   // One fallible <=6 KiB + TimeWidgetBatch allocation per Home lifetime: the immutable visible
   // page is too large for the task stack and must be freed before reader entry.
@@ -303,6 +304,15 @@ class ShellActivity final : public Activity {
                                       StrId::STR_HOME_MOON_LAST_QUARTER,  StrId::STR_HOME_MOON_WANING_CRESCENT};
     return I18N.get(names[phase < 8 ? phase : 0]);
   }
+  void paintTimeText(Rect rect,WidgetCell cell,const char* text,int font=SMALL_FONT_ID,int scale=192,bool bold=false)const{
+    const auto style=bold?EpdFontFamily::BOLD:EpdFontFamily::REGULAR;
+    int x=rect.x+cell.x;const int right=x+cell.width;
+    const int baseline=rect.y+cell.y+renderer.getFontAscenderSize(font)*scale/256;
+    const auto* cursor=reinterpret_cast<const unsigned char*>(text);
+    renderer.beginTextClip(x,rect.y+cell.y,cell.width,cell.height);
+    while(*cursor){const auto cp=utf8NextCodepoint(&cursor);int32_t advance=0;int top=0;if(!renderer.getCodepointMetrics(font,cp,style,advance,top))continue;const int pixels=(advance*scale/256+8)/16;if(x+pixels>right)break;x+=renderer.drawScaledCodepoint(font,cp,style,x,baseline,scale);}
+    renderer.endTextClip();
+  }
   void paintTimeWidget(uint8_t index, Rect rect, bool selected) const {
     const auto kind = widgets->page().widgets[index].kind;
     const auto view = widgets->view(index);
@@ -310,14 +320,14 @@ class ShellActivity final : public Activity {
     const auto* moon = widgets->moonCard(index);
     // Geometry scratch is bounded below 256 bytes; captions are reused per line
     // on the dedicated render stack. No per-paint allocation or source work.
-    widgets::TimeDrawing drawing;
+    auto& drawing=timeDrawing;
     const bool laidOut = clock  ? widgets::Clock::layoutTime(*clock, widgetBox(index), drawing)
                          : moon ? widgets::Moon::layoutTime(*moon, widgetBox(index), drawing)
                                 : false;
     renderer.drawRoundedRect(rect.x, rect.y, rect.width, rect.height, 1, 8, true);
     if (selected) renderer.drawRect(rect.x + 3, rect.y + 3, rect.width - 6, rect.height - 6, 2, true);
     if (!laidOut) {
-      paintFittedText(UI_10_FONT_ID, rect.x + 10, rect.y + 6, kindTitle(kind), rect.width - 20);
+      paintTimeText(rect,{10,6,rect.width-20,18},kindTitle(kind),SMALL_FONT_ID,240,true);
       paintFittedText(SMALL_FONT_ID, rect.x + 10, rect.y + 32, clock || moon ? tr(STR_HOME_WIDGET_SMALL_TILE) : stateText(view.viewState), rect.width - 20);
       return;
     }
@@ -357,14 +367,11 @@ class ShellActivity final : public Activity {
       const auto& c = mark.cell;
       char caption[96]{};
       const char* text = caption;
-      int font = SMALL_FONT_ID;
       switch (mark.line) {
         case widgets::TimeLine::Title:
           text = kindTitle(kind);
-          font = UI_10_FONT_ID;
           break;
         case widgets::TimeLine::Value:
-          font = BITTER_16_FONT_ID;
           if (clock->twelveHour) {
             const unsigned hour = clock->reading.local.hour;
             std::snprintf(caption, sizeof(caption), tr(STR_HOME_CLOCK_12H_FORMAT), hour % 12 ? hour % 12 : 12,
@@ -452,13 +459,17 @@ class ShellActivity final : public Activity {
         renderer.endTextClip();
         continue;
       }
-      renderer.beginTextClip(rect.x + c.x, rect.y + c.y, c.width, c.height);
-      const auto style = mark.line == widgets::TimeLine::Title ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
-      const auto ink = renderer.getTextVerticalBounds(font, text, style);
-      const int inkHeight = ink.bottom - ink.top;
-      const int textY = rect.y + c.y - ink.top + std::max(0, (c.height - inkHeight) / 2);
-      paintFittedText(font, rect.x + c.x, textY, text, c.width, true, style);
-      renderer.endTextClip();
+      if(mark.line==widgets::TimeLine::Illumination){
+        char number[4];std::snprintf(number,sizeof(number),"%u",unsigned(moon->illumination));
+        paintTimeText(rect,c,number,SMALL_FONT_ID,400,true);
+        const int width=renderer.getTextWidth(SMALL_FONT_ID,number,EpdFontFamily::BOLD)*400/256;
+        paintTimeText(rect,{c.x+width+3,c.y+11,c.width-width-3,16},tr(STR_HOME_MOON_LIT_UNIT),SMALL_FONT_ID,192);
+      }else{
+        const bool title=mark.line==widgets::TimeLine::Title;
+        const bool date=mark.line==widgets::TimeLine::Date;
+        const int scale=title?240:mark.line==widgets::TimeLine::Value?544:mark.line==widgets::TimeLine::TimeSource || mark.line==widgets::TimeLine::Stale?144:mark.line==widgets::TimeLine::Next?160:192;
+        paintTimeText(rect,c,text,SMALL_FONT_ID,scale,title || date || mark.line==widgets::TimeLine::TimePhase);
+      }
     }
   }
   const char* shelfTitle(WindowSource source) const {

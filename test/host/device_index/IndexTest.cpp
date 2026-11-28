@@ -617,3 +617,8 @@ TEST(ReadModel, CombinedStatsAndPersonalChargeBothConcretePayloads) {
   batch.rows = 1;
   EXPECT_FALSE(ReadModel::accepts(batch));
 }
+
+TEST(ReadModel, TimeChargesItsPayloadAlongsidePersonalAndStats) {
+ WindowBatchRequest batch;batch.count=1;batch.rows=3;batch.windows[0].limit=1;batch.personalWidgets=personalWidgetBit(PersonalWidget::Highlight);batch.statsWidgets=statsWidgetBit(StatsWidget::Week);batch.timeWidgets=timeWidgetBit(TimeWidget::Clock);
+ batch.bytes=sizeof(LibraryWindow)-sizeof(BookRow)*LibraryRows+sizeof(BookRow)+personalWidgetBytes(batch.personalWidgets)+sizeof(StatsWidgetBatch);EXPECT_FALSE(ReadModel::accepts(batch));batch.bytes+=sizeof(TimeWidgetBatch);EXPECT_TRUE(ReadModel::accepts(batch));
+}
