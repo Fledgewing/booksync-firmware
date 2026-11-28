@@ -274,7 +274,7 @@ class ShellActivity final : public Activity {
       if (height > 0) {
         int32_t advance = 0; int top = 0;
         if (renderer.getCodepointMetrics(BITTER_16_FONT_ID, glyph->codepoint, EpdFontFamily::REGULAR, advance, top)) {
-          const int scale = std::min(44 * 256 / height, advance > 0 ? (cell.width - 4) * 16 * 256 / advance : 256);
+          const int scale = std::min(44 * 256 / height, advance > 0 ? static_cast<int>((cell.width - 4) * 16 * 256 / advance) : 256);
           const int width = static_cast<int>(int64_t(advance) * scale / (16 * 256));
           const int baseline = rect.y + cell.y + (cell.height - height * scale / 256) / 2 +
             (renderer.getFontAscenderSize(BITTER_16_FONT_ID) - ink.top) * scale / 256;
