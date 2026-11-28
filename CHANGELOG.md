@@ -9,11 +9,7 @@
 ### Added
 
 - BookSync publishes timezone-aware clock and date values only after live or retained clock provenance is known; a persisted expiry floor cannot produce a Home clock.
-- BookSync adds the approved compact Series page and next-N download presentations for X4 Pro touch, X4 Classic buttons and X3, with exact file review, offline/Back behavior and scoped queue updates through Library.
-
-- BookSync retains four account-scoped Series download queues with frozen file choices, per-book cancellation and explicit recovery/resume through the existing single verified download writer. The Library screen adapter follows separately.
-
-- BookSync prepares bounded, account-scoped Series next-N previews with contextual ordering, explicit earlier gaps and stale-preview rejection; the approved screen and durable queue follow in separate increments.
+- BookSync adds compact Series pages and exact next-1–10 download review on X4 Pro touch, X4 Classic buttons and X3, with offline/Back behavior, frozen file choices and restart-safe account-scoped queues through Library.
 
 - BookSync adds shared position conflict, reset, override and decline policy with durable account/edition isolation and stale-answer rejection; late consent uses the existing one-draw reading exception. Live transport and reader presentation remain deferred.
 - BookSync adds account-isolated authenticated catalog transport behind Library, with bounded response spooling and rejection of incomplete or revoked responses; automatic sync scheduling follows separately.

@@ -37,6 +37,8 @@ class SeriesActivity final : public Activity {
   CoverBitmap bitmap_{};
 #endif
   Rect safe() const { return UITheme::getInstance().getScreenSafeArea(renderer, true, false); }
+  // Normalize approved design coordinates to the current safe viewport; these
+  // reference units are not physical panel dimensions.
   int seriesScale(int value) const {
     return std::max(1, std::min(value * safe().width / 480, value * safe().height / 800));
   }
@@ -915,7 +917,9 @@ class SeriesActivity final : public Activity {
     std::snprintf(buffer, sizeof(buffer), tr(STR_SERIES_RANGE_FORMAT), static_cast<unsigned long>(first),
                   static_cast<unsigned long>(series_.offset() + series_.members().count),
                   static_cast<unsigned long>(series_.members().matchedBooks));
-    text(Rect{s.x + seriesScale(70), bottom() + seriesScale(8), s.width - seriesScale(140), seriesScale(30)}, buffer);
+    if(series_.members().availability==Availability::Ready && series_.members().count)
+      text(Rect{s.x+seriesScale(70),bottom()+seriesScale(8),s.width-seriesScale(140),seriesScale(30)},buffer);
+    else text(Rect{s.x+seriesScale(16),bottom()+seriesScale(8),s.width-seriesScale(32),seriesScale(30)},tr(STR_BACK));
     if (series_.scene() == SeriesScene::Page) {
       const int y = bottom() + seriesScale(20);
       if (series_.offset()) {
