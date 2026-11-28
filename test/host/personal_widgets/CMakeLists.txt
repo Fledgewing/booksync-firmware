@@ -5,6 +5,8 @@ add_executable(BookSyncPersonalWidgetsTest PersonalWidgetsTest.cpp
   ${REPO_ROOT}/src/booksync/storage/PageJournal.cpp
   ${REPO_ROOT}/src/booksync/storage/LifecycleJournal.cpp
   ${REPO_ROOT}/src/booksync/storage/FilePublish.cpp)
+set_source_files_properties(${REPO_ROOT}/src/booksync/services/PersonalReading.cpp
+  PROPERTIES COMPILE_DEFINITIONS SIMULATOR)
 target_include_directories(BookSyncPersonalWidgetsTest PRIVATE ../file_publish/stubs ${REPO_ROOT}/src)
 target_link_libraries(BookSyncPersonalWidgetsTest PRIVATE crosspoint_test_common GTest::gtest_main)
 if(NOT APPLE)
