@@ -84,6 +84,7 @@ subprocess.run([sys.executable, "test/simulator/live_adapter.py", profile], cwd=
 subprocess.run([sys.executable, 'test/simulator/catalog_jobs.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/download_jobs.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/queries.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/series_plan.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/cover_jobs.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/catalog.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/lifecycle_match.py', profile], cwd=root, env=env, check=True)

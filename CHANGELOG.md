@@ -9,6 +9,7 @@
 ### Added
 
 - BookSync publishes timezone-aware clock and date values only after live or retained clock provenance is known; a persisted expiry floor cannot produce a Home clock.
+- BookSync prepares bounded, account-scoped Series next-N previews with contextual ordering, explicit earlier gaps and stale-preview rejection; the approved screen and durable queue follow in separate increments.
 
 - BookSync adds shared position conflict, reset, override and decline policy with durable account/edition isolation and stale-answer rejection; late consent uses the existing one-draw reading exception. Live transport and reader presentation remain deferred.
 - BookSync adds account-isolated authenticated catalog transport behind Library, with bounded response spooling and rejection of incomplete or revoked responses; automatic sync scheduling follows separately.

@@ -309,3 +309,4 @@ add_subdirectory(host/reminders)
 add_subdirectory(host/clock_values)
 
 add_subdirectory(host/sleep)
+add_subdirectory(host/series_plan)
