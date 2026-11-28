@@ -74,7 +74,7 @@ inline bool tick() {
   if (!directory) return false;
   mappedInputManager.simulatorClearInputFrame();
   static Fixture fixture;
-  static unsigned frame = 0;
+  static unsigned frame = 0, idlePaints = 0;
   const auto f = frame++;
   if (f == 0) {
     fixture.store.load();
@@ -134,6 +134,15 @@ inline bool tick() {
       if (f == 30 || f == 38 || f == 54 || f == 60 || f == 84 || f == 92 || f == 104 || f == 108)
         key(MappedInputManager::Button::Confirm);
     }
+    if (f == 14) {
+      if (activityManager.requestUpdateAndWait() != RequestUpdateResult::Rendered) std::_Exit(22);
+      RenderLock lock;
+      idlePaints = homeScenePaints();
+    }
+    if (f == 18) {
+      RenderLock lock;
+      if (homeScenePaints() != idlePaints) std::_Exit(23);
+    }
     if (f == 20) capture(directory, "edit-grid");
     if (f == 32) capture(directory, "add-picker");
     if (f == 35 && (fixture.page.revision != 1 || fixture.writes != 0)) std::_Exit(21);
@@ -159,10 +168,11 @@ inline bool tick() {
     stale.kind = LayoutEditKind::Remove;
     stale.revision = 1;
     if (fixture.store.edit(fixture.worker, stale) != LayoutEditStatus::Stale) std::_Exit(19);
-    LOG_INF("BSE",
-            "BookSync F35a PASS: add/remove/reset/restart/stale/keep; class=%s editor=%u payload-allocations=0; X3 UI "
-            "NEEDS APPROVAL",
-            Layout::deviceClass(), unsigned(sizeof(LayoutEditor)));
+    LOG_INF(
+        "BSE",
+        "BookSync F35a PASS: add/remove/reset/restart/stale/keep/idle; class=%s editor=%u payload-allocations=0; X3 UI "
+        "NEEDS APPROVAL",
+        Layout::deviceClass(), unsigned(sizeof(LayoutEditor)));
     std::fflush(nullptr);
     std::_Exit(0);
   }

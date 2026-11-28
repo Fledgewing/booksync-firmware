@@ -22,6 +22,9 @@
 
 namespace booksync {
 namespace {
+#ifdef SIMULATOR
+uint32_t scenePaints = 0;  // Read only while holding RenderLock in the scenario harness.
+#endif
 class ShellActivity final : public Activity {
   Library& library;
   Home home;
@@ -353,6 +356,8 @@ class ShellActivity final : public Activity {
             break;
           }
         }
+    } else {
+      return true;  // Consume the editor context without scheduling an idle repaint.
     }
     requestUpdate();
     return true;
@@ -491,6 +496,9 @@ class ShellActivity final : public Activity {
     if (takeHomeOpenRequest()) activityManager.goToReader(bookPath);
   }
   void render(RenderLock&&) override {
+#ifdef SIMULATOR
+    ++scenePaints;
+#endif
     renderer.clearScreen();
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
@@ -560,6 +568,7 @@ void showHome(GfxRenderer& renderer, MappedInputManager& input, HalDisplay::Refr
   activityManager.replaceActivity(std::move(shell));
 }
 #ifdef SIMULATOR
+uint32_t homeScenePaints() { return scenePaints; }
 void showHomeScene(GfxRenderer& renderer, MappedInputManager& input, Library& library) {
   auto shell = makeUniqueNoThrow<ShellActivity>(renderer, input, HalDisplay::FULL_REFRESH, library);
   if (!shell) {
