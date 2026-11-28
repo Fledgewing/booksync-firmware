@@ -518,8 +518,9 @@ void ActivityManager::renderTaskLoop() {
       BatteryDiagnosticLog::beginDisplayFrame();
 #endif
       currentActivity->render(std::move(lock));
-      currentActivity->reminderFrame_.finishRender(currentActivity->isBookReaderActivity(),
-                                                  currentActivity->allowsReminderOverlay() && !currentActivity->blocksGlobalInput());
+      currentActivity->reminderFrame_.finishRender(
+          currentActivity->isBookReaderActivity(),
+          currentActivity->allowsReminderOverlay() && !currentActivity->blocksGlobalInput());
 #if FREEINK_DEVICE_PICCO && CROSSINK_BATTERY_DIAG_LOG
       BatteryDiagnosticLog::finishDisplayFrame();
 #endif
@@ -1544,7 +1545,9 @@ bool ActivityManager::checkpointReminderSleep() {
 }
 
 bool ActivityManager::connectReminderClock() {
-  if (!currentActivity || pendingAction != PendingAction::None || booksync::reminderOwnsFrame()) return false;
+  if (!isCurrentActivityNamed("Reminders") || pendingAction != PendingAction::None || booksync::reminderOwnsFrame() ||
+      !currentActivity->allowsReminderOverlay() || currentActivity->blocksGlobalInput())
+    return false;
   auto sync = makeUniqueNoThrow<ClockSyncActivity>(renderer, mappedInput);
   if (!sync) {
     LOG_ERR("BSR", "Cannot allocate manual clock connection");

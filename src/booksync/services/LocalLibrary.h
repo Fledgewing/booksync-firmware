@@ -6,7 +6,7 @@ class RemindersFacade;
 struct ReminderActivity;
 void bindReminderActivity(void (*)(ReminderActivity));
 void bindReminders(RemindersFacade&);
-bool takeReminderConnectRequest();
+void bindReminderConnect(void (*)());
 // Composition root publishes small cached values and a private checkpoint port.
 // No storage access occurs through Library snapshot/paint.
 void publishUpgradeState(bool pending, bool recovery, bool (*dismiss)());

@@ -53,7 +53,7 @@ static_assert(sizeof(LocalState) <= 28 * 1024);
 std::unique_ptr<LocalState> local;
 SleepView currentSleep{};
 RemindersFacade* reminders = nullptr;
-bool reminderConnect = false;
+void (*reminderConnectHook)() = nullptr;
 void (*reminderActivityHook)(ReminderActivity) = nullptr;
 ClockStatus currentClock{};
 AccountView accountPresentation{};
@@ -270,8 +270,8 @@ class OfflineLibrary final : public Library {
       return CommandStatus::Accepted;
     }
     if (intent == Intent::ConnectReminderTime) {
-      if (!reminders) return CommandStatus::Unavailable;
-      reminderConnect = true;
+      if (!reminderConnectHook) return CommandStatus::Unavailable;
+      reminderConnectHook();
       return CommandStatus::Accepted;
     }
     if (intent == Intent::DismissUpgradeNotice) {
@@ -296,11 +296,7 @@ OfflineLibrary& shellLibrary() {
 }  // namespace
 Library& offlineLibrary() { return shellLibrary(); }
 void publishSleepView(SleepView value) { currentSleep = value; }
-bool takeReminderConnectRequest() {
-  const bool requested = reminderConnect;
-  reminderConnect = false;
-  return requested;
-}
+void bindReminderConnect(void (*callback)()) { reminderConnectHook = callback; }
 void bindReminderActivity(void (*callback)(ReminderActivity)) { reminderActivityHook = callback; }
 void publishClockStatus(ClockStatus value) { currentClock = value; }
 void bindReminders(RemindersFacade& facade) { reminders = &facade; }

@@ -37,7 +37,7 @@ struct Presenter {
   ReminderClaimRetry retry;
   ReminderNow now{};
   uint64_t lifetime = 1, lastEvaluation = 0, revision = 0, changes = 0;
-  bool initialized = false, hidden = false, input = false, claiming = false, sleep = false;
+  bool initialized = false, hidden = false, input = false, claiming = false, sleep = false, connectPending = false;
   std::atomic<uint32_t> frame{0};
 };
 static_assert(sizeof(Presenter) <= ReminderDueBytes);
@@ -45,6 +45,7 @@ Presenter& presenter() {
   static Presenter value{offlineLibrary()};
   return value;
 }
+void queueReminderClock() { presenter().connectPending = true; }
 void observeActivity(ReminderActivity value) {
   auto now = presenter().now;
   now.elapsed = value.elapsed;
@@ -318,6 +319,7 @@ void reminderHidden(bool hidden) {
 }
 void reminderNavigation() {
   auto& p = presenter();
+  p.connectPending = false;
   p.sheet.retireSheet();
   if (p.claiming) offlineLibrary().remindersRetire(p.lifetime);
   p.claiming = false;
@@ -350,6 +352,7 @@ bool reminderLoop(GfxRenderer& renderer, MappedInputManager& input, bool page, b
   auto& library = offlineLibrary();
   if (!p.initialized) {
     bindReminders(facade);
+    bindReminderConnect(queueReminderClock);
     bindReminderActivity(observeActivity);
     facade.configureFormatter(format);
     facade.configureListFormatter(formatList);
@@ -357,7 +360,8 @@ bool reminderLoop(GfxRenderer& renderer, MappedInputManager& input, bool page, b
     facade.sleepAvailable(true);
     p.initialized = true;
   }
-  if (takeReminderConnectRequest()) {
+  if (p.connectPending) {
+    p.connectPending = false;
     activityManager.connectReminderClock();
     return false;
   }
