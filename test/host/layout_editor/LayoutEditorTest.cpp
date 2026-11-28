@@ -312,3 +312,26 @@ TEST(LayoutEditor, BrokenSourceReadAndRevisionExhaustionCannotPublish) {
   EXPECT_EQ(editor.prepare(broken, "x4", request(LayoutEditKind::Remove)), LayoutEditStatus::Invalid);
   EXPECT_EQ(editor.output().bytes, 0u);
 }
+TEST(LayoutEditor, UnknownInstancesReserveCellsAndSurviveKnownRemoval) {
+  auto raw = original();
+  const std::string unknown =
+      R"({"instance":"future","widget":"future-widget","version":99,"x":2,"y":6,"w":2,"h":1,"settings":{"opaque":[null,{"keep":"exact"}]}})";
+  raw.insert(raw.find("\"placements\":[") + 14, unknown + ",");
+  for (const char* device : {"x4", "x3"}) {
+    const auto key = std::string("\"") + device + "\":{\"resume\"";
+    raw.insert(raw.find(key) + 6, "\"future\":{\"x\":0,\"y\":5},");
+  }
+  LayoutEditor editor;
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", request(LayoutEditKind::Add)),
+            LayoutEditStatus::Saved);
+  raw = bytes(editor.output());
+  EXPECT_NE(raw.find(unknown), std::string::npos);
+  Layout parser;
+  HomePage page;
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
+  ASSERT_EQ(page.count, 4);
+  EXPECT_EQ(page.widgets[3].y, 6);  // The unknown tile reserved row 5.
+  auto edit = request(LayoutEditKind::Remove, 2);
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+  EXPECT_NE(bytes(editor.output()).find(unknown), std::string::npos);
+}
