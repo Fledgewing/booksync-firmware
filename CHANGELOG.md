@@ -20,6 +20,7 @@
 - BookSync Home adds compact When you read and Reading records widgets on X4 Pro and Classic, with local-hour history and explicit per-record source availability.
 - BookSync can publish daily native saved highlights through Library without changing original clipping files; incomplete, scoped and oversized captures stay explicit.
 - BookSync prepares a bounded current-book chapter route from the native reader’s TOC and measured timing, preserving unknown pace and retiring old-book observations.
+- BookSync Home adds compact Clock/date and approximate Moon phase widgets on X4 Pro and Classic, with independent empty, off, unsupported, stale and oversized-data presentations; X3 keeps these widgets disabled.
 
 - BookSync publishes timezone-aware clock and date values only after live or retained clock provenance is known; a persisted expiry floor cannot produce a Home clock.
 - BookSync adds compact Series pages and exact next-1–10 download review on X4 Pro touch, X4 Classic buttons and X3, with offline/Back behavior, frozen file choices and restart-safe account-scoped queues through Library.

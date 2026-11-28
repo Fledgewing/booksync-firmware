@@ -53,6 +53,7 @@
 #include "../../test/simulator/NativePersonalScenario.h"
 #include "../../test/simulator/DeviceBridgeScenario.h"
 #include "booksync/reader/ChapterCapture.h"
+#include "../../test/simulator/TimeWidgetScenario.h"
 
 #include <Epub.h>
 #include <Epub/WordSpacing.h>
@@ -12196,7 +12197,7 @@ SimulatorSmokeTest smokeTest;
 
 void runSimulatorSmokeTestTick() {
   if (reminderUiScenario::tick()) return;
-  if (!catalogSurfaceScenario::tick() && !seriesSurfaceScenario::tick() && !upgradeNoticeScenario::tick() &&
+  if (!timeWidgetScenario::tick() && !catalogSurfaceScenario::tick() && !seriesSurfaceScenario::tick() && !upgradeNoticeScenario::tick() &&
       !accountSurfaceScenario::tick() && !editorScenario::tick() &&
       !goalWidgetScenario::tick() && !recordsWidgetScenario::tick() && !dailyWidgetScenario::tick() && !calendarWidgetScenario::tick() && !statsWidgetScenario::tick() && !widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() &&
       !EpubReaderCompletionSmokeTest::sleepScenarioTick() &&

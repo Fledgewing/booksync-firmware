@@ -21,7 +21,7 @@ const Size* sizes(WidgetKind kind, unsigned& count) {
     count = 1;
     return calendarMonth;
   }
-  if (isStatsWidget(kind)) {
+  if (isStatsWidget(kind) || isTimeWidget(kind)) {
     count = 1;
     return compact;
   }

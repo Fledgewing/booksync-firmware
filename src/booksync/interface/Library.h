@@ -19,6 +19,7 @@
 #include "booksync/interface/SeriesFlow.h"
 #include "booksync/interface/StatsWidgets.h"
 #include "booksync/interface/PersonalWidgets.h"
+#include "booksync/interface/TimeWidgets.h"
 
 namespace booksync {
 // UI reads bounded published values. No scans, writes, parsing or transport in
@@ -51,6 +52,7 @@ class Library {
   virtual DeviceSnapshot deviceStatus() const { return {}; }
   virtual DeviceResult deviceResult() const { return {}; }
   virtual CommandStatus deviceCommand(DeviceCommand) { return CommandStatus::Unavailable; }
+  virtual void readTimeWidgets(TimeWidgetBatch& out) const { out = {}; }
   virtual AccountView accountView() const { return {}; }
   virtual CommandStatus accountAction(AccountFormRequest) { return CommandStatus::Unavailable; }
   virtual void readAccountForm(AccountFormView& out) const { out = {}; }
