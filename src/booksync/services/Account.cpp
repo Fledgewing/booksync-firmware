@@ -48,6 +48,28 @@ bool Account::current(DeliveryTicket expected) const {
   return expected.owner == state.ticket.owner && expected.epoch == state.ticket.epoch;
 }
 AuthError Account::signIn(CredentialCapture& input, DeliveryTicket expected) {
+  return acceptLogin(input, expected, false);
+}
+AuthError Account::restoreLogin(CredentialCapture& input, DeliveryTicket expected, LoginAuthorization authorization) {
+  // Import only fills absent independent connector slots. It never revives a
+  // web account or replaces a current login in an already-running worker.
+  if (input.kind() == LoginKind::Account || (input.kind() == LoginKind::Sync && state.syncReady) ||
+      (input.kind() == LoginKind::Acquisition && state.acquisitionReady)) {
+    input.clear();
+    return AuthError::Stale;
+  }
+  if (!authorization.empty() &&
+      (authorization.identity.empty() || authorization.secret.empty() || authorization.identity.size() > 256 ||
+       authorization.secret.size() > CredentialCapture::SecretCapacity ||
+       authorization.identity.find('\0') != std::string_view::npos ||
+       authorization.secret.find('\0') != std::string_view::npos)) {
+    input.clear();
+    return AuthError::Invalid;
+  }
+  return acceptLogin(input, expected, true, authorization);
+}
+AuthError Account::acceptLogin(CredentialCapture& input, DeliveryTicket expected, bool restore,
+                               LoginAuthorization authorization) {
   // Erasure is unconditional, including rejected/stale requests and unsupported adapters.
   struct Cleanup {
     CredentialCapture& input;
@@ -61,7 +83,7 @@ AuthError Account::signIn(CredentialCapture& input, DeliveryTicket expected) {
       (input.kind() == LoginKind::Sync && !capabilities.sync) ||
       (input.kind() == LoginKind::Acquisition && !capabilities.acquisition))
     return AuthError::Unsupported;
-  const auto result = adapter.authenticate(input);
+  const auto result = restore ? adapter.restoreLogin(input, authorization) : adapter.authenticate(input);
   if (result.error != AuthError::None) return result.error;
   if (!result.owner) return AuthError::InvalidResponse;
   // Even reauthentication of the same owner retires all old result tickets.

@@ -19,7 +19,11 @@ PIPELINE = ('microlink_init', 'wolfSSL_connect', 'booksync::reader::Bridge::open
             'booksync::Account::signOut(', 'booksync::Account::snapshot() const',
             'booksync::Account::removeLogin(', 'booksync::Account::useAccountLogin(',
             'booksync::defaultServerAdapter()', 'booksync::server::Auth::authenticate(',
-            'booksync_identity_audit_link', 'booksync_update_trust_link', 'booksync::Feed::Feed(',
+            'booksync_identity_audit_link',
+            'booksync_credentials_import_link', 'booksync::legacy::Credentials::stage(',
+            'booksync::legacy::Credentials::restore(', 'booksync::legacy::Credentials::restoreWifi(',
+            'booksync::Account::restoreLogin(',
+            'booksync_update_trust_link', 'booksync::Feed::Feed(',
             'booksync::ed25519::verify(')
 
 

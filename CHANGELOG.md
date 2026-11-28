@@ -6,6 +6,7 @@
 - BookSync checkpoints verified local-to-server book matches under its sole sync owner, preserving native captures and reconciling uncertain results after restart; validated against a fake server with account and edition isolation.
 - BookSync Home hosts Continue reading, Shelf and Browse widgets from one bounded offline batch, with independent failure cards and touch, button and X3 text presentations.
 - BookSync audits legacy Tailnet identity in place without rewriting NVS or regenerating keys; incomplete, unknown and corrupt state remains untouched for later upgrade recovery. Activation remains deferred.
+- BookSync prepares read-only import of legacy sync, acquisition and Wi-Fi credentials, retaining originals and unresolved formats across repeated boots; activation remains deferred.
 
 - BookSync preserves shared Home layouts and device-class overrides across interrupted saves, retaining unknown widgets and damaged layouts while falling back safely.
 - BookSync allows one sync owner at a time, preserves offline work across owner changes, and checkpoints uncertain phase delivery for safe reconciliation; validated with a toy adapter only.

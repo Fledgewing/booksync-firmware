@@ -19,6 +19,10 @@ class OfflineAdapter final : public ServerAdapter {
  public:
   AuthCapabilities authCapabilities() const override { return auth.authCapabilities(); }
   AuthResult authenticate(const CredentialCapture& input) override { return auth.authenticate(input); }
+  AuthResult restoreLogin(const CredentialCapture& input) override { return auth.restoreLogin(input); }
+  AuthResult restoreLogin(const CredentialCapture& input, LoginAuthorization authorization) override {
+    return auth.restoreLogin(input, authorization);
+  }
   void clearAuth() override { auth.clearAuth(); }
   AuthResult useAccountLogin(LoginKind kind) override { return auth.useAccountLogin(kind); }
   AuthError removeLogin(LoginKind kind) override { return auth.removeLogin(kind); }

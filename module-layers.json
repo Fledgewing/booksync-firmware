@@ -5802,7 +5802,7 @@
     },
     "platformio.ini": {
       "role": "retained-build-input",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F11: S3 simulator profiles mirror the hardware PSRAM framebuffer ownership capability; native heap is still not ESP32 memory. F15 retains the neutral auth factory, capture and account entry points in the hardware size gate; this does not enable transport. F18a retains the dormant bounded match handler in the physical-image gate before external replay activation.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F11: S3 simulator profiles mirror the hardware PSRAM framebuffer ownership capability; native heap is still not ESP32 memory. F15 retains the neutral auth factory, capture and account entry points in the hardware size gate; this does not enable transport. F18a retains the dormant bounded match handler in the physical-image gate before external replay activation. F26b explicitly roots dormant import code for Xtensa and RISC-V full-link reserve checks.",
       "includes": []
     },
     "scripts/app_only_upload.py": {
@@ -13298,10 +13298,11 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup.",
       "includes": [
         "../../test/simulator/AccountScenario.h",
         "../../test/simulator/CatalogScenario.h",
+        "../../test/simulator/CredentialsScenario.h",
         "../../test/simulator/DeliveryScenario.h",
         "../../test/simulator/DeviceIndexScenario.h",
         "../../test/simulator/FilePublishScenario.h",
@@ -15268,6 +15269,14 @@
         "nvs.h",
         "openssl/sha.h"
       ]
+    },
+    "src/booksync/import/Credentials.h": {
+      "role": "import",
+      "rationale": "F26b worker-private bounded CPV1 read-only import, exact-byte private snapshots and offline F15 restore; no transport or activation."
+    },
+    "src/booksync/import/Credentials.cpp": {
+      "role": "import",
+      "rationale": "F26b worker-private bounded CPV1 read-only import, exact-byte private snapshots and offline F15 restore; no transport or activation."
     }
   },
   "generators": {
