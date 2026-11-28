@@ -17,7 +17,7 @@ struct SeriesFileSet {
 enum class SeriesConnect : uint8_t { Pending, Ready, Failed };
 struct SeriesFlowPorts {
   void* context = nullptr;
-  bool (*online)(void*) = nullptr;
+  bool (*online)(void*) = nullptr;  // Connection only; auth loss still uses the same Resume action.
   bool (*files)(void*, BookKey, SeriesFileSet&) = nullptr;
   bool (*selectionCurrent)(void*, BookKey, const DownloadSpec&) = nullptr;
   bool (*connect)(void*) = nullptr;

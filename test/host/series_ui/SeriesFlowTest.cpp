@@ -60,7 +60,7 @@ struct SeriesFlowTest : testing::Test {
   storage::SeriesQueueStore store{{"/queues", "/queues.tmp", "/queues.bak"}, "/series", scope};
   SeriesQueuePorts queuePorts{
       this, [](void* p) { return static_cast<SeriesFlowTest*>(p)->writable; },
-      [](void* p) { return static_cast<SeriesFlowTest*>(p)->online; },
+      [](void* p) { return static_cast<SeriesFlowTest*>(p)->online && static_cast<SeriesFlowTest*>(p)->authorized; },
       [](void* p, const storage::SeriesQueueRecord&) { return static_cast<SeriesFlowTest*>(p)->current; }};
   storage::SeriesQueueRecord reviewed{};
   SeriesQueueView view{};
@@ -84,6 +84,7 @@ struct SeriesFlowTest : testing::Test {
     for (unsigned i = 0; i < turns; ++i) q.tick(owner);
   }
 
+  bool authorized = true;
   uint8_t variants = 1;
   unsigned fileReads = 0;
   int unsupported = -1;
@@ -409,5 +410,25 @@ TEST_F(SeriesFlowTest, RevokedReadingGateDefersFileResolutionUntilOwnerPermitsWo
   ticks(6);
   EXPECT_EQ(published.scene, SeriesFlowScene::Review);
   EXPECT_EQ(fileReads, 3u);
+}
+TEST_F(SeriesFlowTest, RefusedAuthResumePublishesSameQueueWithNewRevision) {
+  reviewFiles();
+  ASSERT_TRUE(send(SeriesAction::Start));
+  ticks(3);
+  online = false;
+  ticks(50);
+  ASSERT_TRUE(send(SeriesAction::Status));
+  ticks(2);
+  ASSERT_TRUE(published.queue.paused);
+  const auto revision = published.revision, id = published.queue.id;
+  online = true;
+  authorized = false;
+  ASSERT_TRUE(send(SeriesAction::Resume));
+  ticks(2);
+  EXPECT_GT(published.revision, revision);
+  EXPECT_EQ(published.scene, SeriesFlowScene::Queue);
+  EXPECT_EQ(published.queue.id, id);
+  EXPECT_TRUE(published.queue.paused);
+  EXPECT_FALSE(published.pending);
 }
 }  // namespace

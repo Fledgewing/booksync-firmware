@@ -3,6 +3,7 @@
 
 #include <Logging.h>
 
+#include <algorithm>
 #include <cstring>
 #include <limits>
 namespace booksync {
@@ -96,7 +97,9 @@ void SeriesFlow::selectSeriesOption(uint8_t option) {
   row.key = view_.plan.next[next_].book.key;
   row.title = view_.plan.next[next_].book.title;
   row.variantLabel.fill(0);
-  std::memcpy(row.variantLabel.data(), chosen.label.data(), row.variantLabel.size() - 1);
+  size_t labelBytes = std::min(std::strlen(chosen.label.data()), row.variantLabel.size() - 1);
+  while (labelBytes && (static_cast<uint8_t>(chosen.label[labelBytes]) & 0xc0) == 0x80) --labelBytes;
+  std::memcpy(row.variantLabel.data(), chosen.label.data(), labelBytes);
   row.destination = chosen.destination;
   row.state = SeriesItemState::Queued;
   auto& shown = view_.review[next_];
@@ -225,6 +228,9 @@ bool SeriesFlow::action(const SeriesFlowRequest& input) {
       } else if (ports_.online(ports_.context) && queue_.resume(view_.queue.id)) {
         phase_ = Phase::Queue;
         change(SeriesFlowScene::Queue, true);
+      } else {
+        phase_ = Phase::Idle;
+        change(SeriesFlowScene::Queue);
       }
       return true;
     case SeriesAction::CancelRow:
@@ -303,7 +309,7 @@ void SeriesFlow::tick(DeliveryTicket current) {
         return;
       }
       options_.clear();
-      view_.fileRow=next_;
+      view_.fileRow = next_;
       if (!ports_.files(ports_.context, view_.plan.next[next_].book.key, options_) || !options_.complete ||
           options_.count > SeriesFileChoices) {
         notice(SeriesNotice::FileUnavailable);
