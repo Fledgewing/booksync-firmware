@@ -209,7 +209,7 @@ class ShellActivity final : public Activity {
     if (selected) renderer.drawRect(rect.x + 3, rect.y + 3, rect.width - 6, rect.height - 6, 2, true);
     if (!laidOut) {
       paintFittedText(UI_10_FONT_ID, rect.x + 10, rect.y + 6, kindTitle(kind), rect.width - 20);
-      paintFittedText(SMALL_FONT_ID, rect.x + 10, rect.y + 32, stateText(view.viewState), rect.width - 20);
+      paintFittedText(SMALL_FONT_ID, rect.x + 10, rect.y + 32, clock || moon ? tr(STR_HOME_WIDGET_SMALL_TILE) : stateText(view.viewState), rect.width - 20);
       return;
     }
     // Small header symbols use fixed native primitives; no asset/source work.

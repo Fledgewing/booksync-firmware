@@ -275,4 +275,55 @@ TEST(TimeLayout, NewClockAndMoonUseMainSizeAndStayHiddenOnX3) {
     EXPECT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x3", edit), LayoutEditStatus::Invalid);
   }
 }
+
+TEST(TimeProjection, KnownZeroMoonIlluminationIsNotEmpty) {
+  MoonWidget moon;
+  projectMoonWidget({ClockEvidence::Synchronized, 1712615281, 0, {2024, 4, 8, 1, 22, 28, 1}}, {}, moon);
+  EXPECT_EQ(moon.status.state, TimeCardState::Ready);
+  EXPECT_EQ(moon.illumination, 0);
+  EXPECT_EQ(moon.phase, 0);
+}
+TEST(TimeDrawing, InsufficientPixelsRefuseTheFaceWithoutChangingSavedValues) {
+  ClockWidget clock;
+  MoonWidget moon;
+  projectClockWidget(known(), {}, clock);
+  projectMoonWidget(known(), {}, moon);
+  for (WidgetBox box : {WidgetBox{224, 90}, WidgetBox{160, 108}}) {
+    widgets::TimeDrawing drawing;
+    EXPECT_FALSE(widgets::Clock::layoutTime(clock, box, drawing));
+    EXPECT_EQ(drawing.count, 0);
+    EXPECT_FALSE(widgets::Moon::layoutTime(moon, box, drawing));
+    EXPECT_EQ(drawing.count, 0);
+  }
+  EXPECT_EQ(clock.status.state, TimeCardState::Ready);
+  EXPECT_EQ(clock.reading.utcSeconds, 1795789920);
+}
+TEST(TimeLayout, CompactDefaultPreservesExistingCustomGridCounts) {
+  auto input = Layout::defaults();
+  std::string raw(input.bytes, '\0');
+  ASSERT_TRUE(input.read(input.context, 0, raw.data(), raw.size()));
+  Layout parser;
+  HomePage page;
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
+  EXPECT_EQ(page.rows, 6);
+  const auto at = raw.find("\"x4\":{\"cols\":2,\"rows\":6}");
+  ASSERT_NE(at, std::string::npos);
+  raw.replace(at, 24, "\"x4\":{\"cols\":2,\"rows\":7}");
+  // Existing custom counts are projected and retained by an unrelated Add.
+  ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
+  EXPECT_EQ(page.rows, 7);
+  LayoutEditor editor;
+  LayoutEdit edit;
+  edit.kind = LayoutEditKind::Add;
+  edit.widget = WidgetKind::Clock;
+  edit.revision = 1;
+  ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
+  auto output = editor.output();
+  std::string saved(output.bytes, '\0');
+  ASSERT_TRUE(output.read(output.context, 0, saved.data(), saved.size()));
+  ASSERT_TRUE(parser.project(LayoutInput::memory(saved.data(), saved.size()), "x4", 0, page));
+  EXPECT_EQ(page.rows, 7);
+  ASSERT_TRUE(parser.project(LayoutInput::memory(saved.data(), saved.size()), "x3", 0, page));
+  EXPECT_EQ(page.rows, 7);
+}
 }  // namespace
