@@ -525,7 +525,7 @@ class CatalogActivity final : public Activity {
               else if (h.action == 2)
                 catalog_->catalogSeries(h.index);
               else {
-                catalog_->selectCatalogControl(h.index);
+                catalog_->selectCatalogControl(h.action == 4 ? catalog_->catalogVisibleRows() + 3 + h.index : h.index);
                 catalog_->activateCatalog();
               }
               break;
