@@ -74,7 +74,7 @@ void Bridge::observeSession(const ReadingSessionJournal::Record& record) {
   observation.utcOffsetMinutes = record.utcOffsetMinutes;
   capture_.session(observation);
 }
-void Bridge::observe(Sample sample, const std::string& cache, bool closed) {
+void Bridge::observe(Sample sample, const std::string& cache, bool closed, bool refreshNative) {
   // Most loops do no work. Read raw slots only when live page/stats change or
   // closing, after the caller has excluded paint with RenderLock.
   if (pages_.hasWork()) {
@@ -89,7 +89,7 @@ void Bridge::observe(Sample sample, const std::string& cache, bool closed) {
   sample.primaryBytes = capture_.lastSample().primaryBytes;
   sample.backupBytes = capture_.lastSample().backupBytes;
   const bool captureClosed = closed && !pages_.hasWork();
-  if (capture_.unchanged(sample, captureClosed)) return;
+  if (!refreshNative && capture_.unchanged(sample, captureClosed)) return;
   for (unsigned slot = 0; slot < 2; ++slot) {
     char path[128];
     const auto n = snprintf(path, sizeof(path), "%s/progress.bin%s", cache.c_str(), slot ? ".bak" : "");

@@ -53,7 +53,7 @@ struct ToastRect {
 
 class EpubReaderActivity final : public Activity {
   booksync::reader::Bridge booksyncCapture;
-  void observeBookSync(bool closed = false);
+  void observeBookSync(bool closed = false, bool refreshNative = false);
 
   PluginReaderEvents pluginEvents;
 #ifdef SIMULATOR
@@ -608,6 +608,7 @@ class EpubReaderActivity final : public Activity {
   void onExit() override;
   void prepareForSleep() override {
     if (!saveReadingProgress()) LOG_ERR("PEVT", "Reader progress save failed before sleep");
+    observeBookSync(false, true);
     pluginEvents.poll(getCurrentBookPath());
     pluginEvents.flush(getCurrentBookPath());
   }

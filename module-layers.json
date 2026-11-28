@@ -7064,7 +7064,7 @@
     },
     "src/activities/ActivityManager.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owns boot/Home routing and offline Home regression coverage; F05 retires native writers while retaining local capture; F06 retains isolated publication probes. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission. R1 publishes already established clock provenance before foreground work; no I/O or draw is introduced.",
+      "rationale": "F04 owns boot/Home routing and offline Home regression coverage; F05 retires native writers while retaining local capture; F06 retains isolated publication probes. F11: safe display release/restore, prepared transport leases, internal stack and allocation admission. R1 publishes already established clock provenance before foreground work; no I/O or draw is introduced. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk.",
       "includes": [
         "ActivityManager.h",
         "CrossInkHalFrontlight.h",
@@ -7118,7 +7118,7 @@
     },
     "src/activities/ActivityManager.h": {
       "role": "retained-runtime",
-      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives.",
+      "rationale": "BookSync F05: retire native network writers and product sync routes while preserving local capture and hardware primitives. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk.",
       "includes": [
         "CrossPointSettings.h",
         "GfxRenderer.h",
@@ -8780,7 +8780,7 @@
     },
     "src/activities/reader/EpubReaderActivity.cpp": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged.",
       "includes": [
         "../settings/DictionarySelectActivity.h",
         "Arduino.h",
@@ -8874,7 +8874,7 @@
     },
     "src/activities/reader/EpubReaderActivity.h": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged.",
       "includes": [
         "BackgroundBuildMemoryGuard.h",
         "BookLoadingFeedback.h",
@@ -9859,7 +9859,7 @@
     },
     "src/activities/reader/TxtReaderActivity.cpp": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged.",
       "includes": [
         "BidiUtils.h",
         "CrossPointSettings.h",
@@ -9890,7 +9890,7 @@
     },
     "src/activities/reader/TxtReaderActivity.h": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged.",
       "includes": [
         "BookLoadingFeedback.h",
         "CrossPointSettings.h",
@@ -9922,7 +9922,7 @@
     },
     "src/activities/reader/XtcReaderActivity.cpp": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged.",
       "includes": [
         "BookStatsActivity.h",
         "BookStatsTracking.h",
@@ -9959,7 +9959,7 @@
     },
     "src/activities/reader/XtcReaderActivity.h": {
       "role": "retained-reader",
-      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk.",
+      "rationale": "F09 declared engine bridge: local observations only on the main task outside paint; native navigation, timing and persistence formats remain owned by CrossInk. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged.",
       "includes": [
         "BookLoadingFeedback.h",
         "BookReadingStats.h",
@@ -12278,7 +12278,7 @@
     },
     "src/main.cpp": {
       "role": "retained-runtime",
-      "rationale": "F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change.",
+      "rationale": "F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change. F42 captures native progress before the bounded sleep drain via the declared runtime bridge; native renderer and wake routes remain owned by CrossInk.",
       "includes": [
         "AppCapabilities.h",
         "AppVersion.h",
@@ -12336,6 +12336,7 @@
         "array",
         "booksync/system/Bootstrap.h",
         "booksync/system/NetworkPhase.h",
+        "booksync/system/SleepRuntime.h",
         "builtinFonts/all.h",
         "components/UITheme.h",
         "components/icons/tablerFilledIcons.h",
@@ -13304,7 +13305,7 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F35a adds isolated editor HAL/interaction scenario coverage. F18d exercises private state checkpoints, native writeback and durable fake-server restart scenarios. F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change. F23 invokes the opt-in synthetic download/fault/restart scenario before normal boot. F18c adds only the synthetic durable annotation lifecycle scenario entry point. F22 adds offline neutral queries over committed synthetic catalog generations, restart/paging and unsupported coverage. F39 invokes bounded offline personal/stats scenarios with saved page history and normalized fake account snapshots. F37a adds the synthetic account surface paint/epoch/retirement scenario. F18e invokes only the synthetic progress checkpoint/reconciliation scenario under F17 and F15; no native reader change. F24 invokes opt-in real EPUB copy replacement and publication-cut recovery before the unchanged native F08 reflow/reopen harness. B2 synthetic notice capture and neutral dispatch scenario only. F25 adds synthetic bounded cover acquisition and retired-view probes, with no live transport or product presentation. R1 adds an opt-in synthetic clock-proof scenario, never changing the host clock. F19 invokes the synthetic durable position-policy and F12 late-consent scenario only. F20 adds real-HAL offline finish/Undo/reconciliation using a synthetic remote ledger; no UI. F46a opt-in real HTTP adapter scenario uses admitted worker, synthetic credentials and isolated response spool; no production startup scheduling. R1 adds an opt-in synthetic reminder policy/store scenario before ordinary boot.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F35a adds isolated editor HAL/interaction scenario coverage. F18d exercises private state checkpoints, native writeback and durable fake-server restart scenarios. F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change. F23 invokes the opt-in synthetic download/fault/restart scenario before normal boot. F18c adds only the synthetic durable annotation lifecycle scenario entry point. F22 adds offline neutral queries over committed synthetic catalog generations, restart/paging and unsupported coverage. F39 invokes bounded offline personal/stats scenarios with saved page history and normalized fake account snapshots. F37a adds the synthetic account surface paint/epoch/retirement scenario. F18e invokes only the synthetic progress checkpoint/reconciliation scenario under F17 and F15; no native reader change. F24 invokes opt-in real EPUB copy replacement and publication-cut recovery before the unchanged native F08 reflow/reopen harness. B2 synthetic notice capture and neutral dispatch scenario only. F25 adds synthetic bounded cover acquisition and retired-view probes, with no live transport or product presentation. R1 adds an opt-in synthetic clock-proof scenario, never changing the host clock. F19 invokes the synthetic durable position-policy and F12 late-consent scenario only. F20 adds real-HAL offline finish/Undo/reconciliation using a synthetic remote ledger; no UI. F46a opt-in real HTTP adapter scenario uses admitted worker, synthetic credentials and isolated response spool; no production startup scheduling. R1 adds an opt-in synthetic reminder policy/store scenario before ordinary boot. F42 adds test-only native sleep/reboot/resume and pre-drain capture proof.",
       "includes": [
         "../../test/simulator/AccountScenario.h",
         "../../test/simulator/AccountSurfaceScenario.h",
@@ -13335,6 +13336,7 @@
         "../../test/simulator/QueriesScenario.h",
         "../../test/simulator/ReaderCaptureScenario.h",
         "../../test/simulator/RemindersScenario.h",
+        "../../test/simulator/SleepScenario.h",
         "../../test/simulator/SyncOwnerScenario.h",
         "../../test/simulator/UpdateInstallScenario.h",
         "../../test/simulator/UpdateScenario.h",
@@ -13360,6 +13362,7 @@
         "Epub/parsers/ChapterHtmlSlimParser.h",
         "FilenameFontSystem.h",
         "FontInstaller.h",
+        "GlobalActions.h",
         "HalScalableFont.h",
         "HalScreenCalibration.h",
         "HalStorage.h",
@@ -13445,6 +13448,7 @@
         "activities/util/OptionSelectionActivity.h",
         "algorithm",
         "booksync/reader/Locator.h",
+        "booksync/system/Bootstrap.h",
         "builtinFonts/bitter_12_regular.h",
         "chrono",
         "components/CompactHeader.h",
@@ -14987,11 +14991,11 @@
     },
     "src/booksync/reader/Bridge.h": {
       "role": "reader",
-      "rationale": "F09 main-task local reader capture into F07; bounded native observations, no transport or presentation. Rendering is excluded by the native reader RenderLock."
+      "rationale": "F09 main-task local reader capture into F07; bounded native observations, no transport or presentation. Rendering is excluded by the native reader RenderLock. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged."
     },
     "src/booksync/reader/Bridge.cpp": {
       "role": "reader",
-      "rationale": "F09 main-task local reader capture into F07; bounded native observations, no transport or presentation. Rendering is excluded by the native reader RenderLock."
+      "rationale": "F09 main-task local reader capture into F07; bounded native observations, no transport or presentation. Rendering is excluded by the native reader RenderLock. F42 forces only the sleep-time two-slot raw native progress refresh after debounce flush; normal loop deduplication and native file behavior remain unchanged."
     },
     "src/activities/reader/NativeReaderObserver.h": {
       "role": "retained-runtime",
@@ -15749,6 +15753,34 @@
     "src/booksync/services/Clock.cpp": {
       "role": "services",
       "rationale": "F40w prerequisite: validate known-clock civil and UTC values outside paint; pure fixed-size projection with no storage, transport or native settings dependencies."
+    },
+    "src/booksync/interface/Sleep.h": {
+      "role": "interface",
+      "rationale": "F42 bounded main-loop sleep pass, immutable Library-only cached presentation and safe ownership retirement; no transport, extra framebuffer or new artwork."
+    },
+    "src/booksync/services/Sleep.h": {
+      "role": "services",
+      "rationale": "F42 bounded main-loop sleep pass, immutable Library-only cached presentation and safe ownership retirement; no transport, extra framebuffer or new artwork."
+    },
+    "src/booksync/services/Sleep.cpp": {
+      "role": "services",
+      "rationale": "F42 bounded main-loop sleep pass, immutable Library-only cached presentation and safe ownership retirement; no transport, extra framebuffer or new artwork."
+    },
+    "src/booksync/ui/Sleep.h": {
+      "role": "ui",
+      "rationale": "F42 bounded main-loop sleep pass, immutable Library-only cached presentation and safe ownership retirement; no transport, extra framebuffer or new artwork."
+    },
+    "src/booksync/ui/Sleep.cpp": {
+      "role": "ui",
+      "rationale": "F42 bounded main-loop sleep pass, immutable Library-only cached presentation and safe ownership retirement; no transport, extra framebuffer or new artwork."
+    },
+    "src/booksync/system/SleepRuntime.h": {
+      "role": "system",
+      "rationale": "F42 bounded main-loop sleep pass, immutable Library-only cached presentation and safe ownership retirement; no transport, extra framebuffer or new artwork."
+    },
+    "src/booksync/system/SleepRuntime.cpp": {
+      "role": "system",
+      "rationale": "F42 bounded main-loop sleep pass, immutable Library-only cached presentation and safe ownership retirement; no transport, extra framebuffer or new artwork."
     }
   },
   "generators": {

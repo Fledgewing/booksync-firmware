@@ -1082,6 +1082,14 @@ void ActivityManager::goToReaderAndRunMenuAction(std::string path, const uint8_t
   goToReader(std::move(path));
 }
 
+void ActivityManager::prepareForSleep() {
+  RenderLock lock;
+  if (sleepCapturePrepared) return;
+  for (auto& activity : stackActivities) activity->prepareForSleep();
+  if (currentActivity) currentActivity->prepareForSleep();
+  sleepCapturePrepared = true;
+}
+
 bool ActivityManager::goToSleep(bool fromTimeout) {
   // Hold the visible page steady from the first sleep indication through reader saves.
   RenderLock lock;
@@ -1466,9 +1474,14 @@ bool RenderLock::heldByCurrentTask() {
 }
 
 void ActivityManager::captureSleepEvents() {
+  // Capture remains available with plugins disabled. The main-loop sleep
+  // coordinator normally prepared it before the network drain.
+  if (!sleepCapturePrepared) {
+    for (auto& activity : stackActivities) activity->prepareForSleep();
+    if (currentActivity) currentActivity->prepareForSleep();
+  }
+  sleepCapturePrepared = false;
   if (!SETTINGS.pluginsEnabled) return;
-  for (auto& activity : stackActivities) activity->prepareForSleep();
-  if (currentActivity) currentActivity->prepareForSleep();
   const std::string book = getCurrentBookPath();
   pluginevents::queueSleep(book.c_str(), getScreenshotInfo().progressPercent);
   return;

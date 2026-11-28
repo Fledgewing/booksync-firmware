@@ -85,6 +85,7 @@ class ActivityManager {
   // Apply navigation and render requests without polling the outgoing activity.
   void processPendingActivities();
   void captureSleepEvents();
+  bool sleepCapturePrepared = false;
 
   // Pending activity to be launched on next loop iteration
   std::unique_ptr<Activity> pendingActivity;
@@ -175,6 +176,8 @@ class ActivityManager {
                   bool cleanImageBaseOnEntry = false, bool keepWakeFrame = false);
   void goToReaderAndRunMenuAction(std::string path, uint8_t action);
   // Returns true only when sleep rendered a known complete B/W frame.
+  void retireSleepCapture() { sleepCapturePrepared = false; }
+  void prepareForSleep();  // Main loop, local capture before network drain.
   bool goToSleep(bool fromTimeout = false);
   void goToBoot();
   void goToFullScreenMessage(StrId title, StrId message);

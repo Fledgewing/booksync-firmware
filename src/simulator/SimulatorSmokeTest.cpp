@@ -2,6 +2,8 @@
 
 #include "SimulatorSmokeTest.h"
 #include "booksync/reader/Locator.h"
+#include "booksync/system/Bootstrap.h"
+#include "GlobalActions.h"
 #include "../../test/simulator/FilePublishScenario.h"
 #include "../../test/simulator/LifecycleJournalScenario.h"
 #include "../../test/simulator/SyncOwnerScenario.h"
@@ -185,6 +187,7 @@ extern CrossPointSettings::SHORT_PWRBTN getPowerButtonAction();
 struct EpubReaderCompletionSmokeTest {
 #include "../../test/simulator/LocatorScenario.h"
 #include "../../test/simulator/ReaderCaptureScenario.h"
+#include "../../test/simulator/SleepScenario.h"
   static std::optional<uint32_t> statusAnchor;
   static bool fontBrowserReturn(EpubReaderActivity& reader, const char* family) {
     RenderLock lock;
@@ -12176,8 +12179,12 @@ SimulatorSmokeTest smokeTest;
 }  // namespace
 
 void runSimulatorSmokeTestTick() {
-  if (!upgradeNoticeScenario::tick() && !accountSurfaceScenario::tick() && !editorScenario::tick() && !widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() && !EpubReaderCompletionSmokeTest::readerCaptureScenarioTick() &&
-      !EpubReaderCompletionSmokeTest::locatorScenarioTick()) smokeTest.tick();
+  if (!upgradeNoticeScenario::tick() && !accountSurfaceScenario::tick() && !editorScenario::tick() &&
+      !widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() &&
+      !EpubReaderCompletionSmokeTest::sleepScenarioTick() &&
+      !EpubReaderCompletionSmokeTest::readerCaptureScenarioTick() &&
+      !EpubReaderCompletionSmokeTest::locatorScenarioTick())
+    smokeTest.tick();
 }
 
 bool simulatorInterceptNetworkRestart(const uint32_t target, const uint32_t payload) {

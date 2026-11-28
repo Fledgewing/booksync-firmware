@@ -14,7 +14,7 @@ Refer to https://freeink.org/llms.txt for guidance.
 - Known simulator limits:
   - No image rendering: `platformio.ini` ignores `hal`, `PNGdec`, and `JPEGDEC`, so image decoders are intentionally absent.
   - JPEGDEC stub always fails; `JPEGDEC fallback: open failed (err=-1)` is expected in simulator.
-  - `esp_deep_sleep_start()` is a no-op in simulator.
+  - The pinned BookSync simulator HAL waits inside `HalGPIO::startDeepSleep()` and re-execs on a button wake; SDL_QUIT returns. The low-level `esp_deep_sleep_start()` stub alone is a no-op. Test the HAL lifecycle, not that stub.
   - `HalStorage` uses POSIX file access under `./fs_` and allows multiple readers, unlike real hardware.
 
 ## Real Hardware / Storage
