@@ -20,6 +20,6 @@ with tempfile.TemporaryDirectory(prefix='booksync-records-widgets-') as director
     if result.returncode or 'BookSync F40w hours/records PASS:' not in log:
         raise SystemExit(f'F40w {profile} failed; see {out}/records-widgets.log')
     assert not any('Font ' in line and 'not found' in line for line in log.splitlines())
-    for scene in ('known', 'empty', 'not-saved', 'off', 'unsupported', 'stale', 'oversize', 'error', 'known-zero', 'stale-empty', 'account-only'):
+    for scene in ('known', 'empty', 'not-saved', 'off', 'unsupported', 'stale', 'oversize', 'error', 'known-zero', 'stale-empty', 'account-only', 'add-list-final'):
         assert (out / f'{scene}.pgm').stat().st_size > 1000
-print(f'BookSync F40w {profile}: eleven states PASS')
+print(f'BookSync F40w {profile}: twelve states PASS')

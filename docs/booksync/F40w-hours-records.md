@@ -47,10 +47,10 @@ overlapping visits, coverage and a date-only calendar. Layout tests cover
 installed sizes, shared editing and X3 exclusion.
 
 Run `test/simulator/records_widgets.py` with each of `x4-pro-simulator`,
-`x4-classic-simulator` and `simulator-X3`. Eleven scenes cover those states,
+`x4-classic-simulator` and `simulator-X3`. Twelve scenes cover those states,
 partial known-zero fields, stale empty and account-only records. The scene
 asserts one Library batch/read and rejects accidental read-only dispatch.
-The complete simulator suite includes this scenario.
+A twelfth scene swipes the Pro Add list or advances Classic focus, then selects its last entry. The complete simulator suite includes this scenario.
 
 Build `x4-pro`, `x4-classic` and `default`; run `tools/ci/measure.py` for each.
 The required firmware check repeats host, boundary, frame, six build and three

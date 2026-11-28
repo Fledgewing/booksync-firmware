@@ -7,10 +7,13 @@
 #include <filesystem>
 
 #include "activities/Activity.h"
+#include "activities/ActivityManager.h"
 #include "booksync/services/Layout.h"
 #include "booksync/services/widgets/Records.h"
 #include "booksync/services/widgets/When.h"
 #include "booksync/system/Bootstrap.h"
+#include "components/UITheme.h"
+#include "fontIds.h"
 extern GfxRenderer renderer;
 extern MappedInputManager mappedInputManager;
 namespace recordsWidgetScenario {
@@ -21,6 +24,12 @@ class Fixture final : public Library {
   LibraryWindow windowValue{};
   StatsWidgetBatch stats{};
   unsigned scene = 0, batches = 0;
+  bool selectedLast = false;
+  CommandStatus editLayout(LayoutEdit request) override {
+    if (scene != 11 || request.kind != LayoutEditKind::Add || request.widget != WidgetKind::Records) std::_Exit(7);
+    selectedLast = true;
+    return CommandStatus::Unavailable;
+  }
   mutable unsigned windowReads = 0, statsReads = 0;
   Capabilities capabilities() const override { return {}; }
   Snapshot snapshot() const override { return {}; }
@@ -125,7 +134,46 @@ inline bool tick() {
     if (frame == 20)
       mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Down));
   }
-  if (frame < 35) return true;
+  if (scene == 11 && !fixture.page.textOnly) {
+    if (frame == 10)
+      mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Right));
+    if (frame == 14 || frame == 16)
+      mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Down));
+    if (frame >= 22 && frame < 22 + 2 * uint8_t(WidgetKind::Records) && frame % 2 == 0) {
+#if CROSSINK_APP_CAP_TOUCH
+      if (mappedInputManager.hasTouch()) {
+        mappedInputManager.simulatorInjectTouchDown(renderer.getScreenWidth() / 2, renderer.getScreenHeight() * 3 / 5);
+        mappedInputManager.simulatorInjectTouchRelease(renderer.getScreenWidth() / 2,
+                                                       renderer.getScreenHeight() * 2 / 5);
+      } else
+#endif
+        mappedInputManager.simulatorInjectRelease(mappedInputManager.menuButton(MappedInputManager::Button::Down));
+    }
+    if (frame == 18) mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
+    if (frame > 60) {
+      if (frame == 62) {
+#if CROSSINK_APP_CAP_TOUCH
+        if (mappedInputManager.hasTouch()) {
+          const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+          const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+          const int line = renderer.getLineHeight(UI_10_FONT_ID), height = line + 26;
+          const int top = header.y + header.height + line * 3 + 28;
+          const int capacity = (safe.y + safe.height - 48 - top) / height;
+          const int x = safe.x + 50, y = top + (capacity - 1) * height + height / 2;
+          mappedInputManager.simulatorInjectTouchDown(x, y);
+          mappedInputManager.simulatorInjectTouchRelease(x, y);
+        } else
+#endif
+          mappedInputManager.simulatorInjectRelease(MappedInputManager::Button::Confirm);
+      }
+      if (frame < 66) return true;
+      if (!fixture.selectedLast) std::_Exit(8);
+      LOG_INF("BSW", "BookSync F40w hours/records PASS: twelve states, one batch, X3 off, Add last entry");
+      std::fflush(nullptr);
+      std::_Exit(0);
+    }
+  }
+  if (frame < (scene == 11 && !fixture.page.textOnly ? 60u : 35u)) return true;
   if (activityManager.requestUpdateAndWait() != RequestUpdateResult::Rendered) std::_Exit(2);
   {
     RenderLock lock;
@@ -137,8 +185,8 @@ inline bool tick() {
       std::_Exit(3);
     }
     std::filesystem::create_directories(output);
-    const char* names[] = {"known",    "empty", "not-saved",  "off",         "unsupported", "stale",
-                           "oversize", "error", "known-zero", "stale-empty", "account-only"};
+    const char* names[] = {"known",    "empty", "not-saved",  "off",         "unsupported",  "stale",
+                           "oversize", "error", "known-zero", "stale-empty", "account-only", "add-list-final"};
     const auto path = std::filesystem::path(output) / (std::string(names[scene]) + ".pgm");
     FILE* file = std::fopen(path.c_str(), "wb");
     if (!file) std::_Exit(4);
@@ -147,9 +195,10 @@ inline bool tick() {
       for (int x = 0; x < renderer.getScreenWidth(); ++x) std::fputc(renderer.isPixelBlack(x, y) ? 0 : 255, file);
     std::fclose(file);
   }
+  if (scene == 11 && !fixture.page.textOnly) return true;
   frame = 0;
-  if (++scene == 11) {
-    LOG_INF("BSW", "BookSync F40w hours/records PASS: eleven states, one batch, X3 off");
+  if (++scene == 12) {
+    LOG_INF("BSW", "BookSync F40w hours/records PASS: twelve states, one batch, X3 off");
     std::fflush(nullptr);
     std::_Exit(0);
   }
