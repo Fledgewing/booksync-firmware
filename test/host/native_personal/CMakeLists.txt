@@ -4,6 +4,7 @@ add_executable(BookSyncNativePersonalTest NativePersonalTest.cpp SavedNativePass
   ${REPO_ROOT}/src/booksync/services/PersonalWorker.cpp
   ${REPO_ROOT}/src/booksync/services/ReadingStats.cpp
   ${REPO_ROOT}/src/booksync/storage/PageJournal.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/BookList.cpp
   ${REPO_ROOT}/src/booksync/services/PersonalReading.cpp
   ${REPO_ROOT}/src/booksync/services/Clock.cpp
   ${REPO_ROOT}/src/booksync/storage/LifecycleJournal.cpp
