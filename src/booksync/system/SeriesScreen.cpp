@@ -9,6 +9,9 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#ifdef SIMULATOR
+#include <cstdlib>
+#endif
 
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
@@ -21,6 +24,15 @@ namespace {
 uint32_t paints = 0;
 class SeriesActivity;
 SeriesActivity* scenarioActivity = nullptr;
+struct TextBox {
+  Rect bounds{0, 0, 0, 0};
+  uint8_t layer = 0;
+  char label[96]{};
+};
+std::array<TextBox, 256> textBoxes_{};
+unsigned textBoxCount_ = 0;
+uint8_t textLayer_ = 0;
+bool geometryOverflow_ = false;
 #endif
 class SeriesActivity final : public Activity {
   Library& library_;
@@ -29,6 +41,7 @@ class SeriesActivity final : public Activity {
   uint8_t focus_ = 0, scroll_ = 0;
   uint32_t lastPoll_ = 0;
   bool painted_ = false;
+  int textLine_ = 0, smallLine_ = 0, titleLine_ = 0, captionLine_ = 0, memberLine_ = 0;
 #if !CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
   // Three prepared 48x72 covers plus one reusable F25 bitmap. No second framebuffer.
   std::array<std::array<uint8_t, 432>, 3> covers_{};
@@ -36,33 +49,75 @@ class SeriesActivity final : public Activity {
   std::array<BookKey, 3> keys_{};
   CoverBitmap bitmap_{};
 #endif
-  Rect safe() const { return UITheme::getInstance().getScreenSafeArea(renderer, true, false); }
+  Rect safe() const { return UITheme::getInstance().getScreenSafeArea(renderer, false, false); }
   // Normalize approved design coordinates to the current safe viewport; these
   // reference units are not physical panel dimensions.
   int seriesScale(int value) const {
     return std::max(1, std::min(value * safe().width / 480, value * safe().height / 800));
   }
-  int textFont() const { return CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS ? SMALL_FONT_ID : UI_10_FONT_ID; }
-  int titleFont() const { return CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS ? UI_10_FONT_ID : UI_12_FONT_ID; }
-  int seriesTextLine() const { return renderer.getLineHeight(textFont()); }
+  int textFont() const { return UI_10_FONT_ID; }
+  int memberFont() const { return SERIES_MEMBER_FONT_ID; }
+  int titleFont() const { return UI_12_FONT_ID; }
+  int seriesTextLine() const { return textLine_; }
   int seriesTop() const {
     const auto s = safe();
-    return s.y + seriesScale(64);
+    return s.y + seriesScale(80);
   }
   int bottom() const {
     const auto s = safe();
-    return s.y + s.height - seriesScale(50);
+    return s.y + s.height - seriesScale(37);
   }
   void text(Rect r, const char* value, bool bold = false, int font = 0) const {
     if (r.width < 1 || r.height < 1) return;
+#ifdef SIMULATOR
+    const int selectedFont = font ? font : textFont();
+    const auto style = bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
+    const auto ink = renderer.getTextVerticalBounds(selectedFont, value, style);
+    if (value[0] && ink.bottom > ink.top) {
+      if (textBoxCount_ == textBoxes_.size())
+        geometryOverflow_ = true;
+      else {
+        auto& box = textBoxes_[textBoxCount_++];
+        box.bounds = Rect{r.x, r.y, std::min(r.width, renderer.getTextWidth(selectedFont, value, style)),
+                          std::max(renderer.getLineHeight(selectedFont), ink.bottom)};
+        box.layer = textLayer_;
+        std::snprintf(box.label, sizeof(box.label), "%s", value);
+        if (ink.top < 0 || ink.bottom > r.height) {
+          LOG_ERR("BSS", "Clipped text geometry: %s ink=%d..%d box=%d", value, ink.top, ink.bottom, r.height);
+          geometryOverflow_ = true;
+        }
+      }
+    }
+#endif
     renderer.beginTextClip(r.x, r.y, r.width, r.height);
     renderer.drawText(font ? font : textFont(), r.x, r.y, value, true,
                       bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
     renderer.endTextClip();
   }
+  void actionOutline(Rect r, bool focused = false, bool disabled = false) const {
+    renderer.drawRoundedRect(r.x, r.y, r.width, r.height, focused && !disabled ? 2 : 1,
+                             CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS ? 0 : r.height / 2, true);
+    if (disabled) {
+      // Stipple the empty frame before drawing its label, using the existing 1-bit buffer.
+      const int period = seriesScale(8), ink = seriesScale(4);
+      for (int y = r.y; y < r.y + r.height; ++y)
+        for (int x = r.x; x < r.x + r.width; ++x)
+          if ((x + y) % period >= ink) renderer.drawPixel(x, y, false);
+    }
+  }
+  void buttonText(Rect area, const char* label, bool enabled = true) const {
+    const int width = std::min(
+        area.width - seriesScale(12),
+        renderer.getTextWidth(SERIES_META_FONT_ID, label, enabled ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR));
+    text(Rect{area.x + (area.width - width) / 2, area.y + (area.height - smallLine()) / 2, width, smallLine()}, label,
+         enabled, SERIES_META_FONT_ID);
+  }
   void wrapped(Rect area, const char* value, uint8_t maxLines, bool bold = false, int font = 0) const {
     const int selectedFont = font ? font : textFont();
-    const int height = renderer.getLineHeight(selectedFont);
+    const int height = selectedFont == titleFont()              ? titleLine_
+                       : selectedFont == SERIES_META_FONT_ID    ? smallLine()
+                       : selectedFont == SERIES_CAPTION_FONT_ID ? captionLine_
+                                                                : seriesTextLine();
     char chunk[96]{};
     for (uint8_t row = 0; row < maxLines && *value && (row + 1) * height <= area.height; ++row) {
       uint8_t n = 0, lastSpace = 0;
@@ -96,22 +151,51 @@ class SeriesActivity final : public Activity {
     }
   }
   void outline(Rect r, int thick = 1) const {
-    renderer.drawRoundedRect(r.x, r.y, r.width, r.height, thick, seriesScale(10), true);
+    renderer.drawRoundedRect(r.x, r.y, r.width, r.height, thick,
+                             CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS ? 0 : seriesScale(10), true);
+  }
+  int smallLine() const { return smallLine_; }
+  int cardTop() const { return totalsBarY(seriesTop() + seriesScale(70)) + seriesScale(19); }
+  int cardListTop() const { return cardTop() + seriesTextLine() + smallLine() + seriesScale(60); }
+  int cardTitleStep() const {
+#ifdef SIMULATOR
+    // Regression probe recreates the former fixed-pitch overlap; never in hardware images.
+    if (std::getenv("BOOKSYNC_SERIES_GEOMETRY_NEGATIVE")) return seriesScale(18);
+#endif
+    return smallLine() + seriesScale(3);
+  }
+  int cardButtonY() const {
+    const auto count = std::min<uint8_t>(series_.plan().count, 3);
+    return count ? cardListTop() + count * (smallLine() + seriesScale(3)) + seriesScale(8)
+                 : cardListTop() + seriesScale(20);
+  }
+  int membersY() const { return cardButtonY() + seriesScale(50) + seriesScale(22); }
+  int memberTextHeight(bool reading) const {
+    return memberLine_ + 2 * seriesScale(4) + renderer.getLineHeight(SERIES_CAPTION_FONT_ID) + captionLine_ +
+           (reading ? 6 + std::max(3, seriesScale(4)) : 0);
+  }
+  int memberHeight() const {
+    return std::max(CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS ? 72 : 90, memberTextHeight(true) + 4);
   }
   Rect pageRow(uint8_t i) const {
     const auto s = safe();
-    const int start = std::max(seriesScale(336), seriesScale(318) + seriesTextLine() + seriesScale(6));
-    return Rect{s.x + seriesScale(16), seriesTop() + start + i * seriesScale(91), s.width - seriesScale(32),
-                seriesScale(91)};
+    return Rect{s.x + seriesScale(16), membersY() + memberLine_ + seriesScale(5) + i * memberHeight(),
+                s.width - seriesScale(32), memberHeight()};
+  }
+  Rect retryButton() const {
+    const auto s = safe();
+    return Rect{s.x + seriesScale(16), seriesTop() + seriesScale(98), seriesScale(150), seriesScale(50)};
   }
   Rect downloadButton() const {
     const auto s = safe();
-    return Rect{s.x + seriesScale(28), seriesTop() + seriesScale(258), s.width - seriesScale(56), seriesScale(50)};
+    return Rect{s.x + seriesScale(28), cardButtonY(), s.width - seriesScale(56), seriesScale(50)};
   }
   Rect seriesPanel() const {
     const auto s = safe();
     const int available = bottom() - seriesTop() - seriesScale(20);
-    int needed = sheetListTop() + rowCount() * rowHeight() + actionCount() * seriesScale(54) + seriesScale(18);
+    int needed = sheetListTop() +
+                 (std::min<int>(rowCount(), maxTableRows()) + (series_.scene() == SeriesScene::Review)) * rowHeight() +
+                 (series_.scene() == SeriesScene::Review ? 1 : actionCount()) * seriesScale(59) + seriesScale(30);
     if (series_.scene() == SeriesScene::Notice) {
       const int width = s.width - seriesScale(82);
       int textWidth = renderer.getTextWidth(titleFont(), notice(), EpdFontFamily::BOLD);
@@ -123,7 +207,7 @@ class SeriesActivity final : public Activity {
       const int lines = std::min(8, std::max(1, (textWidth + width - 1) / width));
       needed = lines * renderer.getLineHeight(titleFont()) + seriesScale(100);
     }
-    if (series_.scene() == SeriesScene::Count) needed = seriesScale(CROSSINK_APP_CAP_TOUCH ? 480 : 300);
+    if (series_.scene() == SeriesScene::Count) return Rect{s.x, seriesTop(), s.width, bottom() - seriesTop()};
     const int height = std::min(available, needed);
     const int y = series_.scene() == SeriesScene::Count && CROSSINK_APP_CAP_TOUCH
                       ? bottom() - seriesScale(10) - height
@@ -132,7 +216,7 @@ class SeriesActivity final : public Activity {
   }
   Rect keyboard() const {
     const auto s = safe();
-    return Rect{s.x + seriesScale(16), bottom() - seriesScale(224), s.width - seriesScale(32), seriesScale(216)};
+    return Rect{s.x + seriesScale(94), bottom() - seriesScale(224), s.width - seriesScale(188), seriesScale(216)};
   }
   Rect keyRect(uint8_t i) const {
     const auto k = keyboard();
@@ -169,15 +253,17 @@ class SeriesActivity final : public Activity {
     }
   }
   int rowHeight() const {
-    return std::max(seriesScale(50),
-                    seriesTextLine() * (series_.scene() == SeriesScene::Review ? 3 : 2) + seriesScale(8));
+    const int content = std::max(50, seriesTextLine() + seriesScale(22));
+    return content +
+           ((series_.scene() == SeriesScene::Files || series_.scene() == SeriesScene::Queue) ? seriesScale(6) : 0);
   }
-  int sheetListTop() const { return series_.scene() == SeriesScene::Queue ? seriesScale(136) : seriesScale(76); }
+  int maxTableRows() const { return std::max(1, seriesScale(326) / rowHeight()); }
+  int sheetListTop() const { return series_.scene() == SeriesScene::Queue ? seriesScale(172) : seriesScale(60); }
   int visibleRows() const {
     const auto r = seriesPanel();
-    const int available =
-        r.height - sheetListTop() - seriesScale(12) - seriesScale(6) - actionCount() * seriesScale(54);
-    return std::max(1, available / rowHeight());
+    const int end = actionRect(0).y - r.y - seriesScale(6) - (series_.scene() == SeriesScene::Review ? rowHeight() : 0);
+    const int available = end - sheetListTop();
+    return std::min(maxTableRows(), std::max(1, available / rowHeight()));
   }
   Rect sheetRow(uint8_t i) const {
     const auto r = seriesPanel();
@@ -186,18 +272,14 @@ class SeriesActivity final : public Activity {
   }
   Rect actionRect(uint8_t i) const {
     const auto r = seriesPanel();
-    if (series_.scene() == SeriesScene::Count) {
-#if CROSSINK_APP_CAP_TOUCH
-      const auto k = keyboard();
-      return Rect{r.x + seriesScale(12) + i * (r.width - seriesScale(24)) / 2, k.y - seriesScale(62),
-                  (r.width - seriesScale(32)) / 2, seriesScale(50)};
-#else
-      return Rect{r.x + seriesScale(12) + i * (r.width - seriesScale(24)) / 2, r.y + r.height - seriesScale(66),
-                  (r.width - seriesScale(32)) / 2, seriesScale(50)};
-#endif
+    if (series_.scene() == SeriesScene::Count || series_.scene() == SeriesScene::Review) {
+      const int y = series_.scene() == SeriesScene::Count ? r.y + seriesScale(CROSSINK_APP_CAP_TOUCH ? 170 : 218)
+                                                          : r.y + r.height - seriesScale(68);
+      return Rect{r.x + seriesScale(18) + i * (r.width - seriesScale(27)) / 2, y, (r.width - seriesScale(45)) / 2,
+                  seriesScale(50)};
     }
-    return Rect{r.x + seriesScale(12), r.y + r.height - seriesScale(12) - (actionCount() - i) * seriesScale(54),
-                r.width - seriesScale(24), seriesScale(50)};
+    return Rect{r.x + seriesScale(18), r.y + r.height - seriesScale(18) - (actionCount() - i) * seriesScale(59),
+                r.width - seriesScale(36), seriesScale(50)};
   }
   static bool inside(Rect r, int x, int y) { return x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height; }
   const char* notice() const {
@@ -234,42 +316,59 @@ class SeriesActivity final : public Activity {
         return tr(STR_SERIES_FAILED_STATUS);
     }
   }
-  void sizeText(char* out, size_t capacity, uint64_t bytes, bool known) const {
-    if (known)
-      std::snprintf(out, capacity, tr(STR_SERIES_BYTES_FORMAT), static_cast<unsigned long long>(bytes));
-    else
+  void sizeText(char* out, size_t capacity, uint64_t bytes, bool known, bool fileSize = true) const {
+    if (!known) {
       std::snprintf(out, capacity, "%s", tr(STR_SERIES_SIZE_UNKNOWN));
+      return;
+    }
+    const uint64_t unit = bytes >= 1073741824                                   ? 1073741824
+                          : (bytes >= 1048576 || (fileSize && bytes >= 104858)) ? 1048576
+                          : bytes >= 1024                                       ? 1024
+                                                                                : 1;
+    const char* suffix = unit == 1073741824 ? tr(STR_SERIES_GB)
+                         : unit == 1048576  ? tr(STR_SERIES_MB)
+                         : unit == 1024     ? tr(STR_SERIES_KB)
+                                            : tr(STR_SERIES_B);
+    if (bytes == unit && unit > 1)
+      std::snprintf(out, capacity, tr(STR_SERIES_SIZE_DECIMAL_FORMAT), double(bytes) / unit, suffix);
+    else if (bytes % unit == 0)
+      std::snprintf(out, capacity, tr(STR_SERIES_SIZE_WHOLE_FORMAT), static_cast<unsigned long long>(bytes / unit),
+                    suffix);
+    else
+      std::snprintf(out, capacity, tr(STR_SERIES_SIZE_DECIMAL_FORMAT), double(bytes) / unit, suffix);
+  }
+  Rect headerSearchTarget() const {
+    const auto s = safe();
+    const int cx = s.x + s.width - seriesScale(40), cy = s.y + seriesScale(16) + seriesScale(29);
+    return Rect{cx - 25, cy - 25, 50, 50};
   }
   void header() const {
-    const auto s = safe();
-    text(Rect{s.x + seriesScale(12), s.y + seriesScale(14), seriesScale(90), seriesScale(40)}, tr(STR_BACK));
-    text(Rect{s.x + seriesScale(108), s.y + seriesScale(9), s.width - seriesScale(176), seriesScale(44)},
+    auto s = safe();
+    s.y += seriesScale(16);
+    const auto target = headerSearchTarget();
+    const int cx = target.x + target.width / 2, cy = target.y + target.height / 2;
+    const int y = cy, x = s.x + seriesScale(18);
+    const auto backInk = renderer.getTextVerticalBounds(SERIES_CAPTION_FONT_ID, tr(STR_BACK));
+    const auto titleInk = renderer.getTextVerticalBounds(titleFont(), tr(STR_SERIES_TITLE), EpdFontFamily::BOLD);
+    renderer.drawLine(x + seriesScale(8), y - seriesScale(9), x, y);
+    renderer.drawLine(x, y, x + seriesScale(8), y + seriesScale(9));
+    text(Rect{s.x + seriesScale(36), cy - (backInk.top + backInk.bottom) / 2, seriesScale(62),
+              std::max(smallLine(), backInk.bottom)},
+         tr(STR_BACK), false, SERIES_CAPTION_FONT_ID);
+    text(Rect{s.x + seriesScale(90), cy - (titleInk.top + titleInk.bottom) / 2, s.width - seriesScale(158),
+              std::max(titleLine_, titleInk.bottom)},
          tr(STR_SERIES_TITLE), true, titleFont());
-    // Search is a top-right icon with a 50-design-pixel target, not a new route.
-    const int x = s.x + s.width - seriesScale(46), y = s.y + seriesScale(16), z = seriesScale(17);
-    renderer.drawRoundedRect(x, y, z, z, 2, z / 2, true);
-    renderer.drawLine(x + z, y + z, x + z + seriesScale(9), y + z + seriesScale(9), 2, true);
+    const int radius = seriesScale(24);
+    const bool focused =
+        !CROSSINK_APP_CAP_TOUCH && series_.scene() == SeriesScene::Page && focus_ == series_.members().count + 1;
+    renderer.drawRoundedRect(cx - radius, cy - radius, 2 * radius, 2 * radius, focused ? 2 : 1, radius, true);
+    const int z = seriesScale(16), sx = cx - seriesScale(10), sy = cy - seriesScale(10);
+    renderer.drawRoundedRect(sx, sy, z, z, 1, z / 2, true);
+    renderer.drawLine(sx + z - 1, sy + z - 1, sx + z + seriesScale(7), sy + z + seriesScale(7), 1, true);
     renderer.drawLine(s.x, s.y + seriesScale(58), s.x + s.width, s.y + seriesScale(58));
   }
   int totalsBarY(int y) const {
-    const auto& plan = series_.plan();
-    const uint32_t values[] = {plan.total, plan.read, plan.reading};
-    const char* labels[] = {tr(STR_SERIES_BOOKS), tr(STR_SERIES_READ), tr(STR_SERIES_READING)};
-    const int width = (safe().width - seriesScale(32)) / 3;
-    int barY = y + seriesScale(48);
-    for (uint8_t i = 0; i < 3; ++i) {
-      char n[16];
-      std::snprintf(n, sizeof(n), "%lu", static_cast<unsigned long>(values[i]));
-      int font = UI_12_FONT_ID;
-      if (renderer.getTextWidth(font, n, EpdFontFamily::BOLD) > width) font = UI_10_FONT_ID;
-      const bool stacked = CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS ||
-                           renderer.getTextWidth(font, n, EpdFontFamily::BOLD) + seriesScale(6) +
-                                   renderer.getTextWidth(SMALL_FONT_ID, labels[i]) >
-                               width;
-      const int labelBottom = y + seriesScale(stacked ? 32 : 8) + renderer.getLineHeight(SMALL_FONT_ID);
-      barY = std::max(barY, labelBottom + seriesScale(6));
-    }
-    return barY;
+    return y + std::max(renderer.getLineHeight(SERIES_NUMBER_FONT_ID), smallLine() + seriesScale(8)) + seriesScale(6);
   }
   void totals(int y) const {
     const auto s = safe();
@@ -277,28 +376,37 @@ class SeriesActivity final : public Activity {
     const uint32_t values[] = {plan.total, plan.read, plan.reading};
     const char* labels[] = {tr(STR_SERIES_BOOKS), tr(STR_SERIES_READ), tr(STR_SERIES_READING)};
     for (uint8_t i = 0; i < 3; ++i) {
-      const int x = s.x + seriesScale(16) + i * (s.width - seriesScale(32)) / 3;
+      const int x = s.x + seriesScale(16) + i * seriesScale(90);
       char n[16];
       std::snprintf(n, sizeof(n), "%lu", static_cast<unsigned long>(values[i]));
-      const int width = (s.width - seriesScale(32)) / 3;
-      int valueFont = UI_12_FONT_ID;
+      const int width = seriesScale(90);
+      int valueFont = SERIES_NUMBER_FONT_ID;
       if (renderer.getTextWidth(valueFont, n, EpdFontFamily::BOLD) > width) valueFont = UI_10_FONT_ID;
       const int valueWidth = renderer.getTextWidth(valueFont, n, EpdFontFamily::BOLD);
-      const bool stacked = CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS ||
-                           valueWidth + seriesScale(6) + renderer.getTextWidth(SMALL_FONT_ID, labels[i]) > width;
+      const bool stacked =
+          valueWidth + seriesScale(6) + renderer.getTextWidth(SERIES_CAPTION_FONT_ID, labels[i]) > width;
       text(Rect{x, y, width, seriesScale(42)}, n, true, valueFont);
-      text(Rect{x + (stacked ? 0 : valueWidth + seriesScale(6)), y + seriesScale(stacked ? 32 : 8),
+      text(Rect{x + (stacked ? 0 : valueWidth + seriesScale(6)),
+                y + (stacked ? renderer.getLineHeight(valueFont)
+                             : renderer.getFontAscenderSize(valueFont) -
+                                   renderer.getFontAscenderSize(SERIES_CAPTION_FONT_ID)),
                 width - (stacked ? 0 : valueWidth + seriesScale(6)), seriesScale(24)},
-           labels[i], false, SMALL_FONT_ID);
+           labels[i], false, SERIES_CAPTION_FONT_ID);
     }
-    if (plan.availability == Availability::Ready && plan.total) {
+    if (plan.progressCount && plan.total) {
       const int barY = totalsBarY(y);
-      const unsigned count = std::min<uint32_t>(plan.total, 24);
+      const unsigned count = std::min<uint8_t>(plan.progressCount, SeriesProgressMax);
+      if (!count) return;
       const int width = (s.width - seriesScale(32)) / count;
       for (unsigned i = 0; i < count; ++i) {
-        const int x = s.x + seriesScale(16) + i * width;
-        renderer.drawRoundedRect(x, barY, width - seriesScale(3), seriesScale(7), 1, seriesScale(3), true);
-        if (i < plan.read) renderer.fillRect(x + 1, barY + 1, width - seriesScale(3) - 2, seriesScale(7) - 2);
+        const int x = s.x + seriesScale(16) + i * width, height = seriesScale(7);
+        renderer.drawRoundedRect(x, barY, width - seriesScale(3), height, 1, seriesScale(3), true);
+        const auto& segment = plan.progress[i];
+        const bool reading = segment.status == QueryShow::Reading || segment.status == QueryShow::Rereading;
+        const int fill = segment.status == QueryShow::Finished ? width - seriesScale(3) - 2
+                         : reading ? (width - seriesScale(3) - 2) * (segment.known ? segment.percent : 50) / 100
+                                   : 0;
+        if (fill > 0 && height > 2) renderer.fillRect(x + 1, barY + 1, fill, height - 2);
       }
     }
   }
@@ -314,11 +422,9 @@ class SeriesActivity final : public Activity {
       text(Rect{s.x + seriesScale(16), seriesTop() + seriesScale(20), s.width - seriesScale(32), seriesScale(100)},
            message);
       if (series_.retryEnabled()) {
-        const Rect retry{s.x + seriesScale(16), seriesTop() + seriesScale(98), seriesScale(140), seriesScale(50)};
-        outline(retry);
-        text(Rect{retry.x + seriesScale(12), retry.y + seriesScale(10), retry.width - seriesScale(24),
-                  retry.height - seriesScale(12)},
-             tr(STR_RETRY), true);
+        const auto retry = retryButton();
+        actionOutline(retry, !CROSSINK_APP_CAP_TOUCH && focus_ == 0);
+        buttonText(retry, tr(STR_RETRY));
       }
       return;
     }
@@ -330,30 +436,36 @@ class SeriesActivity final : public Activity {
                            : !plan.deviceKnown       ? tr(STR_SERIES_DEVICE_UNKNOWN)
                                                      : plan.author.data();
     text(Rect{s.x + seriesScale(16), seriesTop() + seriesScale(44), s.width - seriesScale(32), seriesScale(24)},
-         subtitle, false, SMALL_FONT_ID);
+         subtitle, false, SERIES_CAPTION_FONT_ID);
     if (plan.countsKnown || plan.availability == Availability::Ready) totals(seriesTop() + seriesScale(70));
-    const Rect card{s.x + seriesScale(16), seriesTop() + seriesScale(140), s.width - seriesScale(32), seriesScale(176)};
+    const Rect card{s.x + seriesScale(16), cardTop(), s.width - seriesScale(32),
+                    cardButtonY() + seriesScale(60) - cardTop()};
     outline(card);
     char title[96];
     if (plan.count)
       std::snprintf(title, sizeof(title), tr(STR_SERIES_NEXT_TITLE_FORMAT), unsigned(plan.count));
     else
       std::snprintf(title, sizeof(title), "%s", tr(STR_SERIES_QUEUE));
-    text(Rect{card.x + seriesScale(12), card.y + seriesScale(10), card.width - seriesScale(60), seriesScale(30)}, title,
-         true);
+    text(Rect{card.x + seriesScale(12), card.y + seriesScale(24), card.width - seriesScale(60), seriesTextLine()},
+         title, true);
     // The approved card's download icon stays at its top right.
-    const int ix = card.x + card.width - seriesScale(30), iy = card.y + seriesScale(12);
+    const int ix = card.x + card.width - seriesScale(30), iy = card.y + seriesScale(26);
     renderer.drawLine(ix, iy, ix, iy + seriesScale(18), 2, true);
     renderer.drawLine(ix - seriesScale(7), iy + seriesScale(11), ix, iy + seriesScale(18));
     renderer.drawLine(ix, iy + seriesScale(18), ix + seriesScale(7), iy + seriesScale(11));
-    const char* summary = plan.membershipIncomplete ? tr(STR_SERIES_MEMBERSHIP_INCOMPLETE)
-                          : !plan.deviceKnown       ? tr(STR_SERIES_DEVICE_UNKNOWN)
-                          : plan.count              ? tr(STR_SERIES_KEEP_READY)
-                          : plan.earlierKnown       ? tr(STR_SERIES_EARLIER_PENDING)
-                          : plan.remainingSaved     ? tr(STR_SERIES_REMAINING_SAVED)
-                                                    : tr(STR_SERIES_NO_REMAINING);
-    text(Rect{card.x + seriesScale(12), card.y + seriesScale(43), card.width - seriesScale(24), seriesScale(24)},
-         summary, false, SMALL_FONT_ID);
+    renderer.drawLine(ix - seriesScale(8), iy + seriesScale(18), ix - seriesScale(8), iy + seriesScale(25));
+    renderer.drawLine(ix - seriesScale(8), iy + seriesScale(25), ix + seriesScale(8), iy + seriesScale(25));
+    renderer.drawLine(ix + seriesScale(8), iy + seriesScale(25), ix + seriesScale(8), iy + seriesScale(18));
+    const char* summary = plan.count                  ? tr(STR_SERIES_KEEP_READY)
+                          : plan.membershipIncomplete ? tr(STR_SERIES_MEMBERSHIP_INCOMPLETE)
+                          : !plan.deviceKnown         ? tr(STR_SERIES_DEVICE_UNKNOWN)
+                          : plan.count                ? tr(STR_SERIES_KEEP_READY)
+                          : plan.earlierKnown         ? tr(STR_SERIES_EARLIER_PENDING)
+                          : plan.remainingSaved       ? tr(STR_SERIES_REMAINING_SAVED)
+                                                      : tr(STR_SERIES_NO_REMAINING);
+    text(Rect{card.x + seriesScale(12), card.y + seriesTextLine() + seriesScale(48), card.width - seriesScale(24),
+              seriesScale(24)},
+         summary, false, SERIES_CAPTION_FONT_ID);
     for (uint8_t i = 0; i < std::min<uint8_t>(plan.count, 3); ++i) {
       if (plan.next[i].positionKnown) {
         char number[24];
@@ -361,20 +473,37 @@ class SeriesActivity final : public Activity {
         std::snprintf(title, sizeof(title), tr(STR_SERIES_PAIR_FORMAT), number, plan.next[i].book.title.data());
       } else
         std::snprintf(title, sizeof(title), "%s", plan.next[i].book.title.data());
-      text(Rect{card.x + seriesScale(12), card.y + seriesScale(66) + i * seriesScale(18), card.width - seriesScale(24),
-                seriesScale(18)},
-           title, false, SMALL_FONT_ID);
+      text(Rect{card.x + seriesScale(12), cardListTop() + i * cardTitleStep(), card.width - seriesScale(24),
+                smallLine()},
+           title, true, SERIES_META_FONT_ID);
     }
     const auto d = downloadButton();
-    outline(d, !CROSSINK_APP_CAP_TOUCH && focus_ == 0 ? 2 : 1);
-    text(Rect{d.x + seriesScale(12), d.y + seriesScale(10), d.width - seriesScale(24), d.height - seriesScale(12)},
-         plan.membershipIncomplete    ? tr(STR_SERIES_MEMBERSHIP_INCOMPLETE)
-         : !series_.downloadEnabled() ? tr(STR_SERIES_UNAVAILABLE_SOURCE)
-         : plan.count                 ? tr(STR_SERIES_DOWNLOAD_NEXT)
-                                      : tr(STR_SERIES_DOWNLOADS_MORE),
-         true);
-    text(Rect{s.x + seriesScale(16), seriesTop() + seriesScale(318), seriesScale(130), seriesTextLine()},
-         tr(STR_SERIES_MEMBERS), true);
+    actionOutline(d, !CROSSINK_APP_CAP_TOUCH && focus_ == 0, !series_.downloadEnabled());
+    buttonText(d, plan.membershipIncomplete    ? tr(STR_SERIES_MEMBERSHIP_INCOMPLETE)
+                  : !series_.downloadEnabled() ? tr(STR_SERIES_UNAVAILABLE_SOURCE)
+                  : plan.count                 ? tr(STR_SERIES_DOWNLOAD_NEXT)
+                                               : tr(STR_SERIES_DOWNLOADS_MORE));
+    text(Rect{s.x + seriesScale(16), membersY(), seriesScale(130), memberLine_}, tr(STR_SERIES_MEMBERS), true,
+         memberFont());
+    char range[72];
+    std::snprintf(range, sizeof(range), tr(STR_SERIES_RANGE_FORMAT), static_cast<unsigned long>(series_.offset() + 1),
+                  static_cast<unsigned long>(series_.offset() + members.count),
+                  static_cast<unsigned long>(members.matchedBooks));
+    const int rangeWidth = renderer.getTextWidth(SERIES_CAPTION_FONT_ID, range);
+    text(Rect{s.x + s.width - seriesScale(16) - rangeWidth,
+              membersY() + renderer.getFontAscenderSize(memberFont()) -
+                  renderer.getFontAscenderSize(SERIES_CAPTION_FONT_ID),
+              rangeWidth, smallLine()},
+         range, false, SERIES_CAPTION_FONT_ID);
+    int numberWidth = 25;
+    for (uint8_t i = 0; i < std::min<uint16_t>(members.count, 3); ++i) {
+      char number[24];
+      if (members.entries[i].seriesPositionKnown)
+        std::snprintf(number, sizeof(number), "%.6g", members.entries[i].seriesPosition);
+      else
+        std::snprintf(number, sizeof(number), "–");
+      numberWidth = std::max(numberWidth, renderer.getTextWidth(memberFont(), number, EpdFontFamily::BOLD));
+    }
     for (uint8_t i = 0; i < std::min<uint16_t>(members.count, 3); ++i) {
       const auto r = pageRow(i);
       const auto& row = members.entries[i];
@@ -385,10 +514,13 @@ class SeriesActivity final : public Activity {
         std::snprintf(number, sizeof(number), "%.6g", row.seriesPosition);
       else
         std::snprintf(number, sizeof(number), "–");
-      text(Rect{r.x, r.y + seriesScale(30), seriesScale(30), seriesScale(30)}, number);
-      int left = r.x + seriesScale(34);
+      const auto numberInk = renderer.getTextVerticalBounds(memberFont(), number, EpdFontFamily::BOLD);
+      text(
+          Rect{r.x + seriesScale(4), r.y + (r.height - numberInk.bottom - numberInk.top) / 2, numberWidth, memberLine_},
+          number, true, memberFont());
+      int left = r.x + seriesScale(4) + numberWidth + 10;
 #if !CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
-      const Rect c{left, r.y + seriesScale(9), seriesScale(48), seriesScale(72)};
+      const Rect c{left, r.y + (r.height - seriesScale(72)) / 2, seriesScale(48), seriesScale(72)};
       if (references_[i].id) {
         for (int y = 0; y < c.height; ++y)
           for (int x = 0; x < c.width; ++x) {
@@ -398,31 +530,37 @@ class SeriesActivity final : public Activity {
           }
       } else
         renderer.drawRect(c.x, c.y, c.width, c.height);
-      left += seriesScale(58);
+      left += c.width + 10;
 #endif
       const int width = r.x + r.width - left - seriesScale(6);
-      text(Rect{left, r.y + seriesScale(10), width, seriesScale(30)}, row.book.title.data(), true);
-      text(Rect{left, r.y + seriesScale(39), width, seriesScale(22)}, row.label.data(), false, SMALL_FONT_ID);
+      const bool reading = row.status == QueryShow::Reading || row.status == QueryShow::Rereading;
+      const int titleY = r.y + (r.height - memberTextHeight(reading)) / 2;
+      const int publisherY = titleY + memberLine_ + seriesScale(4);
+      const int stateY = publisherY + renderer.getLineHeight(SERIES_CAPTION_FONT_ID) + seriesScale(4);
+      text(Rect{left, titleY, width, memberLine_}, row.book.title.data(), true, memberFont());
+      text(Rect{left, publisherY, width, captionLine_}, row.label.data(), false, SERIES_CAPTION_FONT_ID);
       const char* status = row.status == QueryShow::Finished ? tr(STR_SERIES_READ_STATUS)
                            : (row.status == QueryShow::Reading || row.status == QueryShow::Rereading)
                                ? tr(STR_SERIES_READING)
                            : row.onDevice == QueryTruth::Yes ? tr(STR_SERIES_ON_DEVICE)
                            : row.onDevice == QueryTruth::No  ? tr(STR_SERIES_ON_SERVER)
                                                              : tr(STR_SERIES_UNKNOWN);
-      const bool reading = row.status == QueryShow::Reading || row.status == QueryShow::Rereading;
-      if (reading && row.book.readingKnown && row.book.pages) {
-        const auto percentage = std::min<uint64_t>(100, uint64_t(row.book.page) * 100 / row.book.pages);
+      const bool progressKnown = reading && row.book.readingKnown && row.book.pages;
+      const auto percentage =
+          progressKnown ? std::min<uint64_t>(100, uint64_t(row.book.page) * 100 / row.book.pages) : 0;
+      if (progressKnown) {
         std::snprintf(title, sizeof(title), tr(STR_SERIES_PROGRESS_FORMAT), unsigned(percentage),
                       tr(STR_SERIES_READING));
-        text(Rect{left, r.y + seriesScale(63), width, seriesScale(22)}, title, false, SMALL_FONT_ID);
-#if !CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
-        const int bar = std::min(width, seriesScale(110)), height = seriesScale(4);
-        renderer.drawRect(left, r.y + seriesScale(84), bar, height);
+        status = title;
+      }
+      text(Rect{left, stateY, width, captionLine_}, status, false, SERIES_CAPTION_FONT_ID);
+      if (reading) {
+        const int bar = std::min(width, seriesScale(110)), height = std::max(3, seriesScale(4));
+        const int y = stateY + captionLine_ + 6;
+        renderer.drawRect(left, y, bar, height);
         if (percentage && bar > 2 && height > 2)
-          renderer.fillRect(left + 1, r.y + seriesScale(84) + 1, (bar - 2) * percentage / 100, height - 2);
-#endif
-      } else
-        text(Rect{left, r.y + seriesScale(63), width, seriesScale(22)}, status, false, SMALL_FONT_ID);
+          renderer.fillRect(left + 1, y + 1, (bar - 2) * percentage / 100, height - 2);
+      }
     }
   }
   const char* actionLabel(uint8_t i, char* buffer, size_t capacity) const {
@@ -546,11 +684,16 @@ class SeriesActivity final : public Activity {
   void sheet() const {
     const auto r = seriesPanel();
     renderer.fillRect(r.x, r.y, r.width, r.height, false);
-    outline(r, 2);
+    if (series_.scene() != SeriesScene::Count) outline(r, 2);
     char buffer[160];
     const auto& f = series_.flow();
     const char* title = tr(STR_SERIES_QUEUE);
     switch (series_.scene()) {
+      case SeriesScene::Queue:
+        std::snprintf(buffer, sizeof(buffer), tr(STR_SERIES_QUEUE_TITLE_FORMAT), f.queue.saved, f.queue.skipped,
+                      f.queue.failed, f.queue.count);
+        title = buffer;
+        break;
       case SeriesScene::Preview:
         std::snprintf(buffer, sizeof(buffer), tr(STR_SERIES_PREVIEW_FORMAT), unsigned(f.plan.requested),
                       unsigned(f.plan.count));
@@ -581,23 +724,39 @@ class SeriesActivity final : public Activity {
     wrapped(Rect{r.x + seriesScale(12), r.y + seriesScale(12), r.width - seriesScale(50),
                  series_.scene() == SeriesScene::Notice ? r.height - seriesScale(90) : seriesScale(68)},
             title, series_.scene() == SeriesScene::Notice ? 8 : 2, true, titleFont());
-    // Compact top-right download icon on existing dialog, no extra control.
-    renderer.drawLine(r.x + r.width - seriesScale(24), r.y + seriesScale(14), r.x + r.width - seriesScale(24),
-                      r.y + seriesScale(32), 2, true);
-    renderer.drawLine(r.x + r.width - seriesScale(30), r.y + seriesScale(26), r.x + r.width - seriesScale(24),
-                      r.y + seriesScale(32));
-    renderer.drawLine(r.x + r.width - seriesScale(24), r.y + seriesScale(32), r.x + r.width - seriesScale(18),
-                      r.y + seriesScale(26));
+    if (series_.scene() == SeriesScene::Notice) {
+      const int x = r.x + r.width - seriesScale(24), y = r.y + seriesScale(14);
+      renderer.drawLine(x, y, x - seriesScale(10), y + seriesScale(20));
+      renderer.drawLine(x - seriesScale(10), y + seriesScale(20), x + seriesScale(10), y + seriesScale(20));
+      renderer.drawLine(x + seriesScale(10), y + seriesScale(20), x, y);
+      renderer.drawLine(x, y + seriesScale(7), x, y + seriesScale(12), 2);
+      renderer.fillRect(x, y + seriesScale(15), 2, 2);
+    } else {
+      renderer.drawLine(r.x + r.width - seriesScale(24), r.y + seriesScale(14), r.x + r.width - seriesScale(24),
+                        r.y + seriesScale(32), 2, true);
+      renderer.drawLine(r.x + r.width - seriesScale(30), r.y + seriesScale(26), r.x + r.width - seriesScale(24),
+                        r.y + seriesScale(32));
+      renderer.drawLine(r.x + r.width - seriesScale(24), r.y + seriesScale(32), r.x + r.width - seriesScale(18),
+                        r.y + seriesScale(26));
+      renderer.drawLine(r.x + r.width - seriesScale(32), r.y + seriesScale(31), r.x + r.width - seriesScale(32),
+                        r.y + seriesScale(38));
+      renderer.drawLine(r.x + r.width - seriesScale(32), r.y + seriesScale(38), r.x + r.width - seriesScale(16),
+                        r.y + seriesScale(38));
+      renderer.drawLine(r.x + r.width - seriesScale(16), r.y + seriesScale(38), r.x + r.width - seriesScale(16),
+                        r.y + seriesScale(31));
+    }
     if (series_.scene() == SeriesScene::Count) {
-      const Rect field{r.x + seriesScale(16), r.y + seriesScale(90), r.width - seriesScale(32), seriesScale(80)};
-      outline(field);
-      text(Rect{field.x + seriesScale(16), field.y + seriesScale(12), field.width - seriesScale(32), seriesScale(54)},
-           series_.countText(), true, UI_12_FONT_ID);
+      const Rect field{r.x + seriesScale(16), r.y + seriesScale(70), r.width - seriesScale(32), seriesScale(74)};
+      renderer.drawRect(field.x, field.y, field.width, field.height, CROSSINK_APP_CAP_TOUCH ? 1 : 2, true);
+      const int numberWidth = renderer.getTextWidth(SERIES_NUMBER_FONT_ID, series_.countText());
+      text(Rect{field.x + (field.width - numberWidth) / 2, field.y + seriesScale(10), numberWidth,
+                renderer.getLineHeight(SERIES_NUMBER_FONT_ID)},
+           series_.countText(), true, SERIES_NUMBER_FONT_ID);
 #if CROSSINK_APP_CAP_TOUCH
       static const char* digits[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", nullptr, "0", nullptr};
       for (uint8_t i = 0; i < 12; ++i) {
         const auto k = keyRect(i);
-        outline(k);
+        renderer.drawRoundedRect(k.x, k.y, k.width, k.height, 1, seriesScale(5), true);
         if (i == 9) {
           const int x = k.x + k.width / 2 - seriesScale(10), y = k.y + k.height / 2;
           renderer.drawLine(x - seriesScale(8), y, x, y - seriesScale(9));
@@ -607,25 +766,26 @@ class SeriesActivity final : public Activity {
           renderer.drawLine(x + seriesScale(22), y - seriesScale(9), x + seriesScale(22), y + seriesScale(9));
           renderer.drawLine(x + seriesScale(5), y - seriesScale(5), x + seriesScale(15), y + seriesScale(5));
           renderer.drawLine(x + seriesScale(15), y - seriesScale(5), x + seriesScale(5), y + seriesScale(5));
-        } else
-          text(
-              Rect{k.x + seriesScale(12), k.y + seriesScale(10), k.width - seriesScale(20), k.height - seriesScale(12)},
-              digits[i] ? digits[i] : tr(STR_SERIES_REVIEW), true);
+        } else if (i == 11) {
+          const int x = k.x + k.width / 2, y = k.y + k.height / 2;
+          renderer.drawLine(x - seriesScale(8), y, x - seriesScale(2), y + seriesScale(6), 2);
+          renderer.drawLine(x - seriesScale(2), y + seriesScale(6), x + seriesScale(9), y - seriesScale(8), 2);
+        } else {
+          const int width = renderer.getTextWidth(memberFont(), digits[i]);
+          const auto ink = renderer.getTextVerticalBounds(memberFont(), digits[i]);
+          text(Rect{k.x + (k.width - width) / 2, k.y + (k.height - ink.top - ink.bottom) / 2, width, memberLine_},
+               digits[i], false, memberFont());
+        }
       }
 #else
-      text(Rect{r.x + seriesScale(16), field.y + field.height + seriesScale(16), r.width - seriesScale(32),
-                seriesScale(40)},
-           tr(STR_SERIES_NUMBER_LABEL));
+      wrapped(Rect{r.x + seriesScale(16), field.y + field.height + seriesScale(12), r.width - seriesScale(32),
+                   2 * smallLine()},
+              tr(STR_SERIES_NUMBER_HINT), 2, false, SERIES_CAPTION_FONT_ID);
 #endif
     }
     if (series_.scene() == SeriesScene::Queue) {
       const uint8_t counts[] = {f.queue.saved, f.queue.skipped, f.queue.failed};
-#if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
-      std::snprintf(buffer, sizeof(buffer), tr(STR_SERIES_QUEUE_COUNTS_FORMAT), counts[0], tr(STR_SERIES_SAVED),
-                    counts[1], tr(STR_SERIES_SKIPPED), counts[2], tr(STR_SERIES_FAILED));
-      wrapped(Rect{r.x + seriesScale(12), r.y + seriesScale(48), r.width - seriesScale(24), seriesScale(80)}, buffer,
-              3);
-#else
+
       const char* labels[] = {tr(STR_SERIES_SAVED), tr(STR_SERIES_SKIPPED), tr(STR_SERIES_FAILED),
                               tr(STR_SERIES_REQUESTED)};
       for (uint8_t i = 0; i < 4; ++i) {
@@ -633,10 +793,17 @@ class SeriesActivity final : public Activity {
         const int x = r.x + seriesScale(12) + i * width;
         char number[8];
         std::snprintf(number, sizeof(number), "%u", i == 3 ? f.queue.count : counts[i]);
-        text(Rect{x, r.y + seriesScale(48), width, seriesScale(42)}, number, true, UI_12_FONT_ID);
-        text(Rect{x, r.y + seriesScale(91), width, seriesScale(24)}, labels[i], false, SMALL_FONT_ID);
+        text(Rect{x, r.y + seriesScale(76), width, renderer.getLineHeight(SERIES_NUMBER_FONT_ID)}, number, true,
+             SERIES_NUMBER_FONT_ID);
+        text(Rect{x, r.y + seriesScale(122), width, smallLine()}, labels[i], false, SERIES_CAPTION_FONT_ID);
       }
-#endif
+    }
+    if (series_.scene() == SeriesScene::Queue && f.queue.paused) {
+      text(Rect{r.x + seriesScale(12), r.y + seriesScale(148), r.width - seriesScale(24), smallLine()},
+           !f.online                ? tr(STR_SERIES_QUEUE_OFFLINE)
+           : series_.signInNeeded() ? tr(STR_SERIES_QUEUE_AUTH)
+                                    : tr(STR_SERIES_QUEUE_RETAINED),
+           false, SERIES_CAPTION_FONT_ID);
     }
     const auto rows = rowCount();
     for (uint8_t i = scroll_; i < rows && i < scroll_ + visibleRows(); ++i) {
@@ -652,10 +819,18 @@ class SeriesActivity final : public Activity {
         std::snprintf(buffer, sizeof(buffer), tr(STR_SERIES_PAIR_FORMAT), number, titleText);
         titleText = buffer;
       }
-      if (focus_ == i) outline(row, 2);
-      text(Rect{row.x + seriesScale(6), row.y + seriesScale(4), row.width - seriesScale(12),
-                seriesTextLine() + seriesScale(4)},
-           titleText, true);
+      const bool choice =
+          series_.scene() == SeriesScene::Files ||
+          (series_.scene() == SeriesScene::Queue && f.queue.items[i].state != SeriesItemState::Complete &&
+           f.queue.items[i].state != SeriesItemState::Unsupported);
+      const int contentHeight = row.height - (choice ? seriesScale(6) : 0);
+      if (choice || (!CROSSINK_APP_CAP_TOUCH && focus_ == i))
+        renderer.drawRoundedRect(row.x, row.y, row.width, contentHeight, !CROSSINK_APP_CAP_TOUCH && focus_ == i ? 2 : 1,
+                                 CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS ? 0 : seriesScale(6), true);
+      char itemTitle[160];
+      std::snprintf(itemTitle, sizeof(itemTitle), "%s", titleText);
+      if (series_.scene() == SeriesScene::Review && f.review[i].supported)
+        std::snprintf(itemTitle, sizeof(itemTitle), tr(STR_SERIES_PAIR_FORMAT), titleText, f.review[i].label.data());
       if (series_.scene() == SeriesScene::Preview)
         sizeText(buffer, sizeof(buffer), f.review[i].bytes, f.review[i].sizeKnown);
       else if (series_.scene() == SeriesScene::Files)
@@ -663,28 +838,50 @@ class SeriesActivity final : public Activity {
       else if (series_.scene() == SeriesScene::Review) {
         if (!f.review[i].supported)
           std::snprintf(buffer, sizeof(buffer), "%s", tr(STR_SERIES_NO_FILE));
-        else {
-          char bytes[40];
-          sizeText(bytes, sizeof(bytes), f.review[i].bytes, f.review[i].sizeKnown);
-          std::snprintf(buffer, sizeof(buffer), tr(STR_SERIES_PAIR_FORMAT), f.review[i].label.data(), bytes);
-        }
+        else
+          sizeText(buffer, sizeof(buffer), f.review[i].bytes, f.review[i].sizeKnown);
       } else {
         const auto& item = f.queue.items[i];
-        const auto* state = stateLabel(item.state);
-        if (item.cancelable)
+        char progress[64];
+        const auto* state = item.error == DownloadError::NoSpace ? tr(STR_SERIES_CARD_FULL) : stateLabel(item.state);
+        if (item.state == SeriesItemState::Running && i == f.queue.active) {
+          if (f.queue.totalKnown && f.queue.total)
+            std::snprintf(progress, sizeof(progress), tr(STR_SERIES_PERCENT_FORMAT),
+                          unsigned(std::min<uint64_t>(100, f.queue.received * 100 / f.queue.total)));
+          else {
+            char received[40];
+            sizeText(received, sizeof(received), f.queue.received, true, false);
+            std::snprintf(progress, sizeof(progress), tr(STR_SERIES_RECEIVED_FORMAT), received);
+          }
+          state = progress;
+        }
+        // Android retains the Cancel label on canceled rows; activation stays disabled.
+        if (item.cancelable || item.state == SeriesItemState::Canceled)
           std::snprintf(buffer, sizeof(buffer), tr(STR_SERIES_CANCEL_SUFFIX_FORMAT), state);
         else
           std::snprintf(buffer, sizeof(buffer), "%s", state);
       }
-      text(Rect{row.x + seriesScale(6), row.y + seriesTextLine() + seriesScale(6), row.width - seriesScale(12),
-                seriesTextLine() + seriesScale(4)},
-           buffer);
-      if (series_.scene() == SeriesScene::Review && f.review[i].supported)
-        text(Rect{row.x + seriesScale(6), row.y + 2 * seriesTextLine() + seriesScale(8), row.width - seriesScale(12),
-                  seriesTextLine()},
-             f.review[i].destination.data());
-      renderer.drawLine(row.x, row.y + row.height - seriesScale(2), row.x + row.width,
-                        row.y + row.height - seriesScale(2));
+      const int detailWidth = std::min(row.width * 55 / 100, renderer.getTextWidth(SERIES_CAPTION_FONT_ID, buffer));
+      const int textY = row.y + (contentHeight - smallLine()) / 2;
+      text(Rect{row.x + seriesScale(5), textY, row.width - detailWidth - seriesScale(22), smallLine()}, itemTitle, true,
+           SERIES_META_FONT_ID);
+      text(Rect{row.x + row.width - seriesScale(5) - detailWidth,
+                textY + renderer.getFontAscenderSize(SERIES_META_FONT_ID) -
+                    renderer.getFontAscenderSize(SERIES_CAPTION_FONT_ID),
+                detailWidth, smallLine()},
+           buffer, false, SERIES_CAPTION_FONT_ID);
+      if (!choice)
+        renderer.drawLine(row.x, row.y + row.height - seriesScale(2), row.x + row.width,
+                          row.y + row.height - seriesScale(2));
+    }
+    if (series_.scene() == SeriesScene::Review) {
+      const auto a = actionRect(0);
+      const int y = a.y - rowHeight() + (rowHeight() - memberLine_) / 2;
+      text(Rect{r.x + seriesScale(18), y, r.width / 3, memberLine_}, tr(STR_SERIES_DESTINATION), true, memberFont());
+      text(Rect{r.x + r.width / 3 + seriesScale(18),
+                y + renderer.getFontAscenderSize(memberFont()) - renderer.getFontAscenderSize(SERIES_CAPTION_FONT_ID),
+                r.width * 2 / 3 - seriesScale(36), captionLine_},
+           f.review[0].destination.data(), false, SERIES_CAPTION_FONT_ID);
     }
     if (rows > visibleRows()) {
       const int x = r.x + r.width - seriesScale(6);
@@ -695,9 +892,10 @@ class SeriesActivity final : public Activity {
     }
     for (uint8_t i = 0; i < actionCount(); ++i) {
       const auto a = actionRect(i);
-      outline(a, focus_ == rows + i ? 2 : 1);
-      text(Rect{a.x + seriesScale(10), a.y + seriesScale(10), a.width - seriesScale(20), a.height - seriesScale(12)},
-           actionLabel(i, buffer, sizeof(buffer)), true);
+      const bool disabled = series_.scene() == SeriesScene::Count && i == 1 && !series_.countValid();
+      actionOutline(a, !CROSSINK_APP_CAP_TOUCH && series_.scene() != SeriesScene::Count && focus_ == rows + i,
+                    disabled);
+      buttonText(a, actionLabel(i, buffer, sizeof(buffer)), !disabled);
     }
   }
   bool prepareCovers() {
@@ -746,6 +944,18 @@ class SeriesActivity final : public Activity {
     scenarioActivity = this;
 #endif
     Activity::onEnter();
+    // Nominal advance can omit a descender pixel; reserve the measured glyph band.
+    const auto measuredLine = [&](int font) {
+      GfxRenderer::TextVerticalBounds body, extent;
+      const bool measured = renderer.getLatinBodyBounds(font, body, extent);
+      return std::max(renderer.getLineHeight(font), measured ? extent.bottom : 0);
+    };
+    textLine_ = measuredLine(textFont());
+    smallLine_ = measuredLine(SERIES_META_FONT_ID);
+    captionLine_ = measuredLine(SERIES_CAPTION_FONT_ID);
+    memberLine_ = std::max(measuredLine(memberFont()),
+                           renderer.getTextVerticalBounds(memberFont(), "Hg", EpdFontFamily::BOLD).bottom);
+    titleLine_ = measuredLine(titleFont());
     LOG_INF("BSS", "Series screen workspace=%u bytes", unsigned(sizeof(SeriesActivity)));
     series_.enterSeries(initial_.key.data(), initial_.current, initial_.currentKnown);
     series_.pollSeries();
@@ -775,7 +985,7 @@ class SeriesActivity final : public Activity {
     const bool tapped = mappedInput.wasScreenTapped(x, y);
     const auto s = safe();
     if (mappedInput.wasReleased(MappedInputManager::Button::Back) ||
-        (tapped && inside(Rect{s.x, s.y, seriesScale(100), seriesScale(58)}, x, y))) {
+        (tapped && inside(Rect{s.x, s.y + seriesScale(16), seriesScale(100), seriesScale(58)}, x, y))) {
       series_.backSeries();
       changed = true;
     } else if (series_.scene() == SeriesScene::Count) {
@@ -833,16 +1043,18 @@ class SeriesActivity final : public Activity {
           changed = true;
         }
         if (tapped) {
-          if (inside(Rect{s.x + s.width - seriesScale(58), s.y, seriesScale(58), seriesScale(58)}, x, y))
-            series_.searchSeries();
+          if (inside(headerSearchTarget(), x, y)) series_.searchSeries();
           if (inside(downloadButton(), x, y)) activate(0);
           if (inside(Rect{s.x, bottom(), seriesScale(80), seriesScale(50)}, x, y)) series_.nextSeriesPage(-1);
-          if (inside(Rect{s.x + s.width - seriesScale(80), bottom(), seriesScale(80), seriesScale(50)}, x, y))
-            series_.nextSeriesPage(1);
-          if (series_.retryEnabled() &&
-              inside(Rect{s.x + seriesScale(16), seriesTop() + seriesScale(98), seriesScale(140), seriesScale(50)}, x,
-                     y))
-            series_.retrySeriesPage();
+          char range[72];
+          std::snprintf(range, sizeof(range), tr(STR_SERIES_RANGE_FORMAT),
+                        static_cast<unsigned long>(series_.offset() + 1),
+                        static_cast<unsigned long>(series_.offset() + series_.members().count),
+                        static_cast<unsigned long>(series_.members().matchedBooks));
+          const int nextX =
+              s.x + seriesScale(16) + renderer.getTextWidth(SERIES_CAPTION_FONT_ID, range) + seriesScale(12);
+          if (inside(Rect{nextX, bottom(), seriesScale(50), seriesScale(37)}, x, y)) series_.nextSeriesPage(1);
+          if (series_.retryEnabled() && inside(retryButton(), x, y)) series_.retrySeriesPage();
           for (uint8_t i = 0; i < std::min<uint16_t>(series_.members().count, 3); ++i)
             if (inside(pageRow(i), x, y)) activate(i + 1);
           changed = true;
@@ -888,12 +1100,20 @@ class SeriesActivity final : public Activity {
   }
 #ifdef SIMULATOR
   bool scenarioInvariant() {
-    if (!focusable(focus_)) return false;
-    if (series_.scene() == SeriesScene::Page && series_.members().count &&
-        pageRow(0).y < seriesTop() + seriesScale(318) + seriesTextLine() + seriesScale(6)) {
-      LOG_ERR("BSS", "Series member focus area overlaps heading line");
-      return false;
+    if (!focusable(focus_) || geometryOverflow_) return false;
+    for (unsigned i = 0; i < textBoxCount_; ++i) {
+      const auto& a = textBoxes_[i];
+      for (unsigned j = i + 1; j < textBoxCount_; ++j) {
+        const auto& b = textBoxes_[j];
+        if (a.layer == b.layer && a.bounds.x < b.bounds.x + b.bounds.width &&
+            b.bounds.x < a.bounds.x + a.bounds.width && a.bounds.y < b.bounds.y + b.bounds.height &&
+            b.bounds.y < a.bounds.y + a.bounds.height) {
+          LOG_ERR("BSS", "Overlapping text geometry: %s / %s", a.label, b.label);
+          return false;
+        }
+      }
     }
+    LOG_INF("BSS", "Series text geometry PASS: %u boxes", textBoxCount_);
     if (rowCount() && series_.scene() != SeriesScene::Page) {
       const uint8_t last = std::min<unsigned>(rowCount(), scroll_ + visibleRows()) - 1;
       if (sheetRow(last).y + rowHeight() + seriesScale(6) > actionRect(0).y) {
@@ -901,14 +1121,7 @@ class SeriesActivity final : public Activity {
         return false;
       }
     }
-#if CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
-    if (series_.scene() == SeriesScene::Page && series_.members().count &&
-        totalsBarY(seriesTop() + seriesScale(70)) <
-            seriesTop() + seriesScale(70) + seriesScale(32) + renderer.getLineHeight(SMALL_FONT_ID) + seriesScale(6)) {
-      LOG_ERR("BSS", "Series statistic labels overlap progress bar");
-      return false;
-    }
-#endif
+
     if (series_.scene() == SeriesScene::Files && focus_ != 0) return false;
     if (series_.scene() == SeriesScene::Count && focus_ != 1) return false;
     if ((series_.scene() == SeriesScene::Preview || series_.scene() == SeriesScene::Review) &&
@@ -923,33 +1136,18 @@ class SeriesActivity final : public Activity {
       scroll_ = savedScroll;
       if (!reached) return false;
     }
-    auto ink = [&](Rect r) {
-      for (int y = r.y; y < r.y + r.height; ++y)
-        for (int x = r.x; x < r.x + r.width; ++x)
-          if (renderer.isPixelBlack(x, y)) return true;
-      return false;
-    };
-    if (series_.scene() == SeriesScene::Count) {
-      const auto r = seriesPanel();
-      if (!ink(Rect{r.x + seriesScale(32), r.y + seriesScale(102), seriesScale(70), seriesScale(54)})) return false;
-    }
 #if !CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
     if (series_.scene() == SeriesScene::Page && series_.members().count) {
       for (uint8_t i = 0; i < std::min<uint16_t>(series_.members().count, 3); ++i)
         if (references_[i].id) {
           const auto r = pageRow(i);
-          const int x = r.x + seriesScale(34) + seriesScale(48) - 1, y = r.y + seriesScale(9), height = seriesScale(72);
+          const int x = r.x + seriesScale(4) + 25 + 10 + seriesScale(48) - 1,
+                    y = r.y + (r.height - seriesScale(72)) / 2, height = seriesScale(72);
           unsigned edge = 0;
           for (int yy = y; yy < y + height; ++yy)
             if (renderer.isPixelBlack(x, yy)) ++edge;
           if (edge < unsigned(height / 2)) return false;
         }
-    }
-    if (series_.scene() == SeriesScene::Queue) {
-      const auto r = seriesPanel();
-      const int width = (r.width - seriesScale(24)) / 4;
-      for (uint8_t i = 0; i < 4; ++i)
-        if (!ink(Rect{r.x + seriesScale(12) + i * width, r.y + seriesScale(48), width, seriesScale(36)})) return false;
     }
 #endif
     return true;
@@ -973,6 +1171,9 @@ class SeriesActivity final : public Activity {
     if (!series_.live()) return;
 #ifdef SIMULATOR
     ++paints;
+    textBoxCount_ = 0;
+    textLayer_ = 0;
+    geometryOverflow_ = false;
 #endif
     renderer.clearScreen();
     header();
@@ -983,9 +1184,15 @@ class SeriesActivity final : public Activity {
       const auto area = safe();
       for (int y = seriesTop(); y < bottom(); ++y)
         for (int x = area.x; x < area.x + area.width; ++x)
-          if ((x & 1) || (y & 1)) renderer.drawPixel(x, y, false);
+          if ((x & 3) || (y & 3)) renderer.drawPixel(x, y, false);
+#ifdef SIMULATOR
+      textLayer_ = 1;
+#endif
       sheet();
     }
+#ifdef SIMULATOR
+    textLayer_ = 0;
+#endif
     const auto s = safe();
     renderer.drawLine(s.x, bottom(), s.x + s.width, bottom());
     char buffer[72];
@@ -993,24 +1200,19 @@ class SeriesActivity final : public Activity {
     std::snprintf(buffer, sizeof(buffer), tr(STR_SERIES_RANGE_FORMAT), static_cast<unsigned long>(first),
                   static_cast<unsigned long>(series_.offset() + series_.members().count),
                   static_cast<unsigned long>(series_.members().matchedBooks));
-    if (series_.members().availability == Availability::Ready && series_.members().count)
-      text(Rect{s.x + seriesScale(70), bottom() + seriesScale(8), s.width - seriesScale(140), seriesScale(30)}, buffer);
-    else
-      text(Rect{s.x + seriesScale(16), bottom() + seriesScale(8), s.width - seriesScale(32), seriesScale(30)},
-           tr(STR_BACK));
-    if (series_.scene() == SeriesScene::Page) {
-      const int y = bottom() + seriesScale(20);
-      if (series_.offset()) {
-        const int x = s.x + seriesScale(24);
-        renderer.drawLine(x + seriesScale(8), y - seriesScale(8), x, y);
-        renderer.drawLine(x, y, x + seriesScale(8), y + seriesScale(8));
-      }
-      if (series_.members().hasMore) {
-        const int x = s.x + s.width - seriesScale(24);
-        renderer.drawLine(x - seriesScale(8), y - seriesScale(8), x, y);
-        renderer.drawLine(x, y, x - seriesScale(8), y + seriesScale(8));
-      }
-    }
+    const int footerY = bottom() + seriesScale(8);
+    if (series_.scene() == SeriesScene::Page && series_.members().count) {
+      char pageLabel[88];
+      std::snprintf(pageLabel, sizeof(pageLabel), tr(STR_SERIES_PAGE_RANGE_FORMAT), buffer);
+      text(Rect{s.x + seriesScale(16), footerY, s.width / 2, smallLine()}, pageLabel, false, SERIES_CAPTION_FONT_ID);
+    } else
+      text(Rect{s.x + seriesScale(16), footerY, s.width / 2, smallLine()},
+           CROSSINK_APP_CAP_TOUCH ? tr(STR_SERIES_TAP_CHOOSE) : tr(STR_SERIES_BUTTON_HINT), false,
+           SERIES_CAPTION_FONT_ID);
+    const char* context = tr(STR_SERIES_CONTEXT);
+    const int contextWidth = renderer.getTextWidth(SERIES_CAPTION_FONT_ID, context);
+    text(Rect{s.x + s.width - seriesScale(16) - contextWidth, footerY, contextWidth, smallLine()}, context, false,
+         SERIES_CAPTION_FONT_ID);
     renderer.displayBuffer(HalDisplay::FAST_REFRESH);
     painted_ = true;
   }
@@ -1042,6 +1244,30 @@ void drawSeriesGroupHeader(GfxRenderer& renderer, int x, int y, int width, const
 }
 #ifdef SIMULATOR
 bool seriesScenarioInvariant() { return !scenarioActivity || scenarioActivity->scenarioInvariant(); }
+void seriesScenarioGeometry(const char* path) {
+  FILE* file = std::fopen(path, "wb");
+  if (!file) {
+    LOG_ERR("BSS", "Cannot retain Series geometry");
+    return;
+  }
+  std::fputs("[", file);
+  for (unsigned i = 0; i < textBoxCount_; ++i) {
+    const auto& box = textBoxes_[i];
+    std::fprintf(file, "%s{\"x\":%d,\"y\":%d,\"width\":%d,\"height\":%d,\"layer\":%u,\"text\":\"", i ? "," : "",
+                 box.bounds.x, box.bounds.y, box.bounds.width, box.bounds.height, box.layer);
+    for (const unsigned char* byte = reinterpret_cast<const unsigned char*>(box.label); *byte; ++byte) {
+      if (*byte == '"' || *byte == '\\') std::fputc('\\', file);
+      if (*byte < 32)
+        std::fprintf(file, "\\u%04x", *byte);
+      else
+        std::fputc(*byte, file);
+    }
+    std::fputs("\"}", file);
+  }
+  std::fputs("]\n", file);
+  if (std::fclose(file)) LOG_ERR("BSS", "Cannot close Series geometry evidence");
+}
+
 void seriesScenarioBegin(bool count, const char* typed) {
   RenderLock lock;
   if (scenarioActivity) scenarioActivity->scenarioBegin(count, typed);

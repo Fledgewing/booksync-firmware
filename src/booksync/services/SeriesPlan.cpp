@@ -3,6 +3,7 @@
 
 #include <Logging.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 namespace booksync {
@@ -132,6 +133,29 @@ void SeriesPlan::project(uint8_t index) {
 }
 void SeriesPlan::observe() {
   ++view_.total;
+  uint8_t at = 0;
+  for (; at < view_.progressCount; ++at) {
+    const auto& other = progressOrder_[at];
+    const bool before = candidate_.positionKnown != other.known ? candidate_.positionKnown
+                        : candidate_.positionKnown && candidate_.position != other.position
+                            ? candidate_.position < other.position
+                        : candidate_.rank != other.rank ? candidate_.rank < other.rank
+                                                        : candidate_.book.key.ordinal < other.ordinal;
+    if (before) break;
+  }
+  if (at < SeriesProgressMax) {
+    if (view_.progressCount < SeriesProgressMax) ++view_.progressCount;
+    for (uint8_t i = view_.progressCount - 1; i > at; --i) {
+      progressOrder_[i] = progressOrder_[i - 1];
+      view_.progress[i] = view_.progress[i - 1];
+    }
+    progressOrder_[at] = {candidate_.position, candidate_.rank, candidate_.book.key.ordinal, candidate_.positionKnown};
+    auto& segment = view_.progress[at];
+    segment.status = candidate_.status;
+    segment.known = candidate_.book.readingKnown && candidate_.book.pages;
+    segment.percent =
+        segment.known ? std::min<uint64_t>(100, uint64_t(candidate_.book.page) * 100 / candidate_.book.pages) : 0;
+  }
   if (candidate_.status == QueryShow::Finished) ++view_.read;
   const bool reading = candidate_.status == QueryShow::Reading || candidate_.status == QueryShow::Rereading;
   if (reading) ++view_.reading;

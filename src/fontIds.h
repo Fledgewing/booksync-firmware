@@ -12,6 +12,10 @@
 #define UI_10_FONT_ID (219014595)
 #define UI_12_FONT_ID (1073124561)
 #define SMALL_FONT_ID (-995923120)
+#define SERIES_META_FONT_ID (-121590765)
+#define SERIES_CAPTION_FONT_ID (-1971553708)
+#define SERIES_MEMBER_FONT_ID (-265508599)
+#define SERIES_NUMBER_FONT_ID (297910061)
 
 // Font ID 0 is reserved as the "not found" sentinel.
 // Guard against any hash accidentally producing 0.
@@ -26,3 +30,7 @@ static_assert(BITTER_16_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UI_10_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UI_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(SMALL_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(SERIES_META_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(SERIES_CAPTION_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(SERIES_MEMBER_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(SERIES_NUMBER_FONT_ID != 0, "Font ID collision with sentinel");

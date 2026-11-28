@@ -35,6 +35,10 @@
 #include <XteinkDetect.h>
 #endif
 #include <builtinFonts/all.h>
+#include <builtinFonts/inter_16_numbers.h>
+#include <builtinFonts/inter_6_regular.h>
+#include <builtinFonts/inter_7_bold.h>
+#include <builtinFonts/inter_8_bold.h>
 #include <uzlib.h>
 
 #include "AppCapabilities.h"
@@ -244,8 +248,18 @@ EpdFont bitter16BoldItalicFont(&bitter_16_bolditalic);
 EpdFontFamily bitter16FontFamily(&bitter16RegularFont, &bitter16BoldFont, &bitter16ItalicFont, &bitter16BoldItalicFont);
 
 #endif
+EpdFont seriesCaptionFont(&inter_6_regular);
+EpdFont seriesMemberBoldFont(&inter_8_bold);
+EpdFont seriesMetaBoldFont(&inter_7_bold);
+EpdFont seriesNumberFont(&inter_16_numbers);
+EpdFontFamily seriesNumberFontFamily(&seriesNumberFont);
+
 EpdFont smallFont(&inter_8_regular);
 EpdFontFamily smallFontFamily(&smallFont);
+EpdFontFamily seriesMetaFontFamily = EpdFontFamily(&seriesMetaBoldFont).withFallbackFonts(&smallFont);
+
+EpdFontFamily seriesMemberFontFamily = EpdFontFamily(&smallFont, &seriesMemberBoldFont).withFallbackFonts(&smallFont);
+EpdFontFamily seriesCaptionFontFamily = EpdFontFamily(&seriesCaptionFont).withFallbackFonts(&smallFont);
 
 const EpdFont uiSymbols10Font(&ui_symbols_10);
 
@@ -1356,6 +1370,10 @@ void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, c
   renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
+  renderer.insertFont(SERIES_NUMBER_FONT_ID, seriesNumberFontFamily);
+  renderer.insertFont(SERIES_META_FONT_ID, seriesMetaFontFamily);
+  renderer.insertFont(SERIES_CAPTION_FONT_ID, seriesCaptionFontFamily);
+  renderer.insertFont(SERIES_MEMBER_FONT_ID, seriesMemberFontFamily);
   // Network screens can return Home without another reboot. Keep the lookup
   // callback available for the next reader, without loading font data here.
   sdFontSystem.begin(renderer, loadReaderResources);

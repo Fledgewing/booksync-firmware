@@ -20,8 +20,8 @@ Library, opens files, decodes covers or starts network work.
 
 Android's existing surface families remain unchanged: Series page, preview,
 count editor, file chooser, final review, one-button notice and queue. The
-existing grouped-page context uses the shared header rather than another screen
-factory. Offline entry reads saved values. Preview defaults to three, count
+grouped-page context is captured through the production F36a Catalog activity;
+its existing group-card presentation remains owned by F36a. Offline entry reads saved values. Preview defaults to three, count
 accepts integers 1–10, invalid Review stays in the same editor, and count Cancel
 returns to Series. Pro's numeric keyboard is bottom docked; button profiles
 adjust the same value. Ten-item lists scroll inside the same dialog. There is no
@@ -73,8 +73,15 @@ is introduced.
 Host tests cover count bounds, offline and Back actions, malformed/stale/foreign
 results, opaque choices, changed plan/file proof, every approved notice reason,
 queue cancellation/resume/completion and writer/reading revocation. The simulator
-captures 31 approved Series states plus the shared grouped-header component on
-Pro, Classic and X3. Every actual activity paint asserts zero Library reads or
+captures 31 approved Series states plus the production grouped Library context on
+Pro, Classic and X3. Each Series state exports measured text boxes; positive checks
+reject intersections and a negative probe recreates the old overlapping title pitch.
+The review gallery pairs all 32 approval strips with native captures at equal pixel
+scale, preserving the native X3 aspect ratio. The Library context is explicitly
+identified because its existing group cards differ from the approval strip.
+Private generated caption, action, member-title and numeric faces match the compact
+hierarchy without changing reader font choices. All generated font data remains
+in flash; the activity caches measured line extents once on entry. Every actual activity paint asserts zero Library reads or
 writes and zero implicit reader opens. The queue simulator separately performs
 real cut/read-only recovery/explicit-resume processes through F23. All six build
 profiles and three hardware image/map/partition/reserve receipts remain required

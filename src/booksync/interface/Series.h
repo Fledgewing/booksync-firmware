@@ -3,6 +3,12 @@
 #include "booksync/interface/Queries.h"
 namespace booksync {
 constexpr uint8_t SeriesNextMax = 10;
+constexpr uint8_t SeriesProgressMax = 24;
+struct SeriesProgress {
+  QueryShow status = QueryShow::Unknown;
+  uint8_t percent = 0;
+  bool known = false;
+};
 struct SeriesRequest {
   std::array<char, 64> key{};
   BookKey current{}, start{};
@@ -32,6 +38,8 @@ struct SeriesMember {
 // catalog or infers eligibility from a partial membership window.
 struct SeriesPlanView {
   std::array<SeriesMember, SeriesNextMax> next{};
+  std::array<SeriesProgress, SeriesProgressMax> progress{};
+  uint8_t progressCount = 0;
   SeriesMember earlier{};
   Provenance provenance{};
   std::array<char, 96> title{}, author{};
@@ -43,6 +51,8 @@ struct SeriesPlanView {
   bool deviceKnown = false, remainingSaved = false, countsKnown = false, offline = false;
   void clear() {
     for (uint8_t i = 0; i < SeriesNextMax; ++i) next[i].clear();
+    progress.fill({});
+    progressCount = 0;
     earlier.clear();
     provenance = {};
     title.fill(0);

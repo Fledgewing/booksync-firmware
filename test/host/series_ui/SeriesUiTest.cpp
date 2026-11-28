@@ -16,12 +16,14 @@ struct FakeSeriesLibrary : Library {
   std::vector<SeriesAction> actions;
   SeriesFlowRequest last{};
   unsigned polls = 0, opens = 0;
-  bool online = true, accept = true, immediate = true;
+  bool online = true, accept = true, immediate = true, signedIn = true;
   Capabilities capabilities() const override { return {true, true, true}; }
   Snapshot snapshot() const override { return snap; }
   AccountView accountView() const override {
     AccountView v;
     v.ticket = owner;
+    v.available = v.accountSupported = true;
+    v.signedIn = signedIn;
     return v;
   }
   CommandStatus submit(Intent) override { return CommandStatus::Accepted; }
@@ -157,14 +159,17 @@ TEST_F(SeriesUiTest, InvalidCountReviewIsNoOpInSameEditor) {
   ui.appendSeriesCount('1');
   ui.appendSeriesCount('1');
   const auto before = library.actions.size();
+  EXPECT_FALSE(ui.countValid());
   ui.submitSeriesCount();
   EXPECT_EQ(ui.scene(), SeriesScene::Count);
   EXPECT_EQ(library.actions.size(), before);
   ui.eraseSeriesCount();
   ui.eraseSeriesCount();
+  EXPECT_FALSE(ui.countValid());
   ui.submitSeriesCount();
   EXPECT_EQ(ui.scene(), SeriesScene::Count);
   ui.appendSeriesCount('0');
+  EXPECT_FALSE(ui.countValid());
   ui.submitSeriesCount();
   EXPECT_EQ(ui.scene(), SeriesScene::Count);
 }
@@ -178,6 +183,7 @@ TEST_F(SeriesUiTest, AllValidCountsOneThroughTenSubmitExactRequest) {
       ui.appendSeriesCount('0');
     } else
       ui.appendSeriesCount('0' + n);
+    EXPECT_TRUE(ui.countValid());
     ui.submitSeriesCount();
     EXPECT_EQ(ui.scene(), SeriesScene::Preview);
     EXPECT_EQ(library.last.series.count, n);
@@ -190,6 +196,7 @@ TEST_F(SeriesUiTest, CountInputRejectsNonDigitsAndStaysBounded) {
   EXPECT_FALSE(ui.appendSeriesCount('-'));
   for (unsigned i = 0; i < 20; ++i) ui.appendSeriesCount('9');
   EXPECT_LE(std::strlen(ui.countText()), 7u);
+  EXPECT_FALSE(ui.countValid());
   ui.submitSeriesCount();
   EXPECT_EQ(ui.scene(), SeriesScene::Count);
 }
@@ -355,3 +362,20 @@ TEST_F(SeriesUiTest, CountCancelRetainsPublishedPageFactsWhenPlannerIsReused) {
   EXPECT_EQ(ui.plan().total, 9u);
 }
 }  // namespace
+
+TEST(SeriesUi, PausedSignInPresentationUsesCachedLibraryAccount) {
+  FakeSeriesLibrary library;
+  Series series(library);
+  ASSERT_TRUE(series.enterSeries("synthetic-series"));
+  series.pollSeries();
+  EXPECT_FALSE(series.signInNeeded());
+  library.signedIn = false;
+  series.pollSeries();
+  EXPECT_TRUE(series.signInNeeded());
+  library.signedIn = true;
+  EXPECT_TRUE(series.signInNeeded());
+  series.pollSeries();
+  EXPECT_FALSE(series.signInNeeded());
+  series.leaveSeries();
+  EXPECT_FALSE(series.signInNeeded());
+}

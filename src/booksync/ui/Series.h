@@ -38,6 +38,17 @@ class Series {
   const char* countText() const { return count_.data(); }
   bool live() const { return live_; }
   bool loading() const { return loading_; }
+  bool countValid() const {
+    if (!count_[0]) return false;
+    unsigned n = 0;
+    for (char c : count_) {
+      if (!c) break;
+      n = n * 10 + unsigned(c - '0');
+      if (n > 10) return false;
+    }
+    return n >= 1;
+  }
+  bool signInNeeded() const { return signInNeeded_; }
   bool pending() const { return pending_; }
   uint32_t offset() const { return query_.offset; }
 
@@ -53,6 +64,7 @@ class Series {
   uint32_t generation_ = 0, epoch_ = 0;
   uint64_t counter_ = 0, expectedFlow_ = 0, pageRequestId_ = 0, awaitRevision_ = 0;
   SeriesScene scene_ = SeriesScene::Page;
+  bool signInNeeded_ = false;
   bool live_ = false, loading_ = false, pending_ = false, awaiting_ = false, delivery_ = false;
   auto sendSeries(SeriesAction) -> bool;
   bool currentSeries() const;
