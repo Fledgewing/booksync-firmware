@@ -23,7 +23,7 @@ PIPELINE = ('booksync::legacy::Activation::boot(', '__wrap_nvs_flash_init', 'mic
             'booksync::server::LifecycleState::run(',
             'booksync::server::LifecycleProgress::run(',
             'booksync_position_link',
-            'booksync_identity_audit_link', 'booksync_personal_reading_link',
+            'booksync_identity_audit_link', 'booksync_personal_reading_link', 'booksync::projectContinue(',
             'booksync_credentials_import_link', 'booksync::legacy::Credentials::stage(',
             'booksync::legacy::Credentials::restore(', 'booksync::legacy::Credentials::restoreWifi(',
             'booksync::Account::restoreLogin(',

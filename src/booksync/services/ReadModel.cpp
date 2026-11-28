@@ -5,7 +5,19 @@
 
 #include "booksync/interface/PersonalWidgets.h"
 #include "booksync/interface/StatsWidgets.h"
+#include "widgets/Continue.h"
 namespace booksync {
+void ReadModel::setContinue(const BookRow& row, bool available, const PersonalCard* resolved) {
+  continue_ = row;
+  continueAvailable_ = available;
+  // Native title-only evidence supplies no measured pace/date. F39 values may
+  // enrich this projection only when a registered provider has saved evidence.
+  const PersonalCard unknown{};
+  continueProgressResolved_ = resolved && resolved->progress.known;
+  projectContinue(available, PersonalState::Ready, resolved ? *resolved : unknown, false, 0, window_.resume, nullptr,
+                  false, &row);
+}
+
 bool ReadModel::accepts(const WindowBatchRequest& batch) {
   constexpr uint32_t Metadata = sizeof(LibraryWindow) - sizeof(BookRow) * LibraryRows;
   if ((!batch.count && !batch.personalWidgets) || batch.personalWidgets > 15 || batch.personalPick > 1000000000 ||
@@ -20,6 +32,9 @@ bool ReadModel::accepts(const WindowBatchRequest& batch) {
     const auto request = batch.windows[i];
     if (!request.limit || request.limit > LibraryRows || request.bytes > LibraryBytes ||
         request.bytes < sizeof(WindowSpan) + request.limit * sizeof(BookRow))
+      return false;
+    if (request.source == WindowSource::Continue &&
+        request.bytes < sizeof(WindowSpan) + request.limit * sizeof(BookRow) + sizeof(ContinueValues))
       return false;
     rows += request.limit;
   }
@@ -59,6 +74,7 @@ bool ReadModel::materializeBatch(const WindowBatchRequest& batch) {
     span.bytes = sizeof(WindowSpan);
     span.availability = window_.availability;
     if (span.request.source == WindowSource::Continue) {
+      span.bytes += sizeof(ContinueValues);  // Charge all summary/context fields to this caller.
       span.availability = Availability::Ready;
       span.total = continueAvailable_ ? 1 : 0;
       if (continueAvailable_) {
@@ -104,6 +120,8 @@ void ReadModel::invalidate(Invalidation reason) {
     window_.rows.fill({});
     window_.fileAvailability.fill(FileAvailability::Unknown);
     window_.windows.fill({});
+    window_.resume = {};
+    continueProgressResolved_ = false;
     window_.provenance = {};
     window_.request = {};
     window_.total = window_.bytes = 0;
@@ -185,6 +203,12 @@ bool ReadModel::historyTick(uint16_t allowance) {
         row.readingKnown = v.known;
         row.statsKnown = v.statsKnown;
       }
+      if (!continueProgressResolved_)
+        for (uint8_t i = 0; i < window_.windowCount; ++i) {
+          const auto& span = window_.windows[i];
+          if (span.request.source == WindowSource::Continue && span.count)
+            projectContinuePosition(window_.rows[span.first], window_.resume);
+        }
       window_.provenance.capture = historyRevision_;
       window_.stale = false;
       publishChanged();

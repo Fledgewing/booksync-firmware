@@ -47,6 +47,8 @@
 #include "booksync/ui/widgets/Week.h"
 #include "booksync/ui/widgets/When.h"
 #include "booksync/ui/widgets/Year.h"
+#include "booksync/ui/CompactGrid.h"
+#include "booksync/ui/widgets/Continue.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -187,7 +189,7 @@ class ShellActivity final : public Activity {
   mutable char defaultPageName[24]{};
 #endif
   std::string bookPath;
-  // One fallible <=6 KiB allocation per Home lifetime: the immutable visible
+  // One fallible <=7 KiB allocation per Home lifetime: the immutable visible
   // page is too large for the task stack and must be freed before reader entry.
   std::unique_ptr<WidgetHost> widgets;
   // Reused <=160-byte paint scratch avoids adding a chart array to each render frame.
@@ -237,18 +239,15 @@ class ShellActivity final : public Activity {
 #endif
                            widgets->page();
     const auto& p = pg.widgets[index];
-    if (!pg.textOnly && pg.rows == 6) {
-      // Approved compact tokens are minimum insets; larger calibrated bezel
-      // bounds and native hints still constrain the grid.
-      int top, right, bottom, left;
-      renderer.getOrientedViewableTRBL(&top, &right, &bottom, &left);
-      const int gridLeft = std::max(left, 12);
-      const int gridRight = renderer.getScreenWidth() - std::max(right, 12);
-      const int gridTop = std::max(top, 64 + 6);
-      const int gridBottom = std::min(safe.y + safe.height, renderer.getScreenHeight() - std::max(bottom, 42));
-      const int stepX = (gridRight - gridLeft + 8) / pg.cols;
-      const int stepY = (gridBottom - gridTop + 8) / pg.rows;
-      return Rect{gridLeft + stepX * p.x, gridTop + stepY * p.y, stepX * p.w - 8, stepY * p.h - 8};
+    if (!pg.textOnly) {
+      int topInset, rightInset, bottomInset, leftInset;
+      renderer.getOrientedViewableTRBL(&topInset, &rightInset, &bottomInset, &leftInset);
+      const CompactGrid gridLayout;
+      const auto cell = gridLayout
+                            .forHomePanel(renderer.getScreenWidth(), renderer.getScreenHeight(), topInset, rightInset,
+                                          bottomInset, leftInset, pg.cols, pg.rows)
+                            .compactTile(p);
+      return Rect{cell.x, cell.y, cell.width, cell.height};
     }
     const int top = header.y + header.height + 16;
     const int height = safe.y + safe.height - top - 56;
@@ -258,7 +257,14 @@ class ShellActivity final : public Activity {
   }
   WidgetBox widgetBox(uint8_t index) const {
     const auto r = tileRect(index);
-    return {r.width, r.height, renderer.getLineHeight(UI_10_FONT_ID), widgets->page().textOnly, mappedInput.hasTouch()};
+    WidgetBox box{r.width, r.height, renderer.getLineHeight(UI_10_FONT_ID), widgets->page().textOnly,
+                  mappedInput.hasTouch()};
+    const auto view = widgets->view(index);
+    if (!box.textOnly && widgets->page().widgets[index].kind == WidgetKind::Continue && box.width >= 360 &&
+        box.height >= 210 && view.viewState == WidgetState::Known && view.rows && view.count &&
+        renderer.getTextWidth(UI_10_FONT_ID, view.rows[0].title.data(), EpdFontFamily::BOLD) > box.width - 156)
+      box.titleLines = 2;
+    return box;
   }
   uint8_t focusRows(uint8_t index) const {
     if (!widgets || index >= widgets->page().count) return 1;
@@ -310,6 +316,8 @@ class ShellActivity final : public Activity {
         return tr(STR_HOME_NO_BOOKS);
       case WidgetState::NotSaved:
         return tr(STR_HOME_NOT_SAVED);
+      case WidgetState::Off:
+        return tr(STR_HOME_SOURCE_OFF);
       case WidgetState::Unsupported:
         return tr(STR_HOME_UNAVAILABLE);
       case WidgetState::Oversize:
@@ -867,6 +875,295 @@ class ShellActivity final : public Activity {
     }
     renderer.endTextClip();
   }
+#if CROSSINK_APP_CAP_HOME_EDITOR && !CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
+  mutable widgets::Canvas continueDrawing;  // <=1536 B, activity-owned reusable paint scratch.
+  widgets::Continue continueRenderer;
+  // One decoded thumbnail, reused for duplicate Continue placements. The
+  // existing activity allocation owns it; no extra framebuffer or paint heap.
+  CoverBitmap continueArtwork{};
+  CoverReference continueArtworkRef{};
+  BookKey continueArtworkKey{};
+  bool continueArtworkReady = false, continueArtworkRequested = false;
+  mutable bool continuePainted = false;
+  void pollContinueArtwork() {
+    if (!widgets || !continuePainted) return;
+    for (uint8_t i = 0; i < widgets->page().count; ++i) {
+      if (widgets->page().widgets[i].kind != WidgetKind::Continue) continue;
+      const auto view = widgets->view(i);
+      if (view.viewState != WidgetState::Known || !view.count) continue;
+      const auto key = view.rows[0].key;
+      if (!(key == continueArtworkKey)) {
+        continueArtworkKey = key;
+        continueArtworkRef = {};
+        continueArtworkReady = continueArtworkRequested = false;
+      }
+      const auto reference = library.coverReference(key);  // Cached only, outside paint.
+      if (reference.id && !(reference == continueArtworkRef)) {
+        const bool wasReady = continueArtworkReady;
+        continueArtworkReady = library.readCover(reference, continueArtwork) && continueArtwork.width &&
+                               continueArtwork.height && continueArtwork.width <= CoverWidth &&
+                               continueArtwork.height <= CoverHeight;
+        continueArtworkRef = reference;  // One cached read per immutable reference, including rejection.
+        if (continueArtworkReady) {
+          requestUpdate();
+        } else {
+          LOG_ERR("BSW", "Cached Continue artwork unavailable");
+          if (wasReady) requestUpdate();
+        }
+      } else if (!reference.id) {
+        if (continueArtworkReady) requestUpdate();
+        continueArtworkReady = false;
+        continueArtworkRef = {};
+        if (!continueArtworkRequested) {
+          library.requestCover(key);  // Post-paint intent; acquisition belongs to F25.
+          continueArtworkRequested = true;
+        }
+      }
+      return;  // One current-book cover, not one read/acquisition per placement.
+    }
+  }
+  void paintTitleLines(int font, int x, int y, int width, int height, const char* caption, bool black,
+                       bool bold) const {
+    char line[96]{};  // Bounded title scratch; never a heap string or row payload.
+    const auto family = bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
+    const int lineHeight = renderer.getLineHeight(font);
+    if (lineHeight <= 0) {
+      LOG_ERR("BSW", "Widget title font unavailable");
+      return;
+    }
+    const int lines = std::clamp(height / lineHeight, 1, 2);
+    size_t start = 0;
+    for (int rowIndex = 0; rowIndex < lines && caption[start]; ++rowIndex) {
+      size_t bytes = 0, lastSpace = 0;
+      line[0] = 0;
+      while (caption[start + bytes] && bytes + 1 < sizeof(line)) {
+        line[bytes] = caption[start + bytes];
+        ++bytes;
+        line[bytes] = 0;
+        if ((static_cast<unsigned char>(caption[start + bytes]) & 0xc0) == 0x80) continue;
+        if (line[bytes - 1] == ' ') lastSpace = bytes - 1;
+        if (renderer.getTextWidth(font, line, family) <= width) continue;
+        if (lastSpace)
+          bytes = lastSpace;
+        else {
+          do {
+            --bytes;
+          } while (bytes && (static_cast<unsigned char>(line[bytes]) & 0xc0) == 0x80);
+        }
+        line[bytes] = 0;
+        break;
+      }
+      if (!bytes) break;
+      renderer.drawText(font, x, y + rowIndex * lineHeight, line, black, family);
+      start += bytes;
+      while (caption[start] == ' ') ++start;
+    }
+  }
+  // Draw prepared built-in glyphs at the approved UI density. The 96-byte
+  // line scratch is reused; no string allocation, font loading or Library call.
+  void paintWidgetText(int x, int y, int width, int height, const char* caption, bool black, int font, int scale,
+                       bool bold = false, bool alignRight = false) const {
+    const auto style = bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
+    const int line = renderer.getLineHeight(font) * scale / 256;
+    if (line <= 0 || width <= 0 || height <= 0 || !caption) return;
+    char captionLine[96]{};
+    size_t start = 0;
+    renderer.beginTextClip(x, y, width, height);
+    for (int top = 0; top < height && (top == 0 || top + line <= height) && caption[start]; top += line) {
+      size_t bytes = 0, lastSpace = 0;
+      captionLine[0] = 0;
+      while (caption[start + bytes] && bytes + 1 < sizeof(captionLine)) {
+        captionLine[bytes] = caption[start + bytes];
+        ++bytes;
+        captionLine[bytes] = 0;
+        if ((static_cast<uint8_t>(caption[start + bytes]) & 0xc0) == 0x80) continue;
+        if (captionLine[bytes - 1] == ' ') lastSpace = bytes - 1;
+        if (renderer.getTextWidth(font, captionLine, style) * scale / 256 <= width) continue;
+        if (lastSpace)
+          bytes = lastSpace;
+        else {
+          do {
+            --bytes;
+          } while (bytes && (static_cast<uint8_t>(captionLine[bytes]) & 0xc0) == 0x80);
+        }
+        captionLine[bytes] = 0;
+        break;
+      }
+      if (!bytes) break;
+      const auto* cursor = reinterpret_cast<const uint8_t*>(captionLine);
+      int pen =
+          x + (alignRight ? std::max(0, width - renderer.getTextWidth(font, captionLine, style) * scale / 256) : 0);
+      const int baseline = y + top + renderer.getFontAscenderSize(font) * scale / 256;
+      uint32_t prior = 0;
+      while (const uint32_t codepoint = utf8NextCodepoint(&cursor)) {
+        if (prior) pen += renderer.getKerning(font, prior, codepoint, style) * scale / 256;
+        pen += renderer.drawScaledCodepoint(font, codepoint, style, pen, baseline, scale, black);
+        prior = codepoint;
+      }
+      start += bytes;
+      while (caption[start] == ' ') ++start;
+    }
+    renderer.endTextClip();
+  }
+  void paintContinueCommands(Rect r) const {
+    for (unsigned i = 0; i < continueDrawing.count; ++i) {
+      const auto& command = continueDrawing.commands[i];
+      const auto b = command.box;
+      const bool black = command.black;
+      const int x = r.x + b.x, y = r.y + b.y;
+      if (command.kind == widgets::Drawing::Fill) {
+        if (b.w > 0 && b.h > 0) {
+          if (command.radius)
+            renderer.fillRoundedRect(x, y, b.w, b.h, command.radius, black ? Color::Black : Color::White);
+          else
+            renderer.fillRect(x, y, b.w, b.h, black);
+        }
+        continue;
+      }
+      if (command.kind == widgets::Drawing::Border) {
+        if (command.radius)
+          renderer.drawRoundedRect(x, y, b.w, b.h, command.thickness, command.radius, black);
+        else
+          renderer.drawRect(x, y, b.w, b.h, command.thickness, black);
+        continue;
+      }
+      if (command.kind == widgets::Drawing::Title || command.kind == widgets::Drawing::SerifTitle) {
+        const int face = command.kind == widgets::Drawing::SerifTitle ? BITTER_10_FONT_ID
+                         : command.bold                               ? UI_10_FONT_ID
+                                                                      : SMALL_FONT_ID;
+        if (command.scale)
+          paintWidgetText(x, y, b.w, b.h, command.caption, black, face, command.scale, command.bold);
+        else {
+          renderer.beginTextClip(x, y, b.w, b.h);
+          paintTitleLines(face, x, y, b.w, b.h, command.caption, black, command.bold);
+          renderer.endTextClip();
+        }
+        continue;
+      }
+      if (command.kind == widgets::Drawing::BookJacket) {
+        if (continueArtworkReady && command.book->key == continueArtworkKey) {
+          // Draw from the immutable decoded 1-bit cache only. At most 128x192
+          // sampled pixels; no decoder, file access or temporary raster buffer.
+          int width = std::min(b.w, int(continueArtwork.width));
+          int height = width * continueArtwork.height / continueArtwork.width;
+          if (height > b.h) {
+            height = b.h;
+            width = height * continueArtwork.width / continueArtwork.height;
+          }
+          const int stride = (continueArtwork.width + 7) / 8;
+          for (int py = 0; py < height; ++py) {
+            const int sy = py * continueArtwork.height / height;
+            for (int px = 0; px < width; ++px) {
+              const int sx = px * continueArtwork.width / width;
+              const bool white = continueArtwork.pixels[sy * stride + sx / 8] & (0x80 >> (sx % 8));
+              renderer.drawPixel(x + (b.w - width) / 2 + px, y + py, !white);
+            }
+          }
+          continue;
+        }
+        renderer.drawRect(x, y, b.w, b.h, 1, black);
+        char initial[2] = {command.book->title[0] >= 32 && command.book->title[0] < 127 ? command.book->title[0] : '?',
+                           0};
+        paintFittedText(UI_10_FONT_ID, x + 8, y + 8, initial, b.w - 16, black);
+        continue;
+      }
+      const char* value = tr(STR_HOME_NOT_SAVED);
+      char formatted[96]{};
+      switch (command.label) {
+        case widgets::Label::Reading:
+          value = tr(STR_HOME_HERO_READING);
+          break;
+        case widgets::Label::Continue:
+          value = tr(STR_CONTINUE_READING);
+          break;
+        case widgets::Label::Resume:
+          value = tr(STR_HOME_RESUME);
+          break;
+        case widgets::Label::EmptyContinue:
+          value = tr(STR_HOME_START_READING);
+          break;
+        case widgets::Label::Off:
+          value = tr(STR_HOME_SOURCE_OFF);
+          break;
+        case widgets::Label::Unsupported:
+          value = tr(STR_HOME_SOURCE_UNSUPPORTED);
+          break;
+        case widgets::Label::OversizedData:
+          value = tr(STR_HOME_WIDGET_DATA_UNAVAILABLE);
+          break;
+        case widgets::Label::Error:
+          value = tr(STR_HOME_WIDGET_ERROR);
+          break;
+        case widgets::Label::Retry:
+          value = tr(STR_RETRY);
+          break;
+        case widgets::Label::Progress:
+          std::snprintf(
+              formatted, sizeof(formatted), tr(STR_HOME_PERCENT_FORMAT),
+              static_cast<unsigned long>(
+                  command.second ? (command.first < command.second ? command.first * 100 / command.second : 100) : 0));
+          value = formatted;
+          break;
+        case widgets::Label::TimeLeft:
+          std::snprintf(formatted, sizeof(formatted),
+                        command.second == static_cast<uint8_t>(ContinueTimeUnit::Hours)
+                            ? tr(STR_HOME_TIME_LEFT_HOURS_FORMAT)
+                            : tr(STR_HOME_TIME_LEFT_FORMAT),
+                        static_cast<unsigned long>(command.first));
+          value = formatted;
+          break;
+        case widgets::Label::FinishDayText:
+          switch (command.first) {
+            case 0:
+              value = tr(STR_HOME_FINISH_THU);
+              break;
+            case 1:
+              value = tr(STR_HOME_FINISH_FRI);
+              break;
+            case 2:
+              value = tr(STR_HOME_FINISH_SAT);
+              break;
+            case 3:
+              value = tr(STR_HOME_FINISH_SUN);
+              break;
+            case 4:
+              value = tr(STR_HOME_FINISH_MON);
+              break;
+            case 5:
+              value = tr(STR_HOME_FINISH_TUE);
+              break;
+            default:
+              value = tr(STR_HOME_FINISH_WED);
+              break;
+          }
+          break;
+        case widgets::Label::SavedUnknown:
+          value = tr(STR_HOME_SAVED_DATA);
+          break;
+        case widgets::Label::SavedAge:
+          std::snprintf(formatted, sizeof(formatted), tr(STR_HOME_SAVED_DAYS_FORMAT),
+                        static_cast<unsigned long>(command.first));
+          value = formatted;
+          break;
+        default:
+          break;
+      }
+      int font = command.bold ? UI_10_FONT_ID : SMALL_FONT_ID;
+      int scale = command.scale ? command.scale : 192;
+      bool rightAligned = false;
+      if (command.label == widgets::Label::Reading) scale = 144;
+      if (command.label == widgets::Label::Resume) scale = 166;
+      if (command.label == widgets::Label::Progress) {
+        font = UI_10_FONT_ID;
+        scale = 230;
+      }
+      if (command.label == widgets::Label::SavedAge || command.label == widgets::Label::SavedUnknown ||
+          command.label == widgets::Label::FinishDayText)
+        scale = 144;
+      paintWidgetText(x, y, b.w, b.h, value, black, font, scale, command.bold, rightAligned);
+    }
+  }
+#endif
   void paintWidget(uint8_t index) const {
     const auto r = tileRect(index);
     if (r.width < 24 || r.height < 24) return;
@@ -885,6 +1182,17 @@ class ShellActivity final : public Activity {
                                   : focus == index && !mappedInput.hasTouch();
 #else
     const bool selected = focus == index && !mappedInput.hasTouch();
+#endif
+#if CROSSINK_APP_CAP_HOME_EDITOR && !CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
+    if (!textOnly && selected && !mappedInput.hasTouch())
+      renderer.drawRoundedRect(r.x - 3, r.y - 3, r.width + 6, r.height + 6, 2, 12, true);
+    if (p.kind == WidgetKind::Continue && !textOnly) {
+      continueDrawing.clear();
+      continueRenderer.paint(continueDrawing, view, widgets->continueValues(), widgetBox(index), selected);
+      paintContinueCommands(r);
+      continuePainted = true;
+      return;
+    }
 #endif
     const bool hero = heroTile && !selected;
     const int font = UI_10_FONT_ID;
@@ -1666,10 +1974,16 @@ class ShellActivity final : public Activity {
       RenderLock lock;
       if (deviceStatusWanted() && workDeviceRuntime({this, deviceNavigation})) notifyDevicePublication();
       if (widgets && widgets->pollWidgets()) {
+#if CROSSINK_APP_CAP_HOME_EDITOR && !CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
+        continuePainted = false;
+#endif
         if (focus >= widgets->page().count) focus = 0;
         if (focusRow >= focusRows(focus)) focusRow = 0;
         requestUpdate();
       }
+#if CROSSINK_APP_CAP_HOME_EDITOR && !CROSSINK_APP_CAP_HOME_EDITOR_SETTINGS
+      pollContinueArtwork();
+#endif
 #if CROSSINK_APP_CAP_HOME_EDITOR
       if (editor.pollEditor()) {
         if (widgets) {
@@ -1749,8 +2063,11 @@ class ShellActivity final : public Activity {
               }
             }
           }
-          const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-          if (y >= safe.y + safe.height - 56 && y < safe.y + safe.height && x >= safe.x && x < safe.x + safe.width) {
+          const bool compactFooter = !widgets->page().textOnly;
+          const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, !compactFooter, false);
+          const int footerHeight = compactFooter ? 42 : 56;
+          if (y >= safe.y + safe.height - footerHeight && y < safe.y + safe.height && x >= safe.x &&
+              x < safe.x + safe.width) {
             const auto& page = widgets->page();
             const int next = page.page + (x < safe.x + safe.width / 2 ? -1 : 1);
             if (next >= 0 && next < page.pages) {

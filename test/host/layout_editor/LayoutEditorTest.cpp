@@ -18,6 +18,13 @@ std::string bytes(LayoutInput in) {
   return out;
 }
 std::string original() { return bytes(Layout::defaults()); }
+std::string legacySevenRows() {
+  auto raw = original();
+  const std::string key = "\"x4\":{\"cols\":2,\"rows\":";
+  const auto row = raw.find(key) + key.size();
+  raw.replace(row, raw.find('}', row) - row, "7");
+  return raw;
+}
 LayoutEdit request(LayoutEditKind kind, uint32_t revision = 1) {
   LayoutEdit edit;
   edit.kind = kind;
@@ -382,6 +389,7 @@ TEST(LayoutEditor, UnknownInstancesReserveCellsAndSurviveKnownRemoval) {
   ASSERT_TRUE(parser.project(LayoutInput::memory(raw.data(), raw.size()), "x4", 0, page));
   ASSERT_EQ(page.count, 4);
   EXPECT_EQ(page.widgets[3].y, 6);  // The unknown tile reserved row 5.
+  EXPECT_EQ(page.rows, 7);          // Editing retains the stored class grid.
   auto edit = request(LayoutEditKind::Remove, 2);
   ASSERT_EQ(editor.prepare(LayoutInput::memory(raw.data(), raw.size()), "x4", edit), LayoutEditStatus::Saved);
   EXPECT_NE(bytes(editor.output()).find(unknown), std::string::npos);

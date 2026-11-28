@@ -3,6 +3,7 @@
 #include "HistorySource.h"
 #include "booksync/storage/Index.h"
 namespace booksync {
+struct PersonalCard;
 enum class Invalidation { Files, Capture, Generation, Account };
 // Worker materializes one visible window; renderer gets only a copied value.
 // Caller excludes rendering during mutation (the existing RenderLock contract).
@@ -10,10 +11,7 @@ class ReadModel {
  public:
   explicit ReadModel(storage::Index& index) : index_(index), lifetime_(++nextLifetime_) {}
   bool materialize(WindowRequest request);
-  void setContinue(const BookRow& row, bool available) {
-    continue_ = row;
-    continueAvailable_ = available;
-  }
+  void setContinue(const BookRow& row, bool available, const PersonalCard* resolved = nullptr);
   void copyWindow(LibraryWindow& out) const { out = window_; }
   bool materializeBatch(const WindowBatchRequest& batch);
   static bool accepts(const WindowBatchRequest& batch);
@@ -39,7 +37,7 @@ class ReadModel {
   storage::Index& index_;
   LibraryWindow window_{};
   BookRow continue_{};
-  bool continueAvailable_ = false;
+  bool continueAvailable_ = false, continueProgressResolved_ = false;
   inline static uint64_t nextPublication_ = 0;
   void publishChanged() {
     sequence_ = ++nextPublication_;
