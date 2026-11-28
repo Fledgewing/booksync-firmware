@@ -23,7 +23,9 @@ acknowledge its barrier. It does this before removing the capture. A cut between
 the two journal publications repeats the transfer safely.
 
 The owner then executes State (finish day), guarded Status, Rating, and local
-Apply in order. A known zero rating explicitly clears; unknown means no rating
+Apply in order. An absent date skips State, an absent status skips State/Status,
+and an unknown rating skips Rating through local acknowledgments without a
+transport call. An attempted operation can never be skipped this way. A known zero rating explicitly clears; unknown means no rating
 write. The neutral adapter contract receives immutable before/desired values,
 account/document identity, event ID, operation and reconciliation flag. Only the
 active serial SyncOwner can mint its writer token. Concrete protocol mapping,

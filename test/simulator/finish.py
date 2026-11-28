@@ -41,7 +41,7 @@ with tempfile.TemporaryDirectory(prefix='booksync-finish-') as directory:
         boot('undo')
         boot('run')
         remote=(sd/'finish/remote').read_bytes()
-        assert remote==bytes([1,0,1,1,1,1,0,1,1,1,1]),remote
+        assert remote==bytes([1,0,1,1,1,1,0,0,1,1,1]),remote
         boot('undo')  # A settled repeated Undo cannot create another side effect.
         assert (sd/'finish/remote').read_bytes()==remote
 (out/'finish.json').write_text(json.dumps({'profile':profile,'scenarios':len(cases),'power_cuts':8,'boots':boots,'result':'PASS','finish_allocations':0,'borrowed_scratch_bytes':5504,'runtime_memory':{'internal_heap':None,'largest_block':None,'stack_high_water':None,'reason':'native HAL does not represent hardware memory; maintainer acceptance required'}},indent=2)+'\n')

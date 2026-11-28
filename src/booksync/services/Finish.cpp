@@ -234,6 +234,14 @@ SyncResult Finish::step(const SyncWriterToken& token, ServerAdapter& adapter, co
   if (phase >= 5 || e.acknowledged != (1U << phase) - 1 || (e.attempting && e.attempting != phase + 1))
     return SyncResult::StorageError;
   const auto selected = LifecyclePhase(phase);
+  const bool skip = (phase == 1 && (v.day.empty() || v.desired.status == ReadingStatus::Unknown)) ||
+                    (phase == 2 && v.desired.status == ReadingStatus::Unknown) ||
+                    (phase == 3 && !v.desired.ratingKnown);
+  if (skip) {
+    if (e.attempting) return SyncResult::StorageError;
+    return journal_.acknowledge(e.id, selected, e.checkpoint) == JournalResult::Ok ? SyncResult::Advanced
+                                                                                   : SyncResult::StorageError;
+  }
   if (!e.attempting && journal_.attempt(e.id, selected) != JournalResult::Ok) return SyncResult::StorageError;
   const auto outcome = adapter.finishPhase(token, {e, v, selected, e.attempting != 0});
   if (outcome == PhaseOutcome::Uncertain) return SyncResult::Uncertain;

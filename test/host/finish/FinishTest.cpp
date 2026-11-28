@@ -31,7 +31,9 @@ class Toy : public ServerAdapter {
     EXPECT_GE(phase, 1U);
     EXPECT_LT(phase, 5U);
     EXPECT_LT(r.entry.id, committed.size());
-    if (phase > 1) EXPECT_TRUE(committed[r.entry.id][phase - 1]);
+    if (phase == 2 && !r.intent.day.empty()) EXPECT_TRUE(committed[r.entry.id][1]);
+    if (phase == 3 && r.intent.desired.status != ReadingStatus::Unknown) EXPECT_TRUE(committed[r.entry.id][2]);
+    if (phase == 4 && r.intent.desired.ratingKnown) EXPECT_TRUE(committed[r.entry.id][3]);
     if (!committed[r.entry.id][phase]) {
       committed[r.entry.id][phase] = true;
       ++effects;
@@ -87,12 +89,12 @@ TEST_F(FinishTest, OfflineRestartDeliversPositionThenStateStatusRatingAndRetains
   uint64_t undo = 0;
   EXPECT_EQ(finish.undo(intent, "toy:grove", "scope:fern", undo), JournalResult::Ok);
   drain(owner);
-  EXPECT_EQ(toy.writes, 8U);
+  EXPECT_EQ(toy.writes, 7U);
   uint64_t repeat = 0;
   EXPECT_EQ(finish.undo(intent, "toy:grove", "scope:fern", repeat), JournalResult::Ok);
   EXPECT_EQ(repeat, undo);
   drain(owner);
-  EXPECT_EQ(toy.writes, 8U);
+  EXPECT_EQ(toy.writes, 7U);
 }
 TEST_F(FinishTest, UndoBeforeAnyAttemptCancelsWithoutRemoteFinish) {
   enqueue();
@@ -121,8 +123,8 @@ TEST_F(FinishTest, UnknownWriteRetainedAndUndoWaitsForReconciliation) {
   ASSERT_EQ(owner.activate(), SyncResult::Ready);
   drain(owner);
   EXPECT_EQ(toy.reconciles, 1U);
-  EXPECT_EQ(toy.writes, 9U);
-  EXPECT_EQ(toy.effects, 8U);
+  EXPECT_EQ(toy.writes, 8U);
+  EXPECT_EQ(toy.effects, 7U);
 }
 TEST_F(FinishTest, ScopeMismatchMissingPositionAndReadOnlyNeverAcceptAnIntent) {
   EXPECT_EQ(finish.enqueue(position, "toy:grove", "scope:other", "leaf:violet", before, after, "", intent),
@@ -167,7 +169,7 @@ TEST_F(FinishTest, NewerChoicePreventsOldUndo) {
   SyncOwner owner(journal, toy, "toy:grove", "scope:fern", scratch.data(), scratch.size(), nullptr, nullptr, &finish);
   ASSERT_EQ(owner.activate(), SyncResult::Ready);
   drain(owner);
-  EXPECT_EQ(toy.writes, 4U);
+  EXPECT_EQ(toy.writes, 3U);
   EXPECT_EQ(finish.undo(intent, "toy:grove", "scope:fern", undo), JournalResult::Invalid);
 }
 TEST_F(FinishTest, MalformedOrFutureIntentNeverReachesAdapter) {
@@ -289,7 +291,7 @@ TEST_F(FinishTest, UndoDuringUnknownFinalPositionWaitsForItsProofAndResolvedIden
   SyncOwner owner(journal, toy, "toy:grove", "scope:fern", scratch.data(), scratch.size(), nullptr, nullptr, &finish);
   ASSERT_EQ(owner.activate(), SyncResult::Ready);
   drain(owner);
-  EXPECT_EQ(toy.writes, 8U);
+  EXPECT_EQ(toy.writes, 7U);
 }
 TEST_F(FinishTest, RepeatedUnknownResultNeverBecomesAnAcknowledgment) {
   enqueue();

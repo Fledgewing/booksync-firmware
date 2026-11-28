@@ -48,7 +48,10 @@ class Toy final : public ServerAdapter {
       return PhaseOutcome::Unavailable;
     const auto phase = unsigned(r.phase);
     const size_t slot = 1 + (r.entry.id - 2) * 5 + phase;
-    if (phase > 1 && !bytes[slot - 1]) return PhaseOutcome::Unavailable;
+    if (phase == 2 && !r.intent.day.empty() && !bytes[slot - 1]) return PhaseOutcome::Unavailable;
+    if (phase == 3 && r.intent.desired.status != ReadingStatus::Unknown && !bytes[slot - 1])
+      return PhaseOutcome::Unavailable;
+    if (phase == 4 && r.intent.desired.ratingKnown && !bytes[slot - 1]) return PhaseOutcome::Unavailable;
     const char* cut = std::getenv("BOOKSYNC_FINISH_CUT");
     char label[32];
     std::snprintf(label, sizeof(label), "before:%u", phase);
