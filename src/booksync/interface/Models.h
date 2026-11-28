@@ -3,10 +3,14 @@
 #include <array>
 #include <cstdint>
 
+#include "booksync/interface/CollectionWidgets.h"
+#include "booksync/interface/ContinueValues.h"
+#include "booksync/interface/Identity.h"
+
 namespace booksync {
 // Presentation values, never wire IDs, credentials or mutable store handles.
 // Identity bytes come from F08 evidence; unknown values remain explicit.
-enum class Availability : uint8_t { NotSaved, Ready, Unsupported, Unavailable };
+enum class Availability : uint8_t { NotSaved, Ready, Unsupported, Unavailable, Off };
 struct Snapshot {
   Availability catalog = Availability::NotSaved;
   uint32_t generation = 0;
@@ -20,21 +24,6 @@ struct Snapshot {
 namespace booksync {
 constexpr uint16_t LibraryRows = 24;
 constexpr uint32_t LibraryBytes = 16384;
-struct Provenance {
-  uint32_t generation = 0, accountEpoch = 1;
-  uint64_t owner = 0, capture = 0;
-  bool operator==(Provenance other) const {
-    if (generation != other.generation) return false;
-    if (accountEpoch != other.accountEpoch) return false;
-    if (owner != other.owner) return false;
-    return capture == other.capture;
-  }
-};
-struct BookKey {
-  Provenance provenance{};
-  uint32_t ordinal = 0;
-  bool operator==(BookKey other) const { return provenance == other.provenance ? ordinal == other.ordinal : false; }
-};
 enum class WindowSource : uint8_t {
   OnDevice,
   Continue,
@@ -45,15 +34,31 @@ enum class WindowSource : uint8_t {
   Random,
   FinishedYear,
   PickBackUp,
+  AlsoReading,
+  AllFinished,
+  LibrarySummary,
+  ListsPreview,
+  Recommended,
   Unknown
 };
+
+enum class CatalogDestination : uint8_t { Library, Authors, Series, Collections, Lists, SavedList, BookList };
+struct CatalogRoute {
+  CatalogDestination destination = CatalogDestination::Library;
+  ListKey list{};
+  WindowSource source = WindowSource::Unknown;
+  std::array<char, 64> caption{};
+};
+
+enum class WindowPresentation : uint8_t { Full, Preview };
 struct WindowRequest {
   uint32_t offset = 0;
   uint16_t limit = 12;
   uint32_t bytes = LibraryBytes;
   WindowSource source = WindowSource::OnDevice;
+  WindowPresentation presentation = WindowPresentation::Full;
   bool operator==(WindowRequest other) const {
-    if (source != other.source || offset != other.offset) return false;
+    if (source != other.source || presentation != other.presentation || offset != other.offset) return false;
     return limit == other.limit ? bytes == other.bytes : false;
   }
 };
@@ -69,9 +74,10 @@ struct WindowBatchRequest {
 };
 struct WindowSpan {
   WindowRequest request{};
-  uint32_t total = 0, bytes = 0;
-  uint16_t first = 0, count = 0;
+  uint32_t total = 0, bytes = 0, ageDays = 0;
+  uint16_t first = 0, count = 0, materializedRows = 0, year = 0;
   Availability availability = Availability::NotSaved;
+  bool stale = false, ageKnown = false;
 };
 struct BookRow {
   BookKey key{};
@@ -83,6 +89,9 @@ struct BookRow {
 };
 enum class FileAvailability : uint8_t { Unknown, OnCard, ServerOnly };
 struct LibraryWindow {
+  ContinueValues resume{};
+  LibraryWidgetValues librarySummary{};
+  ListsWidgetValues savedLists{}, expandedLists{};
   uint64_t publication = 0;  // Non-reused in-process content revision, independent of catalog/capture IDs.
   Provenance provenance{};
   WindowRequest request{};

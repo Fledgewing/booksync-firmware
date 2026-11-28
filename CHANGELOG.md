@@ -5,6 +5,7 @@
 - BookSync Home retains an independently saved account best-streak record when native history is unavailable.
 
 - BookSync Home keeps every installed widget reachable in Add through Classic button focus and Pro touch scrolling.
+- BookSync Continue reading uses the approved compact X4 hero, a focused Resume action and distinct missing/off/unsupported/stale/error states. Estimates stay unknown until saved provider evidence exists. X3 retains its text presentation.
 
 - BookSync captures reader progress before a bounded sleep drain even with plugins disabled, retires stale sleep presentation ownership on return, and preserves native sleep screens while new artwork awaits approval.
 - BookSync stats cards no longer reduce sibling shelves to too few books when a Home page contains many summaries; the combined C3 row budget stays bounded.
@@ -19,6 +20,11 @@
 
 - BookSync Home adds compact When you read and Reading records widgets on X4 Pro and Classic, with local-hour history and explicit per-record source availability.
 - BookSync can publish daily native saved highlights through Library without changing original clipping files; incomplete, scoped and oversized captures stay explicit.
+- BookSync Home adds approved Discover and Recommended for you cards with independent saved-source states, Another, and source-scoped All navigation on X4 Pro and Classic. New cards remain off on X3.
+
+- BookSync Home adds approved compact Library and Lists cards on X4 Pro and Classic, with main/optional sizes, explicit saved-data states and approved Library navigation.
+
+- BookSync Book list uses the approved compact nine-preset previews and top-right All counts on X4; the saved-source list keeps paging, Back and unavailable actions offline. X3 retains its text Home.
 
 - BookSync publishes timezone-aware clock and date values only after live or retained clock provenance is known; a persisted expiry floor cannot produce a Home clock.
 - BookSync adds compact Series pages and exact next-1–10 download review on X4 Pro touch, X4 Classic buttons and X3, with offline/Back behavior, frozen file choices and restart-safe account-scoped queues through Library.
@@ -29,6 +35,8 @@
 - BookSync adds Settings → Reminders with local bedtime and eye-rest editors, explicit Save/Back controls, and unknown-clock or storage recovery states on Pro, Classic and X3.
 
 - BookSync adds the approved compact Library and scoped/grouped lists on touch, buttons and X3 text, with explicit offline download consent, cached file choices, cancel/resume states and Back restoration. The live catalog/download facade remains a separate integration.
+
+- BookSync prepares bounded Book list previews for all nine presets, preserving saved ordering/counts and year/account evidence; new compact widget presentation remains a separate increment.
 
 - BookSync adds shared position conflict, reset, override and decline policy with durable account/edition isolation and stale-answer rejection; late consent uses the existing one-draw reading exception. Live transport and reader presentation remain deferred.
 - BookSync adds account-isolated authenticated catalog transport behind Library, with bounded response spooling and rejection of incomplete or revoked responses; automatic sync scheduling follows separately.

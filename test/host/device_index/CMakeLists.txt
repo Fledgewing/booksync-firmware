@@ -4,6 +4,10 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/storage/Identity.cpp
   ${REPO_ROOT}/src/booksync/services/DeviceIndex.cpp
   ${REPO_ROOT}/src/booksync/services/ReadModel.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Library.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Lists.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/BookList.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Continue.cpp
   ${REPO_ROOT}/src/booksync/reader/Capture.cpp
   ${REPO_ROOT}/src/booksync/reader/CaptureBinding.cpp
   ${REPO_ROOT}/src/booksync/reader/Locator.cpp
@@ -31,6 +35,7 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/services/NativePersonalSource.cpp
   ${REPO_ROOT}/src/booksync/services/SavedNativePassages.cpp
   ${REPO_ROOT}/src/booksync/services/PersonalWorker.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/PersonalWidgets.cpp
   ${REPO_ROOT}/src/booksync/services/PersonalReading.cpp
   ${REPO_ROOT}/src/booksync/services/Clock.cpp
   ${REPO_ROOT}/lib/uzlib/src/uzlib_checksums.c

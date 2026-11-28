@@ -8,6 +8,10 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+
+#include "widgets/BookList.h"
+#include "widgets/Collections.h"
+#include "widgets/PersonalWidgets.h"
 #if defined(SIMULATOR) && defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
 #elif defined(SIMULATOR)
@@ -285,6 +289,10 @@ namespace {
 // This link-only descriptor is never instantiated or invoked by runtime.
 struct ReadingLinkInput {
   booksync::PersonalReading& personal;
+  booksync::BookListSource& bookListSource;
+  booksync::BookListProjection& bookList;
+  booksync::WindowRequest& bookListRequest;
+  uint16_t bookListYear;
   booksync::ReadingStats& stats;
   booksync::StatsSource& source;
   booksync::PageStatsSource& pages;
@@ -295,9 +303,44 @@ struct ReadingLinkInput {
   booksync::ReadingValue watermark;
   uint64_t now;
   int64_t day, pick;
+  const booksync::LibraryWidgetInput* libraryWidget = nullptr;
+  booksync::LibraryWidgetValues* libraryWidgetOut = nullptr;
+  const booksync::ListsWidgetSource* listsWidget = nullptr;
+  booksync::ListsWidgetValues* listsWidgetOut = nullptr;
+  const booksync::CollectionAllowance* collectionAllowance = nullptr;
+  booksync::DiscoverProjection* discoverWidget = nullptr;
+  booksync::PersonalWidgetValues* recommendedWidget = nullptr;
+  const booksync::PersonalWidgetCapture* widgetCapture = nullptr;
+  const booksync::PersonalWidgetAllowance* widgetAllowance = nullptr;
 };
-}  // namespace
-extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
+// Keep the dynamic link probe's outgoing widget arguments in a separate frame;
+// no runtime instance or additional workspace is introduced.
+__attribute__((noinline)) bool projectLinkedPersonalWidgets(ReadingLinkInput& input) {
+  bool widgets = true;
+  if (input.discoverWidget && input.widgetCapture && input.widgetAllowance) {
+    widgets &= input.discoverWidget->begin(input.day, input.pick, *input.widgetCapture, *input.widgetAllowance);
+    widgets &= input.discoverWidget->tick(*input.widgetCapture);
+  }
+  if (input.recommendedWidget && input.widgetCapture && input.widgetAllowance)
+    widgets &= booksync::projectRecommendedWidget(input.personal.result(), *input.widgetCapture, *input.widgetAllowance,
+                                                  *input.recommendedWidget);
+  return widgets;
+}
+// Link-only retention arguments stay in a separate bounded frame; no runtime allocation.
+__attribute__((noinline)) bool projectLinkedCollections(ReadingLinkInput& input) {
+  const auto scope = input.source.scope;
+  bool collections = true;
+  if (input.libraryWidget && input.libraryWidgetOut && input.collectionAllowance)
+    collections &= booksync::projectLibraryWidget(*input.libraryWidget, scope, *input.collectionAllowance,
+                                                  *input.libraryWidgetOut);
+  if (input.listsWidget && input.listsWidgetOut && input.collectionAllowance)
+    collections &=
+        booksync::projectListsWidget(*input.listsWidget, scope, *input.collectionAllowance, *input.listsWidgetOut);
+  return collections;
+}
+// Keep the link-only selector/stats calls in their original bounded frame.
+// No runtime caller or additional workspace is introduced.
+__attribute__((noinline)) bool selectLinkedReading(ReadingLinkInput& input) {
   const auto scope = input.source.scope;
   input.source = input.pages.freeze(scope, input.source.since, input.source.through, input.source.complete);
   input.stats.begin(input.source, input.now, 0, input.watermark);
@@ -305,4 +348,14 @@ extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
   input.personal.begin(input.kind, input.day, input.pick, scope);
   input.personal.card({}, scope, input.card);
   return input.stats.tick() && input.personal.tick();
+}
+}  // namespace
+extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
+  const auto scope = input.source.scope;
+  const bool personal = selectLinkedReading(input);
+  const bool collections = projectLinkedCollections(input);
+  const bool books =
+      booksync::projectBookList(input.bookListSource, input.bookListRequest, scope, input.bookListYear, input.bookList);
+  const bool widgets = projectLinkedPersonalWidgets(input);
+  return personal && collections && books && widgets;
 }
