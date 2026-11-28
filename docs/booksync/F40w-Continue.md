@@ -24,7 +24,7 @@ There is one reusable 1536-byte maximum drawing buffer and one at-most-4-KiB
 decoded thumbnail cache in the existing X4 activity allocation. Cached cover reads
 and acquisition intents run after the first paint; missing artwork uses the title
 placeholder. Sampling a prepared bitmap during drawing is bounded to 128×192 pixels. It is absent from C3. The shared summary is at most 128
-bytes; WidgetHost's allocation is bounded by 7 KiB and freed before reading.
+bytes; WidgetHost's allocation has a compile-time bound in WidgetHost.h and is freed before reading.
 Neither belongs on a FreeRTOS task stack. The pure projection also receives the F39 hardware compiler 256-byte frame gate. Paint allocates nothing, performs no
 Library queries and borrows only the locked visible snapshot until paint ends.
 No additional framebuffer, store or cache format is introduced.
