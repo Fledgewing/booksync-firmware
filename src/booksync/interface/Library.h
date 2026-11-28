@@ -7,6 +7,7 @@
 #include "booksync/interface/AccountView.h"
 #include "booksync/interface/Clock.h"
 #include "booksync/interface/CatalogView.h"
+#include "booksync/interface/Clock.h"
 #include "booksync/interface/Covers.h"
 #include "booksync/interface/Downloads.h"
 #include "booksync/interface/HomeLayout.h"
@@ -96,7 +97,7 @@ class Library {
   virtual CommandStatus showBookDetails(BookKey) { return CommandStatus::Unavailable; }
   virtual CommandStatus showCatalogSeries(std::array<char, 64>) { return CommandStatus::Unavailable; }
   virtual CommandStatus showCatalogFilter() { return CommandStatus::Unavailable; }
-  virtual CommandStatus showDownloadAccount() { return CommandStatus::Unavailable; }
+  virtual CommandStatus showDownloadAccount() { return submit(Intent::OpenAccount); }
   virtual CommandStatus open(BookKey) { return CommandStatus::Unavailable; }
   virtual LibraryWindow window() const { return {}; }
   virtual void readWindow(LibraryWindow& out) const { out = window(); }

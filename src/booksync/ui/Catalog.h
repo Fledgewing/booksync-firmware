@@ -21,6 +21,7 @@ class CatalogSurface {
   CommandStatus activateCatalog();
   CommandStatus activateCatalogRow(uint8_t catalogRow);
   CommandStatus activateCatalogShelfBook(uint8_t index);
+  CommandStatus activateCatalogGroupBook(uint8_t index);
   CommandStatus chooseCatalogDownload(uint8_t choice);
   CommandStatus catalogDialogAction(uint8_t action);
   CommandStatus catalogDetails(uint8_t catalogRow);
@@ -35,7 +36,10 @@ class CatalogSurface {
   uint8_t catalogFocus() const { return focus_; }
   auto catalogControls() const -> uint8_t;
   auto catalogVisibleRows() const -> uint8_t;
-  uint8_t catalogPageRows() const { return textOnly_ ? 6 : 5; }
+  uint8_t catalogPageRows() const {
+    return panel_ == Panel::Sources ? CatalogSourceRows : panel_ == Panel::Groups ? 3 : textOnly_ ? 6 : 5;
+  }
+  static CatalogRoot catalogBrowseRoot(uint8_t index);
   CatalogRoot catalogRoot() const { return current_.root; }
   uint32_t catalogOffset() const { return current_.offset; }
   const CatalogSummary& catalogSummaryValue() const { return summary_; }
@@ -72,6 +76,7 @@ class CatalogSurface {
   Provenance retainedProvenance_{};
   uint32_t retainedTotal_ = 0;
   uint8_t retainedCount_ = 0;
+  bool retainedComplete_ = false;
   Library& library_;
   CatalogSummary summary_{};
   QueryRequest request_{};  // Reused, never a multi-KiB task-stack temporary.
@@ -84,6 +89,7 @@ class CatalogSurface {
   // Cached references only; the host allocates decoded thumbnails on S3 only.
   std::array<CoverReference, 8> references_{};
   Subscription seen_{};
+  uint64_t pagePublication_ = 0, expectedDownload_ = 0;
   Panel panel_ = Panel::Closed;
   Dialog dialog_ = Dialog::None;
   State state_ = State::Loading;

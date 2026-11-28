@@ -219,6 +219,7 @@ TEST(CatalogStateMachine, RetiredOpenIntentCannotOpenCompletedDownload) {
   ui.backCatalog();
   f.status.sequence = ++f.sequence;
   f.status.state = DownloadState::Complete;
+  f.status.id = 8;
   ui.pollCatalog();
   EXPECT_EQ(f.opens, 0u);
 }
@@ -231,6 +232,7 @@ TEST(CatalogStateMachine, ActiveVerifiedCompletionOpensOnce) {
   ui.chooseCatalogDownload(1);
   f.status.sequence = ++f.sequence;
   f.status.state = DownloadState::Complete;
+  f.status.id = 8;
   ui.pollCatalog();
   ui.pollCatalog();
   EXPECT_EQ(f.opens, 1u);
@@ -333,5 +335,70 @@ TEST(CatalogStateMachine, ReadFailureKeepsLastGoodLocalRowsWithoutRemoteActions)
   EXPECT_EQ(f.opens, 1u);
   EXPECT_EQ(ui.activateCatalogRow(1), CommandStatus::Unavailable);
   EXPECT_EQ(f.starts, 0u);
+}
+}  // namespace
+
+namespace {
+TEST(CatalogStateMachine, CoverRequestsYieldAtFourAndX3RequestsNone) {
+  catalogFixture::SceneLibrary f;
+  CatalogSurface ui(f);
+  ui.enterCatalog();
+  ui.pollCatalog();
+  EXPECT_EQ(f.coverRequests, 4u);
+  ui.pollCatalog();
+  EXPECT_EQ(f.coverRequests, 8u);
+  ui.retireCatalog();
+  f.coverRequests = 0;
+  ui.enterCatalog(true);
+  ui.pollCatalog();
+  EXPECT_EQ(f.coverRequests, 0u);
+}
+TEST(CatalogStateMachine, GroupBookAndAllLinkHaveDifferentActions) {
+  catalogFixture::SceneLibrary f;
+  f.configureScene(6);
+  CatalogSurface ui(f);
+  ui.enterCatalog();
+  catalogFixture::arrange(ui, f);
+  ui.selectCatalogControl(0);
+  EXPECT_EQ(ui.activateCatalog(), CommandStatus::Accepted);
+  EXPECT_EQ(f.opens, 1u);
+  ui.selectCatalogControl(ui.catalogVisibleRows() + 3);
+  EXPECT_EQ(ui.activateCatalog(), CommandStatus::Accepted);
+  ui.pollCatalog();
+  EXPECT_EQ(ui.catalogPanel(), CatalogSurface::Panel::Books);
+  EXPECT_EQ(f.wanted.filter.authors.count, 1u);
+}
+}  // namespace
+
+namespace {
+TEST(CatalogStateMachine, ForeignJobCompletionCannotUseTheOriginalOpenIntent) {
+  catalogFixture::SceneLibrary f;
+  f.configureScene(18);
+  CatalogSurface ui(f);
+  ui.enterCatalog();
+  catalogFixture::arrange(ui, f);
+  ui.chooseCatalogDownload(0);
+  f.status.id = 8;
+  f.status.sequence = 1;
+  f.status.state = DownloadState::Transferring;
+  ui.pollCatalog();
+  f.status.id = 9;
+  f.status.sequence = 2;
+  f.status.state = DownloadState::Complete;
+  ui.pollCatalog();
+  EXPECT_EQ(f.opens, 0u);
+}
+TEST(CatalogStateMachine, ChunkProgressOnlyRedrawsCoarseSteps) {
+  catalogFixture::SceneLibrary f;
+  f.configureScene(21);
+  CatalogSurface ui(f);
+  ui.enterCatalog();
+  catalogFixture::arrange(ui, f);
+  ++f.status.sequence;
+  ++f.status.received;
+  EXPECT_FALSE(ui.pollCatalog());
+  ++f.status.sequence;
+  f.status.received += 200000;
+  EXPECT_TRUE(ui.pollCatalog());
 }
 }  // namespace

@@ -59,7 +59,7 @@ AccountView accountPresentation{};
 // a heap allocation for the offline capability view and never holds credentials.
 AccountFormView formPresentation{};
 uint64_t nextAccountForm = 0;
-bool catalogRequested = false;
+bool catalogRequested = false, catalogAccountRequested = false;
 bool noticeDismissalPending = false;
 // Presentation retirement spans Home instances, independently of SD checkpoint
 // success. A failed write must not reopen a dismissed notice during this boot.
@@ -249,6 +249,10 @@ class OfflineLibrary final : public Library {
   Subscription subscribe() const override { return local ? local->model.subscribe() : Subscription{}; }
   bool changed(Subscription value) const override { return local && local->model.changed(value); }
   CommandStatus submit(Intent intent) override {
+    if (intent == Intent::OpenAccount) {
+      catalogAccountRequested = true;
+      return CommandStatus::Accepted;
+    }
     if (intent == Intent::BrowseLibrary) {
       catalogRequested = true;
       return CommandStatus::Accepted;
@@ -298,6 +302,11 @@ void publishHomeBook(bool available, const char* title) {
   }
   shellLibrary().available = available;
   shellLibrary().openRequested = false;
+}
+bool takeCatalogAccountRequest() {
+  const bool requested = catalogAccountRequested;
+  catalogAccountRequested = false;
+  return requested;
 }
 bool takeCatalogRequest() {
   const bool requested = catalogRequested;
@@ -377,6 +386,15 @@ void workLocalLibrary() {
   if (state.resolveOpen) {
     state.resolveOpen = false;
     state.openReady = state.index.read(state.openKey, state.openRecord) && Storage.exists(state.openRecord.path.data());
+    if (!state.openReady) {
+      LOG_ERR("BSI", "Indexed file unavailable; scheduling bounded device-index refresh");
+      state.model.invalidate(Invalidation::Files);
+      state.rescan = true;
+      if (state.query) {
+        state.query->worker.invalidate();
+        state.queryChanged = true;
+      }
+    }
   }
   const bool scanning = state.worker.busy();
   if (scanning && !state.worker.tick()) state.source.close();

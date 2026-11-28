@@ -18,7 +18,7 @@ def forbidden_symbols(objects):
         if len(fields) >= 3 and fields[-2] not in {'U', 'u'}:
             defined.add(fields[-1])
     # Darwin Clang lowers aggregate zeroing to bzero; it is a memory primitive.
-    support = {'_bzero', 'bzero', '_memcpy', 'memcpy', '_memset', 'memset', '_memmove', 'memmove', '___stack_chk_fail', '___stack_chk_guard', '__stack_chk_fail', '__stack_chk_guard'}
+    support = {'_memcmp', 'memcmp', '_bzero', 'bzero', '_memcpy', 'memcpy', '_memset', 'memset', '_memmove', 'memmove', '___stack_chk_fail', '___stack_chk_guard', '__stack_chk_fail', '__stack_chk_guard'}
     undefined = set()
     for line in subprocess.check_output(['nm', '-u', *names], text=True).splitlines():
         if line.strip() and not line.endswith(':'):

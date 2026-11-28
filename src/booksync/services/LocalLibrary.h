@@ -8,6 +8,7 @@ void bindReminders(RemindersFacade&);
 // No storage access occurs through Library snapshot/paint.
 void publishUpgradeState(bool pending, bool recovery, bool (*dismiss)());
 bool takeCatalogRequest();
+bool takeCatalogAccountRequest();
 bool localLibraryActive();
 class ServerAdapter;
 void enterLocalLibrary(ServerAdapter* savedStatsSource = nullptr);

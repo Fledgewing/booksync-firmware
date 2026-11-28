@@ -8,6 +8,7 @@
 
 #include <cstdio>
 
+#include "AccountScreen.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #include "booksync/services/LocalLibrary.h"
@@ -113,7 +114,7 @@ class CatalogActivity final : public Activity {
     if (count.availability == Availability::Ready)
       std::snprintf(value, sizeof(value), all ? tr(STR_CATALOG_ALL_FORMAT) : "%u", unsigned(count.value));
     else
-      std::snprintf(value, sizeof(value), "%s", tr(STR_HOME_NOT_SAVED));
+      std::snprintf(value, sizeof(value), "%s", "—");
     text(r, value, all ? UI_10_FONT_ID : BITTER_16_FONT_ID);
   }
   void paintCatalogCover(Rect r, const BookRow& book, uint8_t index) const {
@@ -165,7 +166,7 @@ class CatalogActivity final : public Activity {
          : catalog_->catalogSummaryValue().online                                     ? tr(STR_CATALOG_SAVED)
                                                                                       : tr(STR_CATALOG_OFFLINE));
     top += line + 12;
-    const int bottom = s.y + s.height - 110;
+    const int bottom = s.y + s.height - 60;
     const int gap = 10;
     const int tileH = (bottom - top) * 17 / 100;
     const int shelfH = (bottom - top - tileH * 2 - gap * 3) / 2;
@@ -226,9 +227,6 @@ class CatalogActivity final : public Activity {
       }
       hit(box, n + 10);
     }
-    button(Rect{s.x + 12, s.y + s.height - 104, (s.width - 34) / 2, 50}, tr(STR_BROWSE), 14);
-    button(Rect{s.x + 22 + (s.width - 34) / 2, s.y + s.height - 104, (s.width - 34) / 2, 50}, tr(STR_CATALOG_LISTS),
-           15);
   }
   void list() const {
     const auto s = safe();
@@ -238,7 +236,7 @@ class CatalogActivity final : public Activity {
       const int h = (s.y + s.height - top - 60) / 5;
       for (uint8_t i = 0; i < 9; ++i)
         button(Rect{s.x + 12 + (i % 2) * ((s.width - 24) / 2), top + (i / 2) * h, (s.width - 34) / 2, h - 8},
-               rootTitle(static_cast<CatalogRoot>(i)), i);
+               rootTitle(CatalogSurface::catalogBrowseRoot(i)), i);
       return;
     }
     button(Rect{s.x + 12, headerBottom() + 6, 140, 50},
@@ -256,7 +254,12 @@ class CatalogActivity final : public Activity {
     }
     if (catalog_->catalogState() == CatalogSurface::State::Ready ||
         catalog_->catalogState() == CatalogSurface::State::Empty || catalog_->catalogVisibleRows()) {
-      std::snprintf(label, sizeof(label), tr(STR_CATALOG_BOOKS_FORMAT), unsigned(catalog_->catalogTotal()));
+      if (catalog_->catalogPanel() == CatalogSurface::Panel::Sources)
+        std::snprintf(
+            label, sizeof(label), "%u %s", unsigned(catalog_->catalogTotal()),
+            catalog_->catalogRoot() == CatalogRoot::Lists ? tr(STR_HOME_LISTS) : rootTitle(catalog_->catalogRoot()));
+      else
+        std::snprintf(label, sizeof(label), tr(STR_CATALOG_BOOKS_FORMAT), unsigned(catalog_->catalogTotal()));
       text(Rect{s.x + 164, headerBottom() + 18, s.width - 176, line}, label);
       if (catalog_->catalogState() == CatalogSurface::State::Empty)
         text(Rect{s.x + 12, top + 15, s.width - 24, line * 2},
@@ -264,7 +267,9 @@ class CatalogActivity final : public Activity {
       const int h = (s.y + s.height - top - 112) / catalog_->catalogPageRows();
       for (uint8_t i = 0; i < catalog_->catalogVisibleRows(); ++i) {
         Rect row{s.x + 12, top + i * h, s.width - 24, h - 5};
-        renderer.drawRect(row.x, row.y, row.width, row.height, catalog_->catalogFocus() == i ? 3 : 1, true);
+        renderer.drawRect(
+            row.x, row.y, row.width, row.height,
+            (catalog_->catalogPanel() != CatalogSurface::Panel::Groups && catalog_->catalogFocus() == i) ? 3 : 1, true);
         hit(row, i);
         if (catalog_->catalogPanel() == CatalogSurface::Panel::Sources) {
           const auto& source = catalog_->catalogSourcesValue().rows[i];
@@ -285,7 +290,24 @@ class CatalogActivity final : public Activity {
           // Header title opens Series; the right All action opens the scoped list.
           if (catalog_->catalogRoot() == CatalogRoot::Series && !entry.missing)
             hit(Rect{row.x, row.y, row.width - 150, 50}, i, 2);
-          text(Rect{row.x + 8, row.y + line + 10, row.width - 16, line}, entry.book.title.data());
+          const Rect preview{row.x + 5, row.y + line + 14, row.width - 10, row.height - line - 20};
+          if (catalog_->catalogFocus() == i)
+            renderer.drawRect(preview.x, preview.y, preview.width, preview.height, 3, true);
+          if (entry.books > 1 && catalog_->catalogResult().membershipComplete) {
+            const Rect all{row.x + row.width - 146, row.y, 142, 50};
+            hit(all, i, 4);
+            if (catalog_->catalogFocus() == catalog_->catalogVisibleRows() + 3 + i)
+              renderer.drawRect(all.x, all.y, all.width, all.height, 3, true);
+          }
+          const int inset = textOnly_ ? 10 : 64;
+          if (!textOnly_)
+            paintCatalogCover(Rect{preview.x + 5, preview.y + 5, 48, preview.height > 80 ? 72 : preview.height - 10},
+                              entry.book, i);
+          text(Rect{row.x + inset, preview.y + 8, row.width - inset - 8, line}, entry.book.title.data());
+          text(Rect{row.x + inset, preview.y + line + 12, row.width - inset - 8, line},
+               entry.onDevice == QueryTruth::Yes  ? tr(STR_CATALOG_ON_CARD)
+               : entry.onDevice == QueryTruth::No ? tr(STR_CATALOG_SERVER_ONLY)
+                                                  : tr(STR_HOME_NOT_SAVED));
         } else {
           const int inset = textOnly_ ? 8 : 48;
           if (!textOnly_) paintCatalogCover(Rect{row.x + 5, row.y + 4, 35, row.height - 8}, entry.book, i);
@@ -318,8 +340,12 @@ class CatalogActivity final : public Activity {
     if (catalog_->catalogHasMore())
       button(Rect{s.x + s.width - 82, foot, 70, 50}, ">", catalog_->catalogVisibleRows() + 2);
     const auto pages = (catalog_->catalogTotal() + catalog_->catalogPageRows() - 1) / catalog_->catalogPageRows();
-    std::snprintf(label, sizeof(label), tr(STR_CATALOG_PAGE_FORMAT),
-                  unsigned(catalog_->catalogOffset() / catalog_->catalogPageRows() + 1), unsigned(pages ? pages : 1));
+    if (catalog_->catalogPanel() == CatalogSurface::Panel::Groups)
+      std::snprintf(label, sizeof(label), "%u / ?",
+                    unsigned(catalog_->catalogOffset() / catalog_->catalogPageRows() + 1));
+    else
+      std::snprintf(label, sizeof(label), tr(STR_CATALOG_PAGE_FORMAT),
+                    unsigned(catalog_->catalogOffset() / catalog_->catalogPageRows() + 1), unsigned(pages ? pages : 1));
     if (catalog_->catalogOffset() || catalog_->catalogHasMore())
       text(Rect{s.x + 92, foot + 12, s.width - 184, line}, label);
   }
@@ -445,8 +471,11 @@ class CatalogActivity final : public Activity {
       for (uint8_t i = 0; bitmaps_ && i < catalog_->catalogCoverCount(); ++i) {
         const auto ref = catalog_->catalogCover(i);
         if (!(ref == loaded_[i])) {
-          loaded_[i] = {};
-          if (ref.id && library_.readCover(ref, bitmaps_[i])) loaded_[i] = ref;
+          loaded_[i] = ref;
+          bitmaps_[i].width = bitmaps_[i].height = 0;
+          // References are immutable. A rejected reference remains a placeholder
+          // until a new publication, rather than redrawing/retrying every loop.
+          if (ref.id) library_.readCover(ref, bitmaps_[i]);
           update = true;
         }
       }
@@ -509,6 +538,10 @@ class CatalogActivity final : public Activity {
         return;
       }
       if (update) requestUpdate();
+    }
+    if (takeCatalogAccountRequest()) {
+      showServiceChoice(renderer, mappedInput, library_);
+      return;
     }
     std::string path;
     if (takeIndexedOpenRequest(path)) activityManager.goToReader(path);

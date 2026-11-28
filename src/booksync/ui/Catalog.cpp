@@ -150,12 +150,19 @@ uint8_t CatalogSurface::catalogVisibleRows() const {
   if (panel_ == Panel::Books || panel_ == Panel::Groups) return result_.count <= catalogPageRows() ? result_.count : 0;
   return 0;
 }
+CatalogRoot CatalogSurface::catalogBrowseRoot(uint8_t index) {
+  static constexpr CatalogRoot roots[] = {CatalogRoot::All,    CatalogRoot::Reading,     CatalogRoot::Recent,
+                                          CatalogRoot::OnCard, CatalogRoot::Libraries,   CatalogRoot::Authors,
+                                          CatalogRoot::Series, CatalogRoot::Collections, CatalogRoot::Lists};
+  return index < 9 ? roots[index] : CatalogRoot::All;
+}
 uint8_t CatalogSurface::catalogControls() const {
   if (!catalogLive()) return 0;
   if (dialog_ == Dialog::Choices) return choices_.count + 1;
   if (dialog_ != Dialog::None) return 2;
-  if (panel_ == Panel::Dashboard) return 16;  // Shelf headers/books, four tiles, Browse and saved lists.
+  if (panel_ == Panel::Dashboard) return 14;  // Shelf headers/books and four compact tiles.
   if (panel_ == Panel::Browse) return 9;
+  if (panel_ == Panel::Groups) return catalogVisibleRows() * 2 + 3;
   return catalogVisibleRows() + (catalogHasMore() ? 3
                                  : current_.offset
                                      ? 2
@@ -169,8 +176,13 @@ bool CatalogSurface::catalogControlEnabled(uint8_t index) const {
     const uint8_t item = shelf ? index - 6 : index - 1;
     return shelf < covers_.windowCount && item < covers_.windows[shelf].count;
   }
+  if (panel_ == Panel::Groups && index >= catalogVisibleRows() + 3) {
+    const auto group = index - catalogVisibleRows() - 3;
+    return group < result_.count && result_.membershipComplete && result_.entries[group].books > 1;
+  }
   if (panel_ != Panel::Dashboard && panel_ != Panel::Browse && index == catalogVisibleRows() + 1 && !current_.offset)
     return false;
+  if (panel_ == Panel::Groups && index == catalogVisibleRows() + 2 && !catalogHasMore()) return false;
   return true;
 }
 void CatalogSurface::stepCatalog(int direction) {
@@ -208,7 +220,9 @@ bool CatalogSurface::pageCatalog(int direction) {
 void CatalogSurface::loadCatalogCovers() {
   coverChanged_ = false;
   if (textOnly_) return;
-  const auto count = panel_ == Panel::Dashboard ? covers_.count : panel_ == Panel::Books ? result_.count : 0;
+  const auto count = panel_ == Panel::Dashboard                            ? covers_.count
+                     : (panel_ == Panel::Books || panel_ == Panel::Groups) ? result_.count
+                                                                           : 0;
   bitmapCount_ = count > 8 ? 8 : uint8_t(count);
   uint8_t admitted = 0;
   for (uint8_t i = 0; i < bitmapCount_; ++i) {
@@ -244,6 +258,8 @@ bool CatalogSurface::pollCatalog() {
   if (queryAccepted_ &&
       (pending_ || catalogNext.sequence != seen_.sequence || catalogNext.lifetime != seen_.lifetime)) {
     seen_ = catalogNext;
+    const auto priorState = state_;
+    const bool wasPending = pending_;
     pending_ = false;
     if (panel_ == Panel::Dashboard) {
       library_.readWindow(covers_);
@@ -288,6 +304,7 @@ bool CatalogSurface::pollCatalog() {
         retainedLocation_ = current_;
         retainedProvenance_ = result_.provenance;
         retainedTotal_ = result_.matchedBooks;
+        retainedComplete_ = result_.membershipComplete;
         retainedCount_ = uint8_t(result_.count);
         for (uint8_t i = 0; i < retainedCount_; ++i) retained_[i] = result_.entries[i];
       }
@@ -324,10 +341,17 @@ bool CatalogSurface::pollCatalog() {
         current_.series == retainedLocation_.series && current_.withoutSeries == retainedLocation_.withoutSeries) {
       result_.count = retainedCount_;
       result_.matchedBooks = retainedTotal_;
+      result_.membershipComplete = retainedComplete_;
       result_.provenance = retainedProvenance_;
       for (uint8_t i = 0; i < retainedCount_; ++i) result_.entries[i] = retained_[i];
     }
-    changed = true;
+    const uint64_t publication = panel_ == Panel::Dashboard ? covers_.publication
+                                 : panel_ == Panel::Sources ? sources_.publication
+                                                            : result_.publication;
+    const bool contentChanged = wasPending || state_ != priorState || publication != pagePublication_;
+    pagePublication_ = publication;
+    if (contentChanged) requestedCovers_ = 0;
+    changed = changed || contentChanged;
   }
   if (preparing_) {
     prepareCatalogChoices();
@@ -340,15 +364,26 @@ bool CatalogSurface::pollCatalog() {
   }
   if (selected_.title[0] && catalogKeyValid(selected_.key)) {
     const auto status = library_.bookDownloadStatus(selected_.key);
-    if (status.sequence != job_.sequence || status.state != job_.state) {
+    if (status.sequence != job_.sequence || status.state != job_.state || status.id != job_.id) {
+      const uint64_t unit = status.totalKnown && status.total ? status.total / 20 + 1 : 256 * 1024;
+      const bool redraw = status.id != job_.id || status.state != job_.state || status.error != job_.error ||
+                          status.totalKnown != job_.totalKnown || status.total != job_.total ||
+                          status.received / unit != job_.received / unit;
       job_ = status;
       if (status.state == DownloadState::Failed) inlineError_ = status.error;
-      changed = true;
-      if (status.state == DownloadState::Complete) {
+      changed = changed || redraw;
+      if (autoOpen_ && status.id) {
+        if (!expectedDownload_)
+          expectedDownload_ = status.id;
+        else if (expectedDownload_ != status.id)
+          autoOpen_ = false;
+      }
+      if (status.id && status.state == DownloadState::Complete) {
         for (uint16_t i = 0; i < result_.count; ++i)
           if (result_.entries[i].book.key == selected_.key) result_.entries[i].onDevice = QueryTruth::Yes;
       }
-      if (autoOpen_ && dialog_ == Dialog::None && status.state == DownloadState::Complete) {
+      if (autoOpen_ && expectedDownload_ && status.id == expectedDownload_ && dialog_ == Dialog::None &&
+          status.state == DownloadState::Complete) {
         autoOpen_ = false;
         library_.open(selected_.key);
       }
@@ -404,7 +439,7 @@ CommandStatus CatalogSurface::activateCatalogRow(uint8_t catalogRow) {
     return CommandStatus::Accepted;
   }
   if (panel_ == Panel::Groups) {
-    focus_ = catalogRow;
+    focus_ = catalogVisibleRows() + 3 + catalogRow;
     if (!pushCatalogLocation()) return CommandStatus::Unavailable;
     const auto& entry = result_.entries[catalogRow];
     if (current_.root == CatalogRoot::Authors)
@@ -420,6 +455,14 @@ CommandStatus CatalogSurface::activateCatalogRow(uint8_t catalogRow) {
   }
   focus_ = catalogRow;
   return selectCatalogBook(result_.entries[catalogRow].book, result_.entries[catalogRow].onDevice);
+}
+CommandStatus CatalogSurface::activateCatalogGroupBook(uint8_t index) {
+  if (!catalogLive() || panel_ != Panel::Groups || index >= result_.count ||
+      (state_ != State::Ready && state_ != State::Error))
+    return CommandStatus::Unavailable;
+  if (state_ == State::Error && result_.entries[index].onDevice != QueryTruth::Yes) return CommandStatus::Unavailable;
+  focus_ = index;
+  return selectCatalogBook(result_.entries[index].book, result_.entries[index].onDevice);
 }
 CommandStatus CatalogSurface::activateCatalogShelfBook(uint8_t index) {
   if (!catalogLive() || panel_ != Panel::Dashboard || index >= 8) return CommandStatus::Unavailable;
@@ -465,6 +508,7 @@ CommandStatus CatalogSurface::chooseCatalogDownload(uint8_t index) {
     dialog_ = Dialog::None;
     focus_ = returnFocus_;
     autoOpen_ = true;
+    expectedDownload_ = 0;
   } else {
     dialog_ = Dialog::None;
     inlineError_ = DownloadError::Unavailable;
@@ -513,19 +557,20 @@ CommandStatus CatalogSurface::activateCatalog() {
       return activateCatalogShelfBook(focus_ - 1);
     else if (focus_ < 10)
       return activateCatalogShelfBook(focus_ - 2);
-    else if (focus_ == 10 || focus_ == 14)
+    else if (focus_ == 10)
       browseCatalogIndex();
     else if (focus_ < 14)
       browseCatalog(focus_ == 11 ? CatalogRoot::Authors : focus_ == 12 ? CatalogRoot::Series : CatalogRoot::OnCard);
-    else
-      browseCatalog(CatalogRoot::Lists);
     return CommandStatus::Accepted;
   }
   if (panel_ == Panel::Browse) {
-    browseCatalog(static_cast<CatalogRoot>(focus_));
+    browseCatalog(catalogBrowseRoot(focus_));
     return CommandStatus::Accepted;
   }
-  if (focus_ < catalogVisibleRows()) return activateCatalogRow(focus_);
+  if (panel_ == Panel::Groups && focus_ >= catalogVisibleRows() + 3)
+    return activateCatalogRow(focus_ - catalogVisibleRows() - 3);
+  if (focus_ < catalogVisibleRows())
+    return panel_ == Panel::Groups ? activateCatalogGroupBook(focus_) : activateCatalogRow(focus_);
   if (focus_ == catalogVisibleRows()) {
     if (state_ == State::Error || state_ == State::NotSaved || state_ == State::Unsupported) {
       requestCatalogPage();
