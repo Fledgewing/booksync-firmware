@@ -164,6 +164,13 @@ class Boundaries(unittest.TestCase):
                             'struct AccountEntry; void submit(AccountEntry& entry);'):
             self.assertTrue(boundary.ui_source_errors(path, declaration), declaration)
 
+    def test_stats_batch_value_does_not_allow_opaque_handles(self):
+        path = 'src/booksync/interface/Probe.h'
+        self.assertFalse(boundary.ui_source_errors(path, 'void read(StatsWidgetBatch& out);'))
+        for declaration in ('void read(StatsWidgetBatch* out);', 'void read(PrivateStats& out);',
+                            'struct StatsWidgetBatch; void read(StatsWidgetBatch& out);'):
+            self.assertTrue(boundary.ui_source_errors(path, declaration), declaration)
+
     def test_import_cannot_link_transport(self):
         for include in ('HTTPClient.h', 'mbedtls/ssl.h', 'wolfssl/ssl.h', 'tailnet/shim/Tailnet.h'):
             self.assertTrue(boundary.ui_source_errors('src/booksync/import/Probe.cpp', '#include <'+include+'>'))

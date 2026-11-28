@@ -231,3 +231,128 @@ TEST(WidgetHost, TextShelfFocusStopsAtTheLastVisibleRow) {
   EXPECT_FALSE(h.widgetCell(0, box, 1, cell));
 }
 }  // namespace
+
+TEST(WidgetHost, StatsShareOneBatchAndRetireOnAccountSwitch) {
+  struct StatsFake final : Library {
+    HomePage page{};
+    StatsWidgetBatch values{};
+    AccountView account{};
+    LibraryWindow data{};
+    unsigned batches = 0;
+    mutable unsigned reads = 0;
+    Capabilities capabilities() const override { return {}; }
+    Snapshot snapshot() const override { return {}; }
+    CommandStatus submit(Intent) override {
+      ADD_FAILURE();
+      return CommandStatus::Unavailable;
+    }
+    AccountView accountView() const override { return account; }
+    HomePage homePage() const override { return page; }
+    bool requestHomePage(uint8_t) override { return true; }
+    bool requestBatch(WindowBatchRequest request) override {
+      ++batches;
+      values.requested = request.statsWidgets;
+      return true;
+    }
+    Subscription subscribe() const override { return {data.publication, 1, true}; }
+    void readWindow(LibraryWindow& out) const override { out = data; }
+    void readStatsWidgets(StatsWidgetBatch& out) const override {
+      ++reads;
+      out = values;
+    }
+  } f;
+  f.page.revision = 1;
+  f.page.count = 2;
+  f.page.rows = 6;
+  f.page.widgets[0] = {WidgetKind::Week, WindowSource::Unknown, 0, 0, 1, 1};
+  f.page.widgets[1] = {WidgetKind::Streak, WindowSource::Unknown, 1, 0, 1, 1};
+  f.values.cards[0].state = f.values.cards[1].state = StatsCardState::Ready;
+  WidgetHost host(f);
+  host.enter();
+  host.pollWidgets();
+  f.data.publication++;
+  host.pollWidgets();
+  EXPECT_EQ(f.batches, 1);
+  EXPECT_EQ(f.reads, 1);
+  EXPECT_EQ(host.view(0).viewState, WidgetState::Known);
+  EXPECT_EQ(host.dispatchWidget(0), CommandStatus::Unavailable);
+  ++f.values.cards[0].bytes;
+  ++f.data.publication;
+  host.pollWidgets();
+  EXPECT_EQ(host.view(0).viewState, WidgetState::Oversize);
+  EXPECT_EQ(host.view(1).viewState, WidgetState::Known);
+  EXPECT_TRUE(host.retryWidget(0));
+  EXPECT_EQ(f.batches, 2);
+  f.account.ticket = {42, 3};
+  host.pollWidgets();
+  EXPECT_EQ(f.batches, 3);
+  EXPECT_EQ(host.view(0).viewState, WidgetState::Loading);
+  f.values.cards[1].source = StatsCardSource::Account;
+  f.values.cards[1].provenance.owner = 42;
+  f.values.cards[1].provenance.accountEpoch = 2;  // Delayed prior-account result.
+  ++f.data.publication;
+  host.pollWidgets();
+  EXPECT_EQ(host.view(1).viewState, WidgetState::NotSaved);
+}
+
+TEST(WidgetHost, MissingOptionalStatsProviderIsUnsupported) {
+  struct NoStats final : Library {
+    HomePage page{};
+    LibraryWindow data{};
+    Capabilities capabilities() const override { return {}; }
+    Snapshot snapshot() const override { return {}; }
+    CommandStatus submit(Intent) override { return CommandStatus::Unavailable; }
+    HomePage homePage() const override { return page; }
+    bool requestHomePage(uint8_t) override { return true; }
+    Subscription subscribe() const override { return {data.publication, 1, true}; }
+    void readWindow(LibraryWindow& out) const override { out = data; }
+    bool requestBatch(WindowBatchRequest) override {
+      ++data.publication;
+      return true;
+    }
+  } source;
+  source.page.revision = 1;
+  source.page.count = 1;
+  source.page.widgets[0].kind = WidgetKind::Week;
+  WidgetHost host(source);
+  host.enter();
+  host.pollWidgets();
+  host.pollWidgets();
+  EXPECT_EQ(host.view(0).viewState, WidgetState::Unsupported);
+}
+
+TEST(WidgetHost, StatsPlaceholdersDoNotShrinkSiblingShelfRows) {
+  Fake source;
+  source.page.count = 9;
+  source.page.rows = 6;
+  source.page.widgets[0] = {WidgetKind::Shelf, WindowSource::OnDevice, 0, 0, 2, 2};
+  for (unsigned i = 1; i < source.page.count; ++i)
+    source.page.widgets[i] = {
+        WidgetKind::Week, WindowSource::Unknown, uint8_t((i - 1) % 2), uint8_t(2 + (i - 1) / 2), 1, 1};
+  WidgetHost host(source);
+  host.enter();
+  host.pollWidgets();
+  EXPECT_EQ(source.batches, 1u);
+  EXPECT_EQ(source.requested.windows[0].limit, 3);
+  EXPECT_EQ(source.requested.statsWidgets, statsWidgetBit(StatsWidget::Week));
+  for (unsigned i = 1; i < source.page.count; ++i) EXPECT_EQ(source.requested.windows[i].limit, 1);
+}
+TEST(WidgetHost, MixedSummariesAndShelvesRespectAggregateRowBudget) {
+  Fake source;
+  source.page.count = 16;
+  source.page.rows = 12;
+  for (unsigned i = 0; i < source.page.count; ++i)
+    source.page.widgets[i] = {i < 8 ? WidgetKind::Shelf : WidgetKind::Week,
+                              i < 8 ? WindowSource::OnDevice : WindowSource::Unknown,
+                              0,
+                              0,
+                              1,
+                              1};
+  WidgetHost host(source);
+  host.enter();
+  host.pollWidgets();
+  unsigned rows = 0;
+  for (unsigned i = 0; i < source.page.count; ++i) rows += source.requested.windows[i].limit;
+  EXPECT_LE(rows, LibraryRows);
+  EXPECT_EQ(source.requested.windows[0].limit, 2);
+}

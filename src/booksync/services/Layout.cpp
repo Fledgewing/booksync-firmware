@@ -531,15 +531,7 @@ bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePa
         if (!text(field(tile, "widget"), text_) || !number(field(tile, "version"), 1, 2147483647, n)) return false;
         const auto widgetId = std::string_view(text_, textLength_);
         WidgetKind kind{};
-        bool installed = n == 1 && !g.hidden;
-        if (widgetId == "continue-reading")
-          kind = WidgetKind::Continue;
-        else if (widgetId == "booklist")
-          kind = WidgetKind::Shelf;
-        else if (widgetId == "library")
-          kind = WidgetKind::Browse;
-        else
-          installed = false;
+        const bool installed = n == 1 && !g.hidden && installedKind(widgetId, output.textOnly, kind);
         if (installed) {
           if (output.count == HomeWidgets) {
             LOG_ERR("BSL", "Visible widget budget exceeded");
@@ -601,6 +593,21 @@ bool Layout::project(LayoutInput input, const char* device, uint8_t page, HomePa
   output.revision = revision_;
   return true;
 }
+bool Layout::installedKind(std::string_view id, bool textOnly, WidgetKind& kind) {
+  if (id == "continue-reading")
+    kind = WidgetKind::Continue;
+  else if (id == "booklist")
+    kind = WidgetKind::Shelf;
+  else if (id == "library")
+    kind = WidgetKind::Browse;
+  else if (!textOnly && id == "this-week")
+    kind = WidgetKind::Week;
+  else if (!textOnly && id == "reading-streak")
+    kind = WidgetKind::Streak;
+  else
+    return false;
+  return true;
+}
 const char* Layout::deviceClass() {
 #if (defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO) ||                                             \
     (defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC) || defined(SIMULATOR_DEVICE_X4_PRO) || \
@@ -612,7 +619,7 @@ const char* Layout::deviceClass() {
 }
 LayoutInput Layout::defaults() {
   static constexpr char raw[] =
-      R"({"schemaVersion":1,"revision":1,"grids":{"android-tablet":{"cols":4,"rows":8},"x4":{"cols":2,"rows":7},"x3":{"cols":2,"rows":7}},"pages":[{"id":"home","tab":"Home","placements":[{"instance":"resume","widget":"continue-reading","version":1,"x":0,"y":0,"w":4,"h":3,"settings":{}},{"instance":"recent","widget":"booklist","version":1,"x":0,"y":3,"w":2,"h":2,"settings":{"src":"recent","style":0,"sort":0,"cap":1}},{"instance":"library","widget":"library","version":1,"x":2,"y":3,"w":2,"h":1,"settings":{}}]}],"overrides":{"x4":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}},"x3":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}}}})";
+      R"({"schemaVersion":1,"revision":1,"grids":{"android-tablet":{"cols":4,"rows":8},"x4":{"cols":2,"rows":6},"x3":{"cols":2,"rows":7}},"pages":[{"id":"home","tab":"Home","placements":[{"instance":"resume","widget":"continue-reading","version":1,"x":0,"y":0,"w":4,"h":3,"settings":{}},{"instance":"recent","widget":"booklist","version":1,"x":0,"y":3,"w":2,"h":2,"settings":{"src":"recent","style":0,"sort":0,"cap":1}},{"instance":"library","widget":"library","version":1,"x":2,"y":3,"w":2,"h":1,"settings":{}}]}],"overrides":{"x4":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}},"x3":{"resume":{"w":2,"h":2},"recent":{"y":2},"library":{"x":0,"y":4}}}})";
   return LayoutInput::memory(raw, sizeof(raw) - 1);
 }
 }  // namespace booksync

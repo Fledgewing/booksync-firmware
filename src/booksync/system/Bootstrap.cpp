@@ -6,6 +6,7 @@
 #include <Logging.h>
 #include <Memory.h>
 #include <ScalableBuiltins.h>
+#include <Utf8.h>
 
 #include <algorithm>
 #include <atomic>
@@ -28,6 +29,8 @@
 #include "booksync/ui/EditorAddRemove.h"
 #include "booksync/ui/Home.h"
 #include "booksync/ui/WidgetHost.h"
+#include "booksync/ui/widgets/Streak.h"
+#include "booksync/ui/widgets/Week.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -121,6 +124,8 @@ class ShellActivity final : public Activity {
   // One fallible <=6 KiB allocation per Home lifetime: the immutable visible
   // page is too large for the task stack and must be freed before reader entry.
   std::unique_ptr<WidgetHost> widgets;
+  // Reused <=160-byte paint scratch avoids adding a chart array to each render frame.
+  mutable widgets::StatsDrawing statsDrawing;
   uint8_t focus = 0, focusRow = 0;
   bool lastAvailable = false;
   Rect tileRect(uint8_t index) const {
@@ -132,6 +137,19 @@ class ShellActivity final : public Activity {
 #endif
                            widgets->page();
     const auto& p = pg.widgets[index];
+    if (!pg.textOnly && pg.rows == 6) {
+      // Approved compact tokens are minimum insets; larger calibrated bezel
+      // bounds and native hints still constrain the grid.
+      int top, right, bottom, left;
+      renderer.getOrientedViewableTRBL(&top, &right, &bottom, &left);
+      const int gridLeft = std::max(left, 12);
+      const int gridRight = renderer.getScreenWidth() - std::max(right, 12);
+      const int gridTop = std::max(top, 64 + 6);
+      const int gridBottom = std::min(safe.y + safe.height, renderer.getScreenHeight() - std::max(bottom, 42));
+      const int stepX = (gridRight - gridLeft + 8) / pg.cols;
+      const int stepY = (gridBottom - gridTop + 8) / pg.rows;
+      return Rect{gridLeft + stepX * p.x, gridTop + stepY * p.y, stepX * p.w - 8, stepY * p.h - 8};
+    }
     const int top = header.y + header.height + 16;
     const int height = safe.y + safe.height - top - 56;
     const int width = safe.width - 16;
@@ -167,8 +185,17 @@ class ShellActivity final : public Activity {
         return tr(STR_HOME_RECENT);
     }
   }
+  const char* widgetTitle(WidgetKind kind) const {
+    if (kind == WidgetKind::Week) return tr(STR_HOME_THIS_WEEK);
+    if (kind == WidgetKind::Streak) return tr(STR_HOME_READING_STREAK);
+    return kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)
+           : kind == WidgetKind::Shelf  ? tr(STR_HOME_SHELF)
+                                        : tr(STR_HOME_BROWSE);
+  }
   const char* stateText(WidgetState state) const {
     switch (state) {
+      case WidgetState::Off:
+        return tr(STR_HOME_STATS_OFF);
       case WidgetState::Loading:
         return tr(STR_HOME_LOADING);
       case WidgetState::Empty:
@@ -200,10 +227,164 @@ class ShellActivity final : public Activity {
     }
     renderer.drawText(font, x, y, caption, black);
   }
+  void paintStatText(int font, int x, int y, const char* text, int width, int scale = 224) const {
+    // Existing bitmap glyph scaling: no new font, buffer, filesystem or allocation.
+    const auto* cursor = reinterpret_cast<const unsigned char*>(text);
+    const int right = x + width;
+    const int baseline = y + renderer.getFontAscenderSize(font) * scale / 256;
+    while (*cursor) {
+      const auto cp = utf8NextCodepoint(&cursor);
+      int32_t advance = 0;
+      int top = 0;
+      if (!renderer.getCodepointMetrics(font, cp, EpdFontFamily::REGULAR, advance, top)) continue;
+      const int pixels = (advance * scale / 256 + 8) / 16;
+      if (x + pixels > right) break;
+      x += renderer.drawScaledCodepoint(font, cp, EpdFontFamily::REGULAR, x, baseline, scale);
+    }
+  }
+  bool widgetSelected(uint8_t index) const {
+#if CROSSINK_APP_CAP_HOME_EDITOR
+    if (editor.panel() != EditorAddRemove::Panel::Closed)
+      return editor.panel() == EditorAddRemove::Panel::Selected ? editor.selected() == index : editor.focus() == index;
+#endif
+    return focus == index && !mappedInput.hasTouch();
+  }
+  void paintStatsHeaderIcon(uint8_t index) const {
+    const auto r = tileRect(index);
+    const int edge = std::min(21, r.height / 5), left = r.x + r.width - edge - 10, top = r.y + 6;
+    auto stroke = [&](int x1, int y1, int x2, int y2) {
+      renderer.drawLine(left + x1 * edge / 24, top + y1 * edge / 24, left + x2 * edge / 24, top + y2 * edge / 24);
+    };
+    if (widgets->page().widgets[index].kind == WidgetKind::Streak) {
+      // Fixed samples of the approved flame outline; flash-resident, no asset allocation.
+      static constexpr int8_t outline[][2] = {
+          {13, 2},  {14, 6},  {13, 9},  {10, 11}, {8, 10}, {8, 8},   {9, 6},   {5, 10},  {3, 14}, {5, 18}, {9, 23},
+          {14, 23}, {18, 19}, {21, 15}, {20, 11}, {17, 8}, {17, 11}, {16, 12}, {14, 13}, {15, 8}, {14, 4}, {13, 2}};
+      for (unsigned i = 1; i < sizeof(outline) / sizeof(outline[0]); ++i)
+        stroke(outline[i - 1][0], outline[i - 1][1], outline[i][0], outline[i][1]);
+    } else {
+      stroke(3, 21, 22, 21);
+      stroke(6, 17, 6, 9);
+      stroke(12, 17, 12, 3);
+      stroke(18, 17, 18, 12);
+    }
+  }
+  void paintStatsWidget(uint8_t index) const {
+    const auto r = tileRect(index);
+    const auto kind = widgets->page().widgets[index].kind;
+    const auto view = widgets->view(index);
+    const auto* card = widgets->statsCard(index);
+    const int font = UI_10_FONT_ID;
+    constexpr int MainHeight = 108;
+    const int unit = std::min(r.height, MainHeight);
+    const int smallScale = 224 * unit / MainHeight;
+    const int line = std::min(renderer.getLineHeight(font) * smallScale / 256, 18 * unit / MainHeight);
+    renderer.drawRoundedRect(r.x, r.y, r.width, r.height, 1, 9, true);
+    if (widgetSelected(index)) renderer.drawRoundedRect(r.x + 2, r.y + 2, r.width - 4, r.height - 4, 3, 8, true);
+    renderer.beginTextClip(r.x + 8, r.y + 4, r.width - 16, r.height - 8);
+    paintStatText(font, r.x + 10, r.y + 5, widgetTitle(kind), r.width - 48, smallScale);
+    paintStatsHeaderIcon(index);
+    if (view.viewState != WidgetState::Known || !card) {
+      const char* message =
+          view.viewState == WidgetState::Empty
+              ? (kind == WidgetKind::Week ? tr(STR_HOME_STATS_WEEK_EMPTY) : tr(STR_HOME_STATS_STREAK_EMPTY))
+          : view.viewState == WidgetState::Unsupported ? tr(STR_HOME_STATS_UNSUPPORTED)
+          : view.viewState == WidgetState::Oversize    ? tr(STR_HOME_STATS_OVERSIZE)
+                                                       : stateText(view.viewState);
+      paragraph(message, r.x + 10, r.y + line + 8, r.width - 20, 2);
+      if (card && card->stale && view.viewState == WidgetState::Empty) {
+        char age[64];
+        std::snprintf(age, sizeof(age), tr(STR_HOME_STATS_SAVED_AGE_FORMAT), (unsigned long long)card->ageDays);
+        paintStatText(font, r.x + 10, r.y + r.height - line - 5, age, r.width - 20, smallScale);
+      }
+      if (view.viewState == WidgetState::Oversize || view.viewState == WidgetState::Error)
+        renderer.drawText(font, r.x + 10, r.y + r.height - line - 6, tr(STR_RETRY));
+    } else {
+      char text[80]{};
+      if (kind == WidgetKind::Week) {
+        std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_TIME_FORMAT), (unsigned long long)card->hours,
+                      (unsigned long long)card->minutes);
+        paintStatText(font, r.x + 10, r.y + 28 * unit / MainHeight, text, r.width - 20, smallScale);
+      } else {
+        std::snprintf(text, sizeof(text), "%llu", (unsigned long long)card->value.value);
+        const int numberY = (card->stale ? 24 : 28) * unit / MainHeight;
+        const int numberWidth =
+            std::min(r.width * 2 / 3, renderer.getTextWidth(BITTER_14_FONT_ID, text) * unit / MainHeight);
+        paintStatText(BITTER_14_FONT_ID, r.x + 10, r.y + numberY, text, r.width * 2 / 3, 256 * unit / MainHeight);
+        paintStatText(font, r.x + 16 + numberWidth, r.y + numberY + 10 * unit / MainHeight,
+                      card->value.value == 1 ? tr(STR_STATS_DAY) : tr(STR_STATS_DAYS), r.width - numberWidth - 26,
+                      smallScale);
+      }
+      if (kind == WidgetKind::Streak) {
+        if (card->best.known)
+          std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_BEST_FORMAT), (unsigned long long)card->best.value);
+        else
+          std::snprintf(text, sizeof(text), "%s", tr(STR_HOME_STATS_BEST_UNKNOWN));
+      } else if (card->stale)
+        std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_SAVED_AGE_FORMAT), (unsigned long long)card->ageDays);
+      else
+        std::snprintf(text, sizeof(text), "%s",
+                      card->complete ? tr(STR_HOME_STATS_KNOWN_TIME) : tr(STR_HOME_STATS_PARTIAL));
+      if (kind == WidgetKind::Streak)
+        paintStatText(font, r.x + 10, r.y + (card->stale ? 75 : 89) * unit / MainHeight, text, r.width - 20,
+                      160 * unit / MainHeight);
+      else if (card->stale || !card->complete)
+        paintStatText(font, r.x + 10, r.y + 48 * unit / MainHeight, text, r.width - 20, 160 * unit / MainHeight);
+      if (kind == WidgetKind::Streak && card->stale) {
+        std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_SAVED_AGE_FORMAT), (unsigned long long)card->ageDays);
+        paintStatText(font, r.x + 10, r.y + 91 * unit / MainHeight, text, r.width - 20, 144 * unit / MainHeight);
+      }
+      auto& drawing = statsDrawing;
+      widgets::Week weekRenderer;
+      widgets::Streak streakRenderer;
+      auto box = widgetBox(index);
+      box.line = line;
+      const bool drawn = kind == WidgetKind::Week ? weekRenderer.layoutStats(*card, box, drawing)
+                                                  : streakRenderer.layoutStats(*card, box, drawing);
+      if (drawn && kind == WidgetKind::Week) {
+        const char* labels[] = {tr(STR_HOME_STATS_SUN), tr(STR_HOME_STATS_MON), tr(STR_HOME_STATS_TUE),
+                                tr(STR_HOME_STATS_WED), tr(STR_HOME_STATS_THU), tr(STR_HOME_STATS_FRI),
+                                tr(STR_HOME_STATS_SAT)};
+        for (unsigned day = 0; day < 7; ++day) {
+          const auto* label = labels[(card->firstWeekday + day) % 7];
+          const int scale = 128 * unit / MainHeight;
+          const int width = renderer.getTextWidth(font, label) * scale / 256;
+          paintStatText(font, r.x + drawing.marks[day].x + (drawing.marks[day].width - width) / 2,
+                        r.y + 88 * unit / MainHeight, label, drawing.marks[day].width, scale);
+        }
+      }
+      if (drawn)
+        for (const auto& mark : drawing.marks) {
+          const int x = r.x + mark.x, y = r.y + mark.y;
+          if (mark.future) continue;
+          if (drawing.dots) {
+            if (mark.known && mark.active)
+              renderer.fillRoundedRect(x, y, mark.width, mark.height, mark.width / 2, Black);
+            else {
+              renderer.drawRoundedRect(x, y, mark.width, mark.height, 1, mark.width / 2, true);
+              if (!mark.known) paintStatText(font, x + 2, y - 1, "?", mark.width - 2, 128 * unit / MainHeight);
+            }
+          } else if (!mark.known)
+            renderer.drawRect(x, y - 3, mark.width, 4);
+          else if (mark.active) {
+            if (mark.latestDay)
+              renderer.fillRect(x, y, mark.width, mark.height);
+            else
+              renderer.drawRect(x, y, mark.width, mark.height);
+          } else
+            renderer.drawLine(x, y, x + mark.width, y);
+        }
+    }
+    renderer.endTextClip();
+  }
   void paintWidget(uint8_t index) const {
     const auto r = tileRect(index);
     if (r.width < 24 || r.height < 24) return;
     const auto& p = widgets->page().widgets[index];
+    if (isStatsWidget(p.kind)) {
+      paintStatsWidget(index);
+      return;
+    }
     const auto view = widgets->view(index);
     const bool textOnly = widgets->page().textOnly;
     const bool heroTile = p.kind == WidgetKind::Continue && !textOnly;
@@ -415,10 +596,7 @@ class ShellActivity final : public Activity {
     char selectedTitle[96]{};
     if (panel == Panel::Selected) {
       const auto kind = widgets->page().widgets[editor.selected()].kind;
-      std::snprintf(selectedTitle, sizeof(selectedTitle), tr(STR_HOME_REMOVE_CONFIRM_FORMAT),
-                    kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)
-                    : kind == WidgetKind::Shelf  ? tr(STR_HOME_SHELF)
-                                                 : tr(STR_HOME_BROWSE));
+      std::snprintf(selectedTitle, sizeof(selectedTitle), tr(STR_HOME_REMOVE_CONFIRM_FORMAT), widgetTitle(kind));
       title = selectedTitle;
       body = tr(STR_HOME_REMOVE_EXPLAIN);
     } else if (panel == Panel::Add) {
@@ -479,14 +657,11 @@ class ShellActivity final : public Activity {
     }
     if (panel == Panel::Reset) return row == 0 ? tr(STR_HOME_KEEP_LAYOUT) : tr(STR_HOME_RESET_LAYOUT);
     if (panel == Panel::Error) return tr(STR_BACK);
-    if (panel == Panel::Add)
-      return row == 0 ? tr(STR_CONTINUE_READING) : row == 1 ? tr(STR_HOME_SHELF) : tr(STR_HOME_BROWSE);
+    if (panel == Panel::Add) return widgetTitle(static_cast<WidgetKind>(row));
     const auto count = widgets->page().count;
     if (row < count) {
       const auto kind = widgets->page().widgets[row].kind;
-      return kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)
-             : kind == WidgetKind::Shelf  ? tr(STR_HOME_SHELF)
-                                          : tr(STR_HOME_BROWSE);
+      return widgetTitle(kind);
     }
     if (row >= count + 3) {
       const char* labels[] = {tr(STR_HOME_PAGE_PREVIOUS),    tr(STR_HOME_PAGE_NEXT), tr(STR_HOME_PAGE_ADD),
@@ -575,6 +750,7 @@ class ShellActivity final : public Activity {
     editor.namePage(pageNameOption(current < 9 ? current + 1 : 0));
   }
   const char* firstWidgetPageName(uint8_t widget) const {
+    if (widget >= 3) return widgetTitle(static_cast<WidgetKind>(widget));
     return widget == 0 ? tr(STR_HOME_PAGE_READING) : widget == 1 ? tr(STR_HOME_RECENT) : tr(STR_LIBRARY);
   }
   void paintPageKeyboard() const {
@@ -912,7 +1088,7 @@ class ShellActivity final : public Activity {
     // allocation failure. C3 keeps its flash-resident bitmap family.
     ensureScalableBuiltinFamily(renderer, 1);
 #endif
-    enterLocalLibrary();
+    enterLocalLibrary(&defaultServerAdapter());
     setNetworkReading(editorOnly || !installNetworkMemory());
     bookPath = APP_STATE.openEpubPath;
     if (bookPath.empty()) {
@@ -1079,7 +1255,7 @@ class ShellActivity final : public Activity {
 #else
     constexpr bool editing = false;
 #endif
-    const char* title = editing && widgets->page().textOnly ? tr(STR_HOME_WIDGETS)
+    const char* title = editing && widgets->page().textOnly   ? tr(STR_HOME_WIDGETS)
                         : widgets && widgets->page().title[0] ? widgets->page().title.data()
                                                               : tr(STR_HOME);
 #if CROSSINK_APP_CAP_HOME_EDITOR
@@ -1087,9 +1263,7 @@ class ShellActivity final : public Activity {
       title = tr(STR_HOME_EDIT);
     if (editing && editor.draftPage()) {
       const auto kind = editor.draftPage()->widgets[editor.selected()].kind;
-      title = kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)
-              : kind == WidgetKind::Shelf  ? tr(STR_HOME_SHELF)
-                                           : tr(STR_HOME_BROWSE);
+      title = widgetTitle(kind);
     }
 #endif
     int titleWidth = header.width - 24;
@@ -1097,8 +1271,11 @@ class ShellActivity final : public Activity {
     if (canEdit()) titleWidth -= 80;
 #endif
     renderer.beginTextClip(header.x + 12, header.y, titleWidth, header.height);
-    renderer.drawText(BITTER_14_FONT_ID, header.x + 12, header.y + 4, title, true, EpdFontFamily::BOLD);
-    renderer.drawText(UI_10_FONT_ID, header.x + 12, header.y + renderer.getLineHeight(BITTER_14_FONT_ID) + 6,
+    const bool compact = widgets && !widgets->page().textOnly && widgets->page().rows == 6;
+    renderer.drawText(BITTER_14_FONT_ID, header.x + 12, compact ? std::max(0, safe.y - 6) : header.y + 4, title, true,
+                      EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, header.x + 12,
+                      compact ? safe.y + 24 : header.y + renderer.getLineHeight(BITTER_14_FONT_ID) + 6,
                       editing ? "" : tr(STR_HOME_OFFLINE));
     renderer.endTextClip();
 #if CROSSINK_APP_CAP_HOME_EDITOR
@@ -1110,7 +1287,10 @@ class ShellActivity final : public Activity {
       for (uint8_t i = 0; i < widgets->page().count; ++i) paintWidget(i);
       char text[24];
       std::snprintf(text, sizeof(text), tr(STR_HOME_PAGE_FORMAT), widgets->page().page + 1, widgets->page().pages);
-      renderer.drawText(UI_10_FONT_ID, safe.x + 12, safe.y + safe.height - 30, text);
+      if (!widgets->page().textOnly && widgets->page().rows == 6)
+        renderer.drawText(UI_10_FONT_ID, safe.x + safe.width - 64, safe.y + 28, text);
+      else
+        renderer.drawText(UI_10_FONT_ID, safe.x + 12, safe.y + safe.height - 30, text);
     } else {
       UITheme::drawCenteredText(renderer, safe, UI_12_FONT_ID, header.y + header.height + 24,
                                 lastAvailable ? tr(STR_CONTINUE_READING) : tr(STR_NO_RECENT_BOOKS));
@@ -1118,7 +1298,8 @@ class ShellActivity final : public Activity {
     const char* action = lastAvailable && (!widgets || !widgets->page().revision) ? tr(STR_OPEN) : "";
     if (widgets && focus < widgets->page().count) {
       const auto state = widgets->view(focus).viewState;
-      if (state == WidgetState::Known && focusRow < widgets->widgetRows(focus, widgetBox(focus)))
+      if (!isStatsWidget(widgets->page().widgets[focus].kind) && state == WidgetState::Known &&
+          focusRow < widgets->widgetRows(focus, widgetBox(focus)))
         action = widgets->page().widgets[focus].kind == WidgetKind::Browse ? tr(STR_HOME_BROWSE) : tr(STR_OPEN);
       else if (state == WidgetState::Error || state == WidgetState::Oversize)
         action = tr(STR_RETRY);

@@ -30,6 +30,7 @@ class Layout {
   uint32_t revision() const { return revision_; }
   static LayoutInput defaults();
   static const char* deviceClass();
+  static bool installedKind(std::string_view, bool textOnly, WidgetKind&);
 
  private:
   friend class LayoutEditor;

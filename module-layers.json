@@ -13305,7 +13305,7 @@
     },
     "src/simulator/SimulatorSmokeTest.cpp": {
       "role": "retained-runtime",
-      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F35a adds isolated editor HAL/interaction scenario coverage. F18d exercises private state checkpoints, native writeback and durable fake-server restart scenarios. F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change. F23 invokes the opt-in synthetic download/fault/restart scenario before normal boot. F18c adds only the synthetic durable annotation lifecycle scenario entry point. F22 adds offline neutral queries over committed synthetic catalog generations, restart/paging and unsupported coverage. F39 invokes bounded offline personal/stats scenarios with saved page history and normalized fake account snapshots. F37a adds the synthetic account surface paint/epoch/retirement scenario. F18e invokes only the synthetic progress checkpoint/reconciliation scenario under F17 and F15; no native reader change. F24 invokes opt-in real EPUB copy replacement and publication-cut recovery before the unchanged native F08 reflow/reopen harness. B2 synthetic notice capture and neutral dispatch scenario only. F25 adds synthetic bounded cover acquisition and retired-view probes, with no live transport or product presentation. R1 adds an opt-in synthetic clock-proof scenario, never changing the host clock. F19 invokes the synthetic durable position-policy and F12 late-consent scenario only. F20 adds real-HAL offline finish/Undo/reconciliation using a synthetic remote ledger; no UI. F46a opt-in real HTTP adapter scenario uses admitted worker, synthetic credentials and isolated response spool; no production startup scheduling. R1 adds an opt-in synthetic reminder policy/store scenario before ordinary boot. F42 adds test-only native sleep/reboot/resume and pre-drain capture proof.",
+      "rationale": "F04 owned Home/open/Back plus F09 native local capture and cut/restart scenarios share the retained simulator harness; native reader baseline remains. F12 adds synthetic delivery/gate policy checks with real HAL journal, without changing reader behavior. F13 adds real-HAL 10k-file cold/warm/interrupted index and 50k-history cursor scenarios. F14 joins native capture/restart to existing fake admission probes; simulator-only dependency, no product UI or transport. F17 harness invokes checkpoint power-loss scenarios through a toy adapter only. F33 adds real-HAL shared layout/override and retained fallback/restart scenarios. F15 adds a fake serial account worker scenario; no real credentials or networking. F30 adds an offline signed-feed trust scenario with no transport or installer. F16 adds incremental fake-server 10k ingest and process-restart/permission-loss scenarios with real HAL publication. F18a adds synthetic match-only fault/restart probes through the production adapter handler, accounts and serial owner; no UI or real transport. F34 adds four isolated starter widget captures with a neutral Library fixture. F26b adds a fake-only private credential import scenario before ordinary smoke startup. F31 invokes synthetic old-to-bridge-to-unified install choices. F18b adds fixed page-interval observations and main-loop history flush; simulator tests exercise real HAL stats checkpoints and a 50k-row backlog. F35a adds isolated editor HAL/interaction scenario coverage. F18d exercises private state checkpoints, native writeback and durable fake-server restart scenarios. F29 boot-only activation and synthetic hard-cut hook before native settings/reader fixture processing; no reader behavior or presentation change. F23 invokes the opt-in synthetic download/fault/restart scenario before normal boot. F18c adds only the synthetic durable annotation lifecycle scenario entry point. F22 adds offline neutral queries over committed synthetic catalog generations, restart/paging and unsupported coverage. F39 invokes bounded offline personal/stats scenarios with saved page history and normalized fake account snapshots. F37a adds the synthetic account surface paint/epoch/retirement scenario. F18e invokes only the synthetic progress checkpoint/reconciliation scenario under F17 and F15; no native reader change. F24 invokes opt-in real EPUB copy replacement and publication-cut recovery before the unchanged native F08 reflow/reopen harness. B2 synthetic notice capture and neutral dispatch scenario only. F25 adds synthetic bounded cover acquisition and retired-view probes, with no live transport or product presentation. R1 adds an opt-in synthetic clock-proof scenario, never changing the host clock. F19 invokes the synthetic durable position-policy and F12 late-consent scenario only. F20 adds real-HAL offline finish/Undo/reconciliation using a synthetic remote ledger; no UI. F46a opt-in real HTTP adapter scenario uses admitted worker, synthetic credentials and isolated response spool; no production startup scheduling. R1 adds an opt-in synthetic reminder policy/store scenario before ordinary boot. F42 adds test-only native sleep/reboot/resume and pre-drain capture proof. F40w saved stats widget state/profile captures and X3 exclusion; no production reader change.",
       "includes": [
         "../../test/simulator/AccountScenario.h",
         "../../test/simulator/AccountSurfaceScenario.h",
@@ -13341,6 +13341,7 @@
         "../../test/simulator/SeriesQueueScenario.h",
         "../../test/simulator/SeriesSurfaceScenario.h",
         "../../test/simulator/SleepScenario.h",
+        "../../test/simulator/StatsWidgetScenario.h",
         "../../test/simulator/SyncOwnerScenario.h",
         "../../test/simulator/UpdateInstallScenario.h",
         "../../test/simulator/UpdateScenario.h",
@@ -15527,7 +15528,7 @@
     },
     "tools/ci/reading_stack.py": {
       "role": "build-tool",
-      "rationale": "F39 hardware-only compiler stack-use gate for fixed personal/stats workspaces; emits stack usage evidence and fails frames above 256 bytes without changing runtime behavior. No SDK, transport or UI dependency. R1 also emits frame evidence and rejects reminder worker frames above its one-record 1 KiB scratch limit.",
+      "rationale": "F39 hardware-only compiler stack-use gate for fixed personal/stats workspaces; emits stack usage evidence and fails frames above 256 bytes without changing runtime behavior. No SDK, transport or UI dependency. R1 also emits frame evidence and rejects reminder worker frames above its one-record 1 KiB scratch limit. F40w week/streak projections and stats workspace also enforce the 256-byte compiler frame bound.",
       "includes": []
     },
     "src/booksync/services/LayoutGeometry.h": {
@@ -15865,6 +15866,58 @@
     "src/booksync/services/SeriesFlow.cpp": {
       "role": "services",
       "rationale": "F36c single-worker scoped flow: bounded file options and frozen review, plan/selection revalidation, explicit connectivity and queue intents; no UI/private adapter dependency or new task."
+    },
+    "src/booksync/interface/StatsWidgets.h": {
+      "role": "interface",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/ui/widgets/Streak.cpp": {
+      "role": "ui",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/ui/widgets/Week.h": {
+      "role": "ui",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/ui/widgets/Week.cpp": {
+      "role": "ui",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/ui/widgets/StatsDrawing.h": {
+      "role": "ui",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/ui/widgets/Streak.h": {
+      "role": "ui",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/services/widgets/Streak.cpp": {
+      "role": "services",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/services/widgets/Week.h": {
+      "role": "services",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/services/widgets/StatsProjection.h": {
+      "role": "services",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/services/widgets/Week.cpp": {
+      "role": "services",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/services/widgets/StatsWorker.h": {
+      "role": "services",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/services/widgets/StatsWorker.cpp": {
+      "role": "services",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
+    },
+    "src/booksync/services/widgets/Streak.h": {
+      "role": "services",
+      "rationale": "F40w compact week/streak projections and immutable Home batch values; bounded worker-only F39 history, pure UI geometry, no transport or new writer."
     }
   },
   "generators": {

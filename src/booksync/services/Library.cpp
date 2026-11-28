@@ -10,6 +10,7 @@
 #include "RemindersFacade.h"
 #include "SdIndexSource.h"
 #include "booksync/storage/LayoutStore.h"
+#include "widgets/StatsWorker.h"
 namespace booksync {
 namespace {
 struct LocalQueryState {
@@ -39,6 +40,8 @@ struct LocalState {
   storage::IndexRecord openRecord{};
   BookKey openKey{};
   std::unique_ptr<LocalQueryState> query;
+  std::unique_ptr<StatsWorker> stats;
+  ServerAdapter* savedStatsSource = nullptr;  // Borrowed Home-lifetime provider; Bootstrap owns it.
   bool queryChanged = false;
   bool requested = false, rescan = false, resolveOpen = false, openReady = false;
 };
@@ -176,6 +179,17 @@ class OfflineLibrary final : public Library {
       out.clear();
     }
   }
+  void readStatsWidgets(StatsWidgetBatch& out) const override {
+    if (local && local->stats && accountPresentation.ticket.epoch <= UINT32_MAX) {
+      out = local->stats->published();
+      return;
+    }
+    out.requested = local ? local->pending.statsWidgets : 0;
+    for (auto& statsValue : out.cards) {
+      statsValue.clear();
+      statsValue.state = StatsCardState::Unavailable;
+    }
+  }
   CommandStatus open(BookKey key) override {
     if (!local || !local->index.ready() || key.provenance != local->index.provenance() ||
         key.ordinal >= local->index.count())
@@ -265,7 +279,7 @@ bool takeHomeOpenRequest() {
   shellLibrary().openRequested = false;
   return requested;
 }
-void enterLocalLibrary() {
+void enterLocalLibrary(ServerAdapter* savedStatsSource) {
   reader::captureChanged = invalidateLocalCapture;
   if (local) return;
   if (!Storage.exists("/.booksync") && !Storage.mkdir("/.booksync")) {
@@ -277,6 +291,7 @@ void enterLocalLibrary() {
     LOG_ERR("BSI", "Cannot allocate local worker (%u bytes)", unsigned(sizeof(LocalState)));
     return;
   }
+  local->savedStatsSource = savedStatsSource;
   if (!local->index.recover()) {
     local.reset();
     return;
@@ -340,11 +355,28 @@ void workLocalLibrary() {
   }
   if (state.requested) {
     state.requested = false;
+    if (state.pending.statsWidgets && !state.page.textOnly && accountPresentation.ticket.epoch <= UINT32_MAX) {
+      // <=28 KiB allocated once per Home lifetime, never on paint or C3. Fixed
+      // F39 calendar/accumulator buffers cannot fit on the main-loop stack.
+      if (!state.stats) {
+        state.stats = makeUniqueNoThrow<StatsWorker>();
+        if (state.stats) LOG_INF("BSW", "Stats workspace bounded allocation: %u bytes", unsigned(sizeof(StatsWorker)));
+      }
+      if (!state.stats)
+        LOG_ERR("BSW", "Cannot allocate stats workspace (%u bytes)", unsigned(sizeof(StatsWorker)));
+      else {
+        auto provenance = state.index.provenance();
+        provenance.owner = accountPresentation.ticket.owner;
+        provenance.accountEpoch = uint32_t(accountPresentation.ticket.epoch);
+        state.stats->begin(state.pending.statsWidgets, provenance, currentClock.known(), state.savedStatsSource);
+      }
+    }
     state.model.setContinue(shellLibrary().lastBook, shellLibrary().available);
     if (state.model.materializeBatch(state.pending) && state.model.availability() == Availability::Ready &&
         state.history.start())
       state.model.beginHistory(state.history.source());
   }
+  if (state.stats && state.stats->tick()) state.model.notifyQueryPublication();
   if (state.model.historyBusy()) state.model.historyTick(DeviceIndex::Batch);
   if (state.query && state.query->worker.busy()) {
     state.query->worker.tick();

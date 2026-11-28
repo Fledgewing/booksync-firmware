@@ -127,7 +127,8 @@ bool LayoutEditor::geometry(Layout::Span root, Layout::Span pg, const char* devi
         !p.text(p.field(tile, "widget"), p.text_) || !p.number(p.field(tile, "version"), 1, 2147483647, version))
       return false;
     const auto widget = std::string_view(p.text_, p.textLength_);
-    if (version == 1 && !old.hidden && (widget == "continue-reading" || widget == "booklist" || widget == "library")) {
+    WidgetKind installedKind;
+    if (version == 1 && !old.hidden && Layout::installedKind(widget, false, installedKind)) {
       if (installed >= edit.count) return false;
       const auto& g = edit.geometry[installed];
       const auto kind = page_.widgets[installed++].kind;
@@ -325,8 +326,9 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
             !p.text(p.field(tile, "widget"), p.text_) || !p.number(p.field(tile, "version"), 1, 2147483647, version))
           return LayoutEditStatus::Invalid;
         const auto widgetId = std::string_view(p.text_, p.textLength_);
-        const bool known = version == 1 && !g.hidden &&
-                           (widgetId == "continue-reading" || widgetId == "booklist" || widgetId == "library");
+        WidgetKind installedKind;
+        const bool known =
+            version == 1 && !g.hidden && Layout::installedKind(widgetId, !std::strcmp(device, "x3"), installedKind);
         p.space(pos);
         if (known && installed++ == edit.index) {
           // Keep orphan override bytes. IDs are never reused by Add, including
@@ -346,14 +348,20 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
       const char* widget = edit.widget == WidgetKind::Continue ? "continue-reading"
                            : edit.widget == WidgetKind::Shelf  ? "booklist"
                            : edit.widget == WidgetKind::Browse ? "library"
+                           : edit.widget == WidgetKind::Week   ? "this-week"
+                           : edit.widget == WidgetKind::Streak ? "reading-streak"
                                                                : nullptr;
       if (!widget) return LayoutEditStatus::Invalid;
-      const uint8_t h = edit.widget == WidgetKind::Browse ? 1 : 2;
+      if (!std::strcmp(device, "x3") && isStatsWidget(edit.widget)) return LayoutEditStatus::Invalid;
+      const uint8_t h = edit.widget == WidgetKind::Browse || isStatsWidget(edit.widget) ? 1 : 2;
+      const uint8_t w = isStatsWidget(edit.widget) ? 1 : 2;
       uint8_t xs[3]{}, ys[3]{};
       static constexpr const char* classes[] = {"android-tablet", "x4", "x3"};
-      for (unsigned i = 0; i < 3; ++i)
-        if (!freeCell(root, pg, classes[i], i == 0 && edit.widget == WidgetKind::Continue ? 4 : 2, h, xs[i], ys[i]))
+      for (unsigned i = 0; i < 3; ++i) {
+        if (i == 2 && isStatsWidget(edit.widget)) continue;  // New X4 cards stay hidden on X3.
+        if (!freeCell(root, pg, classes[i], i == 0 && edit.widget == WidgetKind::Continue ? 4 : w, h, xs[i], ys[i]))
           return LayoutEditStatus::NoSpace;
+      }
       auto overrides = p.field(root, "overrides");
       // A revision-scoped identity, checked against both live and orphan IDs.
       char id[40];
@@ -389,7 +397,7 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
       std::snprintf(
           text, sizeof(scratch_),
           "%s{\"instance\":\"%s\",\"widget\":\"%s\",\"version\":1,\"x\":%u,\"y\":%u,\"w\":%u,\"h\":%u,\"settings\":{}}",
-          p.at(pos) == ']' ? "" : ",", id, widget, xs[0], ys[0], edit.widget == WidgetKind::Continue ? 4 : 2, h);
+          p.at(pos) == ']' ? "" : ",", id, widget, xs[0], ys[0], edit.widget == WidgetKind::Continue ? 4 : w, h);
       if (!patch(tiles.end - 1, tiles.end - 1, text)) return LayoutEditStatus::Invalid;
       // UI supplies the localized first-widget title. Only untouched Page N
       // names are automatic; manual and already-derived names remain stable.
@@ -410,16 +418,18 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
         if (group.type) {
           pos = group.begin + 1;
           p.space(pos);
-          std::snprintf(text, sizeof(scratch_), "%s\"%s\":{\"x\":%u,\"y\":%u,\"w\":2,\"h\":%u}",
-                        p.at(pos) == '}' ? "" : ",", id, xs[i], ys[i], h);
+          std::snprintf(text, sizeof(scratch_), "%s\"%s\":{\"x\":%u,\"y\":%u,\"w\":%u,\"h\":%u%s}",
+                        p.at(pos) == '}' ? "" : ",", id, xs[i], ys[i], w, h,
+                        i == 2 && isStatsWidget(edit.widget) ? ",\"hidden\":true" : "");
           if (!patch(group.end - 1, group.end - 1, text)) return LayoutEditStatus::Invalid;
         } else {
           pos = overrides.begin + 1;
           p.space(pos);
           const auto used = std::strlen(missing);
           std::snprintf(missing + used, sizeof(missing_) - used,
-                        "%s\"%s\":{\"%s\":{\"x\":%u,\"y\":%u,\"w\":2,\"h\":%u}}", used || p.at(pos) != '}' ? "," : "",
-                        classes[i], id, xs[i], ys[i], h);
+                        "%s\"%s\":{\"%s\":{\"x\":%u,\"y\":%u,\"w\":%u,\"h\":%u%s}}",
+                        used || p.at(pos) != '}' ? "," : "", classes[i], id, xs[i], ys[i], w, h,
+                        i == 2 && isStatsWidget(edit.widget) ? ",\"hidden\":true" : "");
         }
       }
       if (missing[0] && !patch(overrides.end - 1, overrides.end - 1, missing)) return LayoutEditStatus::Invalid;

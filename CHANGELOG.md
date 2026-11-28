@@ -3,6 +3,9 @@
 ### Fixed
 
 - BookSync captures reader progress before a bounded sleep drain even with plugins disabled, retires stale sleep presentation ownership on return, and preserves native sleep screens while new artwork awaits approval.
+- BookSync stats cards no longer reduce sibling shelves to too few books when a Home page contains many summaries; the combined C3 row budget stays bounded.
+
+- BookSync keeps the saved best-streak value visible alongside its stale age, and distinguishes an unknown best from zero.
 
 - BookSync Home widgets no longer pulls the retired native Settings screen graph into button images; X3 uses a bounded Settings entry and X4 keeps its spatial editor. Physical symbol guards reject regressions.
 
@@ -10,6 +13,7 @@
 
 - BookSync publishes timezone-aware clock and date values only after live or retained clock provenance is known; a persisted expiry floor cannot produce a Home clock.
 - BookSync adds compact Series pages and exact next-1–10 download review on X4 Pro touch, X4 Classic buttons and X3, with offline/Back behavior, frozen file choices and restart-safe account-scoped queues through Library.
+- BookSync Home adds compact This week and Reading streak summaries on X4 Pro and Classic, with explicit missing/off/stale/error states and unchanged X3 availability.
 
 - BookSync adds shared position conflict, reset, override and decline policy with durable account/edition isolation and stale-answer rejection; late consent uses the existing one-draw reading exception. Live transport and reader presentation remain deferred.
 - BookSync adds account-isolated authenticated catalog transport behind Library, with bounded response spooling and rejection of incomplete or revoked responses; automatic sync scheduling follows separately.

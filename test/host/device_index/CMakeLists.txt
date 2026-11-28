@@ -15,6 +15,11 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/storage/LayoutStore.cpp
   ${REPO_ROOT}/src/booksync/services/Queries.cpp
   ${REPO_ROOT}/src/booksync/storage/ProjectionStore.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/StatsWorker.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Week.cpp
+  ${REPO_ROOT}/src/booksync/services/widgets/Streak.cpp
+  ${REPO_ROOT}/src/booksync/services/ReadingStats.cpp
+  ${REPO_ROOT}/src/booksync/storage/PageJournal.cpp
   ${REPO_ROOT}/src/booksync/services/Library.cpp
   ${REPO_ROOT}/src/booksync/services/Reminders.cpp
   ${REPO_ROOT}/src/booksync/services/RemindersFacade.cpp
