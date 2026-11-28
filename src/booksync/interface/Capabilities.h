@@ -6,5 +6,6 @@ struct Capabilities {
   bool localReading = true;
   bool catalog = false;
   bool delivery = false;
+  bool reminders = false;
 };
 }  // namespace booksync

@@ -7,6 +7,7 @@
 #include "NativeHistory.h"
 #include "OfflineLibrary.h"
 #include "Queries.h"
+#include "RemindersFacade.h"
 #include "SdIndexSource.h"
 #include "booksync/storage/LayoutStore.h"
 namespace booksync {
@@ -47,6 +48,7 @@ static_assert(sizeof(LocalState) <= 28 * 1024);
 // buffers out of the reader lifetime. HAL owns its bounded directory-handle allocations.
 std::unique_ptr<LocalState> local;
 ClockStatus currentClock{};
+RemindersFacade* reminders = nullptr;
 AccountView accountPresentation{};
 // One fixed <=368-byte cached form plus an 8-byte monotonic counter: avoids
 // a heap allocation for the offline capability view and never holds credentials.
@@ -63,8 +65,8 @@ class OfflineLibrary final : public Library {
   bool available = false;
   bool openRequested = false;
   BookRow lastBook{};
-  Capabilities capabilities() const override { return {true, true, false}; }
   ClockStatus clockStatus() const override { return currentClock; }
+  Capabilities capabilities() const override { return {true, true, false, reminders != nullptr}; }
   AccountView accountView() const override { return accountPresentation; }
   CommandStatus selectService(ServiceSelection selection) override {
     const auto& current = accountPresentation;
@@ -98,6 +100,28 @@ class OfflineLibrary final : public Library {
     return CommandStatus::Unsupported;
   }
   void readAccountForm(AccountFormView& out) const override { out = formPresentation; }
+  void remindersList(ReminderList& out) const override {
+    if (reminders)
+      reminders->list(out);
+    else
+      out.clear();
+  }
+  ReminderResult remindersMutate(const ReminderMutation& m) override {
+    return reminders ? reminders->mutate(m) : ReminderResult{};
+  }
+  bool remindersRetry() override { return reminders && reminders->retry(); }
+  ReminderResult remindersResult() const override { return reminders ? reminders->result() : ReminderResult{}; }
+  ReminderEvents remindersEvents() const override { return reminders ? reminders->events() : ReminderEvents{}; }
+  bool remindersDue(ReminderDue& out) const override { return reminders && reminders->due(out); }
+  ReminderResult remindersClaim(const ReminderDue& d, uint64_t owner) override {
+    return reminders ? reminders->claim(d, owner) : ReminderResult{};
+  }
+  ReminderResult remindersRespond(uint64_t token, uint64_t owner, ReminderAction action) override {
+    return reminders ? reminders->respond(token, owner, action) : ReminderResult{};
+  }
+  void remindersRetire(uint64_t owner) override {
+    if (reminders) reminders->retire(owner);
+  }
   Snapshot snapshot() const override {
     Snapshot value;
     value.canOpenLastBook = available;
@@ -205,6 +229,7 @@ OfflineLibrary& shellLibrary() {
 }  // namespace
 Library& offlineLibrary() { return shellLibrary(); }
 void publishClockStatus(ClockStatus value) { currentClock = value; }
+void bindReminders(RemindersFacade& facade) { reminders = &facade; }
 void publishAccountView(AccountView value) {
   value.serviceLabel.back() = 0;
   accountPresentation = value;

@@ -2,6 +2,8 @@
 #pragma once
 #include <string>
 namespace booksync {
+class RemindersFacade;
+void bindReminders(RemindersFacade&);
 // Composition root publishes small cached values and a private checkpoint port.
 // No storage access occurs through Library snapshot/paint.
 void publishUpgradeState(bool pending, bool recovery, bool (*dismiss)());

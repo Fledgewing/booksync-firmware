@@ -111,4 +111,5 @@ subprocess.run([sys.executable, 'test/simulator/upgrade_notice.py', profile], cw
 subprocess.run([sys.executable, 'test/simulator/clock_provenance.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, "test/simulator/position_policy.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/finish.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/reminders.py', profile], cwd=root, env=env, check=True)
 raise SystemExit(0)

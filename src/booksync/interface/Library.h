@@ -11,6 +11,7 @@
 #include "booksync/interface/HomeLayout.h"
 #include "booksync/interface/LayoutEdit.h"
 #include "booksync/interface/Queries.h"
+#include "booksync/interface/Reminders.h"
 
 namespace booksync {
 // UI reads bounded published values. No scans, writes, parsing or transport in
@@ -19,6 +20,18 @@ class Library {
  public:
   virtual ~Library() = default;
   virtual Capabilities capabilities() const = 0;
+  virtual void remindersList(ReminderList& out) const { out.clear(); }
+  virtual ReminderResult remindersMutate(const ReminderMutation&) { return {}; }
+  virtual bool remindersRetry() { return false; }
+  virtual ReminderResult remindersResult() const { return {}; }
+  virtual ReminderEvents remindersEvents() const { return {}; }
+  virtual bool remindersDue(ReminderDue& out) const {
+    (void)out;
+    return false;
+  }
+  virtual ReminderResult remindersClaim(const ReminderDue&, uint64_t) { return {}; }
+  virtual ReminderResult remindersRespond(uint64_t, uint64_t, ReminderAction) { return {}; }
+  virtual void remindersRetire(uint64_t) {}
   virtual Snapshot snapshot() const = 0;
   virtual ClockStatus clockStatus() const { return {}; }
   virtual AccountView accountView() const { return {}; }
