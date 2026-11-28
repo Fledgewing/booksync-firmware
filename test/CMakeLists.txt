@@ -290,3 +290,4 @@ add_subdirectory(host/lifecycle_state)
 add_subdirectory(host/activation)
 
 add_subdirectory(host/download_jobs)
+add_subdirectory(host/lifecycle_annotations)

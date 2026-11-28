@@ -99,3 +99,7 @@ remote commit/reconciliation, pending-checkpoint restart, deferred native
 writeback and dedup using the production F17 owner and real HAL, with independently
 persisted fake remote/native receipts. See `docs/booksync/F18d.md` for bounds,
 private seam contracts and maintainer-only hardware verification.
+F18c adds `test/simulator/lifecycle_annotations.py` to every profile boot gate: 13
+annotation/bookmark scenarios, eight abrupt exits and 40 boots against separately
+persisted fake server, workspace and synthetic native annotations. Hardware images
+retain the dormant phase for reserve measurement. See `docs/booksync/F18c.md`.
