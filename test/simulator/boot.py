@@ -91,6 +91,7 @@ subprocess.run([sys.executable, 'test/simulator/catalog.py', profile], cwd=root,
 subprocess.run([sys.executable, 'test/simulator/lifecycle_match.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/widgets.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/stats_widgets.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/calendar_widgets.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/credentials.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/version.py', profile], cwd=root, env=env, check=True)
 

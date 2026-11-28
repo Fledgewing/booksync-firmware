@@ -6,11 +6,21 @@ namespace {
 struct Size {
   uint8_t w, h;
 };
+static constexpr Size calendarYear[] = {{2, 1}, {2, 2}};
+static constexpr Size calendarMonth[] = {{2, 1}};
 static constexpr Size compact[] = {{1, 1}};
 static constexpr Size hero[] = {{1, 2}, {2, 3}, {2, 2}};
 static constexpr Size shelf[] = {{2, 2}, {1, 3}, {1, 2}, {2, 3}, {2, 4}, {2, 1}};
 static constexpr Size browse[] = {{2, 3}, {1, 2}, {2, 1}, {1, 1}, {2, 2}};
 const Size* sizes(WidgetKind kind, unsigned& count) {
+  if (kind == WidgetKind::Year) {
+    count = 2;
+    return calendarYear;
+  }
+  if (kind == WidgetKind::Monthly) {
+    count = 1;
+    return calendarMonth;
+  }
   if (isStatsWidget(kind)) {
     count = 1;
     return compact;

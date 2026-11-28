@@ -1,10 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "booksync/interface/Models.h"
+#include "booksync/interface/StatsWidgets.h"
 namespace booksync {
 constexpr uint8_t HomeWidgets = LibraryBatchRequests;
-enum class WidgetKind : uint8_t { Continue, Shelf, Browse, Week, Streak };
-constexpr bool isStatsWidget(WidgetKind kind) { return kind == WidgetKind::Week || kind == WidgetKind::Streak; }
+enum class WidgetKind : uint8_t { Continue, Shelf, Browse, Week, Streak, Year, Monthly };
+constexpr bool isStatsWidget(WidgetKind kind) {
+  return kind == WidgetKind::Week || kind == WidgetKind::Streak || kind == WidgetKind::Year ||
+         kind == WidgetKind::Monthly;
+}
+constexpr StatsWidget statsWidgetKind(WidgetKind kind) {
+  return kind == WidgetKind::Week     ? StatsWidget::Week
+         : kind == WidgetKind::Streak ? StatsWidget::Streak
+         : kind == WidgetKind::Year   ? StatsWidget::Year
+                                      : StatsWidget::Monthly;
+}
 struct WidgetPlacement {
   WidgetKind kind = WidgetKind::Continue;
   WindowSource source = WindowSource::Recent;

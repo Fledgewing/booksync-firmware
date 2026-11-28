@@ -2,7 +2,7 @@
 #pragma once
 #include "Models.h"
 namespace booksync {
-enum class StatsWidget : uint8_t { Week, Streak, Count };
+enum class StatsWidget : uint8_t { Week, Streak, Year, Monthly, Count };
 constexpr unsigned StatsWidgetCount = unsigned(StatsWidget::Count);
 enum class StatsCardState : uint8_t { NotSaved, Ready, Empty, Off, Unsupported, Unavailable, Oversize };
 enum class StatsCardSource : uint8_t { Unknown, Reader, Account };
@@ -33,8 +33,23 @@ struct StatsCard {
     stale = complete = false;
   }
 };
+// Single shared calendar payload per visible batch, never per widget instance.
+// Day marks: 0 unknown, 1 known zero, 2 reading, 6 future.
+struct StatsYear {
+  std::array<uint8_t, 366> marks{};
+  std::array<uint16_t, 12> monthStarts{};
+  uint16_t year = 0, count = 0, unknown = 0;
+  uint8_t firstWeekday = 0;
+};
+struct StatsMonths {
+  std::array<StatsMetric, 12> totals{};
+  uint16_t year = 0;
+  uint8_t currentMonth = 0;
+};
 struct StatsWidgetBatch {
   std::array<StatsCard, StatsWidgetCount> cards{};
+  StatsYear year{};
+  StatsMonths months{};
   uint16_t requested = 0;
 };
 constexpr uint16_t statsWidgetBit(StatsWidget id) { return 1u << unsigned(id); }

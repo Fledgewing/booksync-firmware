@@ -42,6 +42,7 @@
 #include "../../test/simulator/WidgetScenario.h"
 #include "../../test/simulator/StatsWidgetScenario.h"
 #include "../../test/simulator/CatalogSurfaceScenario.h"
+#include "../../test/simulator/CalendarWidgetScenario.h"
 #include "../../test/simulator/EditorScenario.h"
 #include "../../test/simulator/AccountSurfaceScenario.h"
 #include "../../test/simulator/UpgradeNoticeScenario.h"
@@ -12187,7 +12188,7 @@ SimulatorSmokeTest smokeTest;
 void runSimulatorSmokeTestTick() {
   if (!catalogSurfaceScenario::tick() && !seriesSurfaceScenario::tick() && !upgradeNoticeScenario::tick() &&
       !accountSurfaceScenario::tick() && !editorScenario::tick() &&
-      !statsWidgetScenario::tick() && !widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() &&
+      !calendarWidgetScenario::tick() && !statsWidgetScenario::tick() && !widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() &&
       !EpubReaderCompletionSmokeTest::sleepScenarioTick() &&
       !EpubReaderCompletionSmokeTest::readerCaptureScenarioTick() &&
       !EpubReaderCompletionSmokeTest::locatorScenarioTick())

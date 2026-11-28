@@ -30,8 +30,10 @@
 #include "booksync/ui/EditorAddRemove.h"
 #include "booksync/ui/Home.h"
 #include "booksync/ui/WidgetHost.h"
+#include "booksync/ui/widgets/Monthly.h"
 #include "booksync/ui/widgets/Streak.h"
 #include "booksync/ui/widgets/Week.h"
+#include "booksync/ui/widgets/Year.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -187,6 +189,8 @@ class ShellActivity final : public Activity {
     }
   }
   const char* widgetTitle(WidgetKind kind) const {
+    if (kind == WidgetKind::Year) return tr(STR_HOME_YEAR_IN_READING);
+    if (kind == WidgetKind::Monthly) return tr(STR_HOME_MONTHLY_READING);
     if (kind == WidgetKind::Week) return tr(STR_HOME_THIS_WEEK);
     if (kind == WidgetKind::Streak) return tr(STR_HOME_READING_STREAK);
     return kind == WidgetKind::Continue ? tr(STR_CONTINUE_READING)
@@ -250,13 +254,124 @@ class ShellActivity final : public Activity {
 #endif
     return focus == index && !mappedInput.hasTouch();
   }
+  void paintCalendarStats(uint8_t index, const StatsCard& statsValue, int line) const {
+    const auto r = tileRect(index);
+    const bool yearTile = widgets->page().widgets[index].kind == WidgetKind::Year;
+    const bool expandedYear = yearTile && r.height >= 180;
+    const int summaryWidth = expandedYear ? r.width - 20 : r.width * (yearTile ? 96 : 110) / 456 - 18;
+    const int metadataScale = 160 * std::min(r.height, 108) / 108;
+    char text[64];
+    std::snprintf(text, sizeof(text),
+                  yearTile ? (expandedYear ? tr(STR_HOME_STATS_DAYS_FORMAT) : "%llu") : tr(STR_HOME_STATS_HOURS_FORMAT),
+                  (unsigned long long)(yearTile ? statsValue.best.value : statsValue.hours));
+    paintStatText(BITTER_14_FONT_ID, r.x + 10, r.y + line + 2, text, summaryWidth, 288 * std::min(r.height, 108) / 108);
+    if (!expandedYear)
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 2 * line + 10,
+                    yearTile ? tr(STR_HOME_STATS_DAYS_READ) : tr(STR_HOME_STATS_KNOWN_TOTAL), summaryWidth,
+                    metadataScale);
+    if (expandedYear && widgets->statsYear(index))
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_YEAR_DETAIL_FORMAT), (unsigned long long)statsValue.hours,
+                    (unsigned long long)widgets->statsYear(index)->unknown);
+    else if (yearTile)
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_HOURS_KNOWN_FORMAT), (unsigned long long)statsValue.hours);
+    else if (statsValue.best.known)
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_LAST_MONTH_FORMAT),
+                    (unsigned long long)(statsValue.best.value / 3600));
+    else
+      std::snprintf(text, sizeof(text), "%s", tr(STR_HOME_STATS_LAST_MONTH_UNKNOWN));
+    if (expandedYear) {
+      const int width = std::min(r.width * 2 / 3 - 20, renderer.getTextWidth(UI_10_FONT_ID, text) * 160 / 256 + 12);
+      paintStatText(UI_10_FONT_ID, r.x + r.width - 10 - width, r.y + line + 12, text, width, 160);
+    } else
+      paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 3 * line + 10, text, summaryWidth, metadataScale);
+    if (statsValue.stale) {
+      std::snprintf(text, sizeof(text), tr(STR_HOME_STATS_SAVED_AGE_FORMAT), (unsigned long long)statsValue.ageDays);
+      if (expandedYear)
+        paintStatText(UI_10_FONT_ID, r.x + 10, r.y + 3 * line + 10, text, summaryWidth, 160);
+      else
+        paintStatText(UI_10_FONT_ID, r.x + r.width - 180, r.y + 5, text, 140, 160);
+    }
+    auto box = widgetBox(index);
+    box.line = line;
+    widgets::StatsMark mark;
+    if (yearTile) {
+      const auto* heat = widgets->statsYear(index);
+      if (!heat) return;
+      widgets::Year yearRenderer;
+      for (unsigned day = 0; day < std::min<unsigned>(heat->count, 366); ++day) {
+        if (!yearRenderer.heatCell(statsValue, *heat, box, day, mark) || mark.future) continue;
+        const int x = r.x + mark.x, y = r.y + mark.y;
+        if (!mark.known)
+          renderer.drawRoundedRect(x, y, mark.width, mark.height, 1, mark.width / 2, true);
+        else if (!mark.active)
+          renderer.fillRect(x + mark.width / 2, y + mark.height / 2, 1, 1);
+        else {
+          renderer.fillRoundedRect(x, y, mark.width, mark.height, mark.width / 2, Black);
+        }
+      }
+      static constexpr StrId labels[] = {StrId::STR_HOME_STATS_JAN, StrId::STR_HOME_STATS_MAR,
+                                         StrId::STR_HOME_STATS_MAY, StrId::STR_HOME_STATS_JUL,
+                                         StrId::STR_HOME_STATS_SEP, StrId::STR_HOME_STATS_NOV};
+      for (unsigned month = 0; month < 12; month += 2) {
+        if (yearRenderer.heatCell(statsValue, *heat, box, heat->monthStarts[month], mark))
+          paintStatText(UI_10_FONT_ID, r.x + mark.x, r.y + (expandedYear ? 110 : 46) - line - 3,
+                        I18N.get(labels[month / 2]), 42, expandedYear ? 160 : metadataScale);
+      }
+      if (expandedYear) {
+        const int y = r.y + r.height - line - 5;
+        renderer.fillRoundedRect(r.x + 10, y + 7, 5, 5, 2, Black);
+        paintStatText(UI_10_FONT_ID, r.x + 22, y, tr(STR_HOME_STATS_LEGEND_READING), 75, 160);
+        renderer.fillRect(r.x + 99, y + 9, 1, 1);
+        paintStatText(UI_10_FONT_ID, r.x + 110, y, tr(STR_HOME_STATS_LEGEND_ZERO), 50, 160);
+        renderer.drawRoundedRect(r.x + 165, y + 7, 5, 5, 1, 2, true);
+        paintStatText(UI_10_FONT_ID, r.x + 177, y, tr(STR_HOME_STATS_LEGEND_UNKNOWN), 85, 160);
+        paintStatText(UI_10_FONT_ID, r.x + 280, y, tr(STR_HOME_STATS_LEGEND_FUTURE), r.width - 290, 160);
+      }
+    } else {
+      const auto* months = widgets->statsMonths(index);
+      if (!months) return;
+      widgets::Monthly monthlyRenderer;
+      static constexpr StrId labels[] = {
+          StrId::STR_HOME_STATS_MONTH_J, StrId::STR_HOME_STATS_MONTH_F, StrId::STR_HOME_STATS_MONTH_M,
+          StrId::STR_HOME_STATS_MONTH_A, StrId::STR_HOME_STATS_MONTH_M, StrId::STR_HOME_STATS_MONTH_J,
+          StrId::STR_HOME_STATS_MONTH_J, StrId::STR_HOME_STATS_MONTH_A, StrId::STR_HOME_STATS_MONTH_S,
+          StrId::STR_HOME_STATS_MONTH_O, StrId::STR_HOME_STATS_MONTH_N, StrId::STR_HOME_STATS_MONTH_D};
+      for (unsigned month = 0; month < 12; ++month) {
+        if (!monthlyRenderer.monthColumn(statsValue, *months, box, month, mark)) continue;
+        const int x = r.x + mark.x, y = r.y + mark.y;
+        if (!mark.known)
+          renderer.drawRect(x, y - 3, mark.width, 4);
+        else if (mark.active)
+          renderer.fillRect(x, y, mark.width, mark.height);
+        else
+          renderer.drawLine(x, y, x + mark.width, y);
+        if (mark.known)
+          std::snprintf(text, sizeof(text), "%llu", (unsigned long long)(months->totals[month].value / 3600));
+        else
+          std::snprintf(text, sizeof(text), "?");
+        paintStatText(UI_10_FONT_ID, x, r.y + r.height - 2 * line - 5, text, mark.width + 3, metadataScale);
+        paintStatText(UI_10_FONT_ID, x, r.y + r.height - line - 5, I18N.get(labels[month]), mark.width + 3,
+                      metadataScale);
+      }
+    }
+  }
   void paintStatsHeaderIcon(uint8_t index) const {
     const auto r = tileRect(index);
     const int edge = std::min(21, r.height / 5), left = r.x + r.width - edge - 10, top = r.y + 6;
     auto stroke = [&](int x1, int y1, int x2, int y2) {
       renderer.drawLine(left + x1 * edge / 24, top + y1 * edge / 24, left + x2 * edge / 24, top + y2 * edge / 24);
     };
-    if (widgets->page().widgets[index].kind == WidgetKind::Streak) {
+    if (widgets->page().widgets[index].kind == WidgetKind::Year) {
+      stroke(3, 5, 21, 5);
+      stroke(21, 5, 21, 21);
+      stroke(21, 21, 3, 21);
+      stroke(3, 21, 3, 5);
+      stroke(3, 10, 21, 10);
+      stroke(7, 2, 7, 8);
+      stroke(17, 2, 17, 8);
+      stroke(7, 14, 10, 14);
+      stroke(14, 14, 17, 14);
+    } else if (widgets->page().widgets[index].kind == WidgetKind::Streak) {
       // Fixed samples of the approved flame outline; flash-resident, no asset allocation.
       static constexpr int8_t outline[][2] = {
           {13, 2},  {14, 6},  {13, 9},  {10, 11}, {8, 10}, {8, 8},   {9, 6},   {5, 10},  {3, 14}, {5, 18}, {9, 23},
@@ -283,15 +398,19 @@ class ShellActivity final : public Activity {
     renderer.drawRoundedRect(r.x, r.y, r.width, r.height, 1, 9, true);
     if (widgetSelected(index)) renderer.drawRoundedRect(r.x + 2, r.y + 2, r.width - 4, r.height - 4, 3, 8, true);
     renderer.beginTextClip(r.x + 8, r.y + 4, r.width - 16, r.height - 8);
-    paintStatText(font, r.x + 10, r.y + 5, widgetTitle(kind), r.width - 48, smallScale);
+    const bool calendarAge =
+        card && card->stale && r.height < 180 && (kind == WidgetKind::Year || kind == WidgetKind::Monthly);
+    paintStatText(font, r.x + 10, r.y + 5, widgetTitle(kind), r.width - (calendarAge ? 228 : 48), smallScale);
     paintStatsHeaderIcon(index);
     if (view.viewState != WidgetState::Known || !card) {
-      const char* message =
-          view.viewState == WidgetState::Empty
-              ? (kind == WidgetKind::Week ? tr(STR_HOME_STATS_WEEK_EMPTY) : tr(STR_HOME_STATS_STREAK_EMPTY))
-          : view.viewState == WidgetState::Unsupported ? tr(STR_HOME_STATS_UNSUPPORTED)
-          : view.viewState == WidgetState::Oversize    ? tr(STR_HOME_STATS_OVERSIZE)
-                                                       : stateText(view.viewState);
+      const char* message = view.viewState == WidgetState::Empty
+                                ? (kind == WidgetKind::Year      ? tr(STR_HOME_STATS_YEAR_EMPTY)
+                                   : kind == WidgetKind::Monthly ? tr(STR_HOME_STATS_MONTHLY_EMPTY)
+                                   : kind == WidgetKind::Week    ? tr(STR_HOME_STATS_WEEK_EMPTY)
+                                                                 : tr(STR_HOME_STATS_STREAK_EMPTY))
+                            : view.viewState == WidgetState::Unsupported ? tr(STR_HOME_STATS_UNSUPPORTED)
+                            : view.viewState == WidgetState::Oversize    ? tr(STR_HOME_STATS_OVERSIZE)
+                                                                         : stateText(view.viewState);
       paragraph(message, r.x + 10, r.y + line + 8, r.width - 20, 2);
       if (card && card->stale && view.viewState == WidgetState::Empty) {
         char age[64];
@@ -300,6 +419,8 @@ class ShellActivity final : public Activity {
       }
       if (view.viewState == WidgetState::Oversize || view.viewState == WidgetState::Error)
         renderer.drawText(font, r.x + 10, r.y + r.height - line - 6, tr(STR_RETRY));
+    } else if (kind == WidgetKind::Year || kind == WidgetKind::Monthly) {
+      paintCalendarStats(index, *card, line);
     } else {
       char text[80]{};
       if (kind == WidgetKind::Week) {
