@@ -308,8 +308,6 @@ class ShellActivity final : public Activity {
   }
   const char* stateText(WidgetState state) const {
     switch (state) {
-      case WidgetState::Off:
-        return tr(STR_HOME_STATS_OFF);
       case WidgetState::Loading:
         return tr(STR_HOME_LOADING);
       case WidgetState::Empty:
