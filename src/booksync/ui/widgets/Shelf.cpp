@@ -18,7 +18,8 @@ void Shelf::paint(Canvas& canvas, WidgetView viewValue, WindowSource source, uin
   const bool hasRows = viewValue.viewState == WidgetState::Known && viewValue.rows && viewValue.count;
   const bool completeEmpty = viewValue.viewState == WidgetState::Empty;
   if (hasRows || completeEmpty) {
-    canvas.text({box.width - 138, 12, 126, 20}, Label::AllBooks, true, true, viewValue.total);
+    const auto all = allHeaderBox(box.width);
+    canvas.text({all.x, 18, all.w, 20}, Label::AllBooks, true, true, viewValue.total);
   }
   if (!hasRows) {
     Label label = completeEmpty ? Label::EmptyShelf : Label::NotSaved;
@@ -31,7 +32,7 @@ void Shelf::paint(Canvas& canvas, WidgetView viewValue, WindowSource source, uin
     return;
   }
   if (viewValue.stale)
-    canvas.text({12, 32, box.width - 24, 18}, viewValue.ageKnown ? Label::SavedAge : Label::SavedUnknown, true, false,
+    canvas.text({12, 32, box.width - 110, 18}, viewValue.ageKnown ? Label::SavedAge : Label::SavedUnknown, true, false,
                 viewValue.ageDays);
   const bool rows = style == 1 || box.width < 360;
   const uint16_t limit = rows ? 3 : 4;

@@ -31,7 +31,7 @@ TEST_P(BookListPresets, MainUsesAuthoritativeHeaderAndBoundedPreview) {
     if (c.kind == widgets::Drawing::Text && c.label == widgets::Label::AllBooks) {
       all = true;
       EXPECT_EQ(c.first, 10000);
-      EXPECT_EQ(c.box.y, 12);
+      EXPECT_EQ(c.box.y, 18);
       EXPECT_GE(c.box.x, 300);
       EXPECT_GE(c.box.w, 50);
       EXPECT_EQ(c.box.h, 20);
@@ -142,4 +142,12 @@ TEST(BookListRenderer, OnCardBadgeRequiresIndependentPublishedFileEvidence) {
   view.files = nullptr;
   Shelf{}.paint(commands, view, WindowSource::Recent, 0, {456, 224, 26, false, true}, 255);
   for (uint8_t i = 0; i < commands.count; ++i) EXPECT_NE(commands.commands[i].kind, Drawing::OnCardMark);
+}
+
+TEST(BookListGeometry, HeaderUsesApprovedRightInsetAndCenteredFiftyPixelTarget) {
+  const auto cell = widgets::allHeaderBox(456);
+  EXPECT_EQ(cell.x, 370);
+  EXPECT_EQ(cell.w, 79);
+  EXPECT_EQ(cell.h, 50);
+  EXPECT_EQ(cell.x + cell.w, 449);
 }

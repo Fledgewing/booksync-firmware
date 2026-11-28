@@ -26,6 +26,10 @@ enum class Label : uint8_t {
 struct Box {
   int x = 0, y = 0, w = 0, h = 0;
 };
+// Approved gallery: right 7, All min-width 79, 50-pixel height;
+// Another is 50 wide, five pixels immediately to its left.
+inline Box allHeaderBox(int width) { return {width - 86, 0, 79, 50}; }
+inline Box anotherHeaderBox(int width) { return {width - 141, 0, 50, 50}; }
 enum class Drawing : uint8_t { Fill, Border, Text, Title, SerifTitle, BookJacket, OnCardMark };
 struct PaintCommand {
   Box box{};

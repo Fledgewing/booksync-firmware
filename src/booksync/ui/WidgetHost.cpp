@@ -196,8 +196,9 @@ uint8_t WidgetHost::hitWidgetRow(uint8_t widget, WidgetBox itemBox, int x, int y
   if (widget >= page_.count) return 255;
   if (page_.widgets[widget].kind != WidgetKind::Shelf) return 0;
   const auto viewValue = view(widget);
+  const auto all = widgets::allHeaderBox(itemBox.width);
   if (!page_.textOnly && (viewValue.viewState == WidgetState::Known || viewValue.viewState == WidgetState::Empty) &&
-      x >= itemBox.width - 140 && x < itemBox.width - 4 && y >= 0 && y < 50)
+      x >= all.x && x < all.x + all.w && y >= all.y && y < all.y + all.h)
     return 0;
   WidgetCell itemCell;
   for (uint8_t itemIndex = 0; itemIndex < viewValue.count && widgetCell(widget, itemBox, itemIndex, itemCell);
