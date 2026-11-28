@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "Calendar.h"
+#include "Pages.h"
 #include "Streak.h"
+#include "Today.h"
 #include "Week.h"
 #include "booksync/services/ServerAdapter.h"
 namespace booksync {

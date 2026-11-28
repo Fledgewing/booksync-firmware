@@ -293,6 +293,16 @@ TEST(WidgetHost, StatsShareOneBatchAndRetireOnAccountSwitch) {
   ++f.data.publication;
   host.pollWidgets();
   EXPECT_EQ(host.view(1).viewState, WidgetState::NotSaved);
+  // A native primary value may carry a secondary saved-account field.
+  f.values.cards[1].source = StatsCardSource::Reader;
+  f.values.cards[1].accountLinked = true;
+  ++f.data.publication;
+  host.pollWidgets();
+  EXPECT_EQ(host.view(1).viewState, WidgetState::NotSaved);
+  f.values.cards[1].provenance.accountEpoch = 3;
+  ++f.data.publication;
+  host.pollWidgets();
+  EXPECT_EQ(host.view(1).viewState, WidgetState::Known);
 }
 
 TEST(WidgetHost, MissingOptionalStatsProviderIsUnsupported) {

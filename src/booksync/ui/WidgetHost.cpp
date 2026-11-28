@@ -71,7 +71,7 @@ bool WidgetHost::pollWidgets() {
     if (batch_.statsWidgets) {
       library_.readStatsWidgets(stats_);
       for (auto& statsValue : stats_.cards) {
-        if (statsValue.source == StatsCardSource::Account &&
+        if ((statsValue.source == StatsCardSource::Account || statsValue.accountLinked) &&
             (statsValue.provenance.owner != statsAccount_.owner ||
              statsValue.provenance.accountEpoch != statsAccount_.epoch))
           statsValue.clear();

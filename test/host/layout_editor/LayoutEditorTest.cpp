@@ -921,7 +921,7 @@ TEST(LayoutPages, FirstWidgetNamesNewPageButManualNamesStay) {
 }
 
 TEST(LayoutGeometry, CompactStatsHaveOnlyTheirApprovedMainSize) {
-  for (auto kind : {WidgetKind::Week, WidgetKind::Streak}) {
+  for (auto kind : {WidgetKind::Week, WidgetKind::Streak, WidgetKind::Today, WidgetKind::Pages}) {
     EXPECT_TRUE(supportedGeometry(kind, 1, 1));
     EXPECT_FALSE(supportedGeometry(kind, 2, 1));
     EXPECT_FALSE(supportedGeometry(kind, 2, 2));
@@ -929,7 +929,8 @@ TEST(LayoutGeometry, CompactStatsHaveOnlyTheirApprovedMainSize) {
 }
 
 TEST(LayoutEditor, NewStatsAreHiddenOnX3) {
-  for (auto kind : {WidgetKind::Week, WidgetKind::Streak, WidgetKind::Year, WidgetKind::Monthly}) {
+  for (auto kind : {WidgetKind::Week, WidgetKind::Streak, WidgetKind::Year, WidgetKind::Monthly, WidgetKind::Today,
+                    WidgetKind::Pages}) {
     card = {};
     storage::LayoutStore store(paths, "x4");
     ASSERT_EQ(store.load(), storage::LayoutSource::Default);

@@ -4,16 +4,18 @@
 #include "booksync/interface/StatsWidgets.h"
 namespace booksync {
 constexpr uint8_t HomeWidgets = LibraryBatchRequests;
-enum class WidgetKind : uint8_t { Continue, Shelf, Browse, Week, Streak, Year, Monthly };
+enum class WidgetKind : uint8_t { Continue, Shelf, Browse, Week, Streak, Year, Monthly, Today, Pages };
 constexpr bool isStatsWidget(WidgetKind kind) {
   return kind == WidgetKind::Week || kind == WidgetKind::Streak || kind == WidgetKind::Year ||
-         kind == WidgetKind::Monthly;
+         kind == WidgetKind::Monthly || kind == WidgetKind::Today || kind == WidgetKind::Pages;
 }
 constexpr StatsWidget statsWidgetKind(WidgetKind kind) {
-  return kind == WidgetKind::Week     ? StatsWidget::Week
-         : kind == WidgetKind::Streak ? StatsWidget::Streak
-         : kind == WidgetKind::Year   ? StatsWidget::Year
-                                      : StatsWidget::Monthly;
+  return kind == WidgetKind::Week      ? StatsWidget::Week
+         : kind == WidgetKind::Streak  ? StatsWidget::Streak
+         : kind == WidgetKind::Year    ? StatsWidget::Year
+         : kind == WidgetKind::Monthly ? StatsWidget::Monthly
+         : kind == WidgetKind::Today   ? StatsWidget::Today
+                                       : StatsWidget::Pages;
 }
 struct WidgetPlacement {
   WidgetKind kind = WidgetKind::Continue;
