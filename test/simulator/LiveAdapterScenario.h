@@ -43,7 +43,7 @@ inline void runLiveAdapterScenario() {
           if (!adapter.selectSyncSession(account.snapshot().syncOwner)) return;
           if (adapter.startCatalog("synthetic-device")) {
             auto* source = adapter.catalogSource();
-            for (unsigned steps = 0; steps < 10000 && networkAdmission().permitted(); ++steps) {
+            for (unsigned steps = 0; steps <= 10000 && networkAdmission().permitted(); ++steps) {
               const auto next = source->next(row);
               if (next == CatalogStep::End) {
                 ready = true;
