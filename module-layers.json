@@ -13315,6 +13315,7 @@
         "../../test/simulator/AccountScenario.h",
         "../../test/simulator/AccountSurfaceScenario.h",
         "../../test/simulator/ActivationScenario.h",
+        "../../test/simulator/BookListProjectionScenario.h",
         "../../test/simulator/CalendarWidgetScenario.h",
         "../../test/simulator/CatalogJobsScenario.h",
         "../../test/simulator/CatalogScenario.h",
@@ -16238,6 +16239,14 @@
     "src/booksync/services/PersonalWorker.cpp": {
       "role": "services",
       "rationale": "F40w production personal prerequisite: bounded original-native saved passage source and cached Library publication; exact identities, frozen generation, full row/byte budgets, no paint I/O or second writer."
+    },
+    "src/booksync/services/widgets/BookList.h": {
+      "role": "services",
+      "rationale": "F40w Book list worker projection: at most four frozen indexed records, independent preset order/count/year/scope evidence, fixed caller-owned output and no UI, transport, allocation or writer."
+    },
+    "src/booksync/services/widgets/BookList.cpp": {
+      "role": "services",
+      "rationale": "F40w Book list worker projection: at most four frozen indexed records, independent preset order/count/year/scope evidence, fixed caller-owned output and no UI, transport, allocation or writer."
     }
   },
   "generators": {

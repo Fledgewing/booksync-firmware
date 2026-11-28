@@ -45,6 +45,8 @@ enum class WindowSource : uint8_t {
   Random,
   FinishedYear,
   PickBackUp,
+  AlsoReading,
+  AllFinished,
   Unknown
 };
 struct WindowRequest {
