@@ -265,15 +265,16 @@ bool CatalogSurface::pollCatalog() {
     pending_ = false;
     if (panel_ == Panel::Dashboard) {
       library_.readWindow(covers_);
-      bool valid = covers_.count <= 8 && covers_.windowCount <= 2 && covers_.bytes <= LibraryBytes;
-      for (uint8_t n = 0; valid && n < covers_.windowCount; ++n) {
+      bool catalogValidWindow = covers_.count <= 8 && covers_.windowCount <= 2 && covers_.bytes <= LibraryBytes;
+      for (uint8_t n = 0; catalogValidWindow && n < covers_.windowCount; ++n) {
         const auto& span = covers_.windows[n];
-        valid = span.count <= 4 && span.first <= covers_.count && span.count <= covers_.count - span.first &&
-                span.bytes <= LibraryBytes && span.bytes >= sizeof(WindowSpan) + span.count * sizeof(BookRow);
+        catalogValidWindow = span.count <= 4 && span.first <= covers_.count &&
+                             span.count <= covers_.count - span.first && span.bytes <= LibraryBytes &&
+                             span.bytes >= sizeof(WindowSpan) + span.count * sizeof(BookRow);
       }
-      for (uint16_t n = 0; valid && n < covers_.count; ++n)
-        valid = catalogTextValid(covers_.rows[n].title) && catalogKeyValid(covers_.rows[n].key);
-      if (!valid) {
+      for (uint16_t n = 0; catalogValidWindow && n < covers_.count; ++n)
+        catalogValidWindow = catalogTextValid(covers_.rows[n].title) && catalogKeyValid(covers_.rows[n].key);
+      if (!catalogValidWindow) {
         covers_.count = covers_.windowCount = 0;
         state_ = State::Error;
       } else {
