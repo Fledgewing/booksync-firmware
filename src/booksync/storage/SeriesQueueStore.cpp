@@ -44,7 +44,7 @@ struct QueueCodec {
       value = static_cast<T>(decoded);
     }
   }
-  void bit(bool& value) {
+  void queueBoolean(bool& value) {
     uint8_t wire = value;
     number(wire, 1);
     if (wire > 1) ok = false;
@@ -87,8 +87,8 @@ struct QueueCodec {
     key(r.start);
     number(r.requestId, 8);
     number(r.count, 1);
-    bit(r.currentKnown);
-    bit(r.startKnown);
+    queueBoolean(r.currentKnown);
+    queueBoolean(r.startKnown);
   }
   void spec(DownloadSpec& s) {
     blob(s.identity.book.bytes.data(), 16);
@@ -103,7 +103,7 @@ struct QueueCodec {
     text(s.proof);
     text(s.path);
     number(s.bytes, 8);
-    bit(s.sizeKnown);
+    queueBoolean(s.sizeKnown);
   }
   void record(SeriesQueueRecord& r) {
     number(r.id, 8);
@@ -125,7 +125,7 @@ struct QueueCodec {
       number(row.job, 8);
       number(row.state, 1);
       number(row.error, 1);
-      bit(row.cancelWanted);
+      queueBoolean(row.cancelWanted);
     }
   }
   void index(SeriesQueueIndex& r) {
@@ -135,7 +135,7 @@ struct QueueCodec {
       number(slot.id, 8);
       text(slot.series);
       number(slot.cancelMask, 2);
-      bit(slot.terminal);
+      queueBoolean(slot.terminal);
     }
   }
 };
@@ -399,7 +399,7 @@ bool SeriesQueueStore::project(uint8_t slot, uint64_t id, SeriesQueueView& out) 
     // The fixed v1 descriptor stores size immediately before the public row.
     ok = file.seekSet(base + 753) && ok;
     codec.number(row.bytes, 8);
-    codec.bit(row.sizeKnown);
+    codec.queueBoolean(row.sizeKnown);
     codec.key(row.key);
     codec.text(row.title);
     codec.text(row.destination);
@@ -407,7 +407,7 @@ bool SeriesQueueStore::project(uint8_t slot, uint64_t id, SeriesQueueView& out) 
     codec.number(row.job, 8);
     codec.number(row.state, 1);
     codec.number(row.error, 1);
-    codec.bit(row.cancelWanted);
+    codec.queueBoolean(row.cancelWanted);
     if (unsigned(row.state) > unsigned(SeriesRowState::Unsupported) ||
         unsigned(row.error) > unsigned(DownloadError::Digest))
       ok = false;
