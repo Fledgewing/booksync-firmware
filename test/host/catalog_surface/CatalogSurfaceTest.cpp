@@ -689,3 +689,28 @@ TEST(CatalogWidgetEntry, PreviousRestoresExactPartialPageCursor) {
   EXPECT_EQ(ui.catalogOffset(), 0u);
   EXPECT_EQ(library.window.windows[0].request.offset, 0u);
 }
+
+TEST(CatalogWidgetEntry, AccountSourceUsesItsTicketEpochIndependentlyOfNativeIndexAndRetiresOnChange) {
+  for (bool changeOwner : {false, true}) {
+    catalogFixture::SceneLibrary library;
+    library.savedAccount.ticket = {17, 4};
+    CatalogSurface ui(library);
+    CatalogRoute route;
+    route.destination = CatalogDestination::BookList;
+    route.source = WindowSource::Recent;
+    ui.enterCatalog(false, route);
+    library.window.provenance = {7, 4, 17, 0};
+    for (uint16_t i = 0; i < library.window.count; ++i)
+      library.window.rows[i].key.provenance = library.window.provenance;
+    ASSERT_TRUE(ui.pollCatalog());
+    EXPECT_EQ(ui.catalogState(), CatalogSurface::State::Ready);
+    EXPECT_EQ(ui.catalogVisibleRows(), 4);
+    if (changeOwner)
+      ++library.savedAccount.ticket.owner;
+    else
+      ++library.savedAccount.ticket.epoch;
+    ASSERT_TRUE(ui.pollCatalog());
+    EXPECT_FALSE(ui.catalogLive());
+    EXPECT_EQ(ui.activateCatalogRow(0), CommandStatus::Unavailable);
+  }
+}

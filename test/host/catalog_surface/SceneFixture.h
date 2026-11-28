@@ -44,6 +44,8 @@ class SceneLibrary final : public Library {
   mutable unsigned reads = 0;
   Snapshot owner{};
   CatalogSummary summary{};
+  AccountView savedAccount{};
+  AccountView accountView() const override { return savedAccount; }
   QueryRequest wanted{};
   BookKey lastDetails{};
   QueryResult result{};

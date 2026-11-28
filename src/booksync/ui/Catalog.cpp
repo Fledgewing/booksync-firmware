@@ -16,6 +16,7 @@ CatalogSurface::State CatalogSurface::catalogAvailabilityState(Availability valu
   return rows ? State::Ready : State::Empty;
 }
 void CatalogSurface::enterCatalog(bool textOnly, CatalogRoute entry) {
+  sourceAccount_ = library_.accountView().ticket;
   sourceCursorCount_ = 0;
   sourceOpenPending_ = false;
   entry_ = entry;
@@ -54,7 +55,10 @@ void CatalogSurface::retireCatalog() {
   bitmapCount_ = 0;
 }
 bool CatalogSurface::catalogKeyValid(BookKey key) const {
-  return catalogLive() && key.provenance.accountEpoch == accountEpoch_;
+  if (!catalogLive()) return false;
+  if (entry_.destination == CatalogDestination::BookList && key.provenance.owner)
+    return key.provenance.owner == sourceAccount_.owner && key.provenance.accountEpoch == sourceAccount_.epoch;
+  return key.provenance.accountEpoch == accountEpoch_;
 }
 bool CatalogSurface::pushCatalogLocation() {
   if (depth_ == 4) return false;
@@ -327,7 +331,10 @@ void CatalogSurface::loadCatalogCovers() {
 }
 bool CatalogSurface::pollCatalog() {
   if (!catalogLive()) return false;
-  if (library_.snapshot().accountEpoch != accountEpoch_) {
+  const auto currentSourceAccount = library_.accountView().ticket;
+  if (library_.snapshot().accountEpoch != accountEpoch_ ||
+      (entry_.destination == CatalogDestination::BookList &&
+       (currentSourceAccount.owner != sourceAccount_.owner || currentSourceAccount.epoch != sourceAccount_.epoch))) {
     retireCatalog();
     return true;
   }
@@ -472,7 +479,7 @@ bool CatalogSurface::pollCatalog() {
         state_ = queryAccepted_ ? State::Loading : State::Error;
         return true;
       }
-      if ((result_.availability == Availability::Ready && result_.provenance.accountEpoch != accountEpoch_) ||
+      if ((result_.availability == Availability::Ready && !catalogKeyValid({result_.provenance, 0})) ||
           result_.count > catalogPageRows() || result_.bytes > LibraryBytes ||
           result_.bytes < result_.count * sizeof(QueryEntry)) {
         result_.count = 0;
@@ -492,7 +499,7 @@ bool CatalogSurface::pollCatalog() {
           }
       }
     }
-    if (state_ == State::Error && retainedCount_ && retainedProvenance_.accountEpoch == accountEpoch_ &&
+    if (state_ == State::Error && retainedCount_ && catalogKeyValid({retainedProvenance_, 0}) &&
         current_.root == retainedLocation_.root && current_.offset == retainedLocation_.offset &&
         current_.scope == retainedLocation_.scope && current_.author == retainedLocation_.author &&
         current_.series == retainedLocation_.series && current_.withoutSeries == retainedLocation_.withoutSeries &&

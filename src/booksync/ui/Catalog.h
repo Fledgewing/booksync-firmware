@@ -82,6 +82,7 @@ class CatalogSurface {
   uint8_t retainedCount_ = 0;
   bool retainedComplete_ = false;
   CatalogRoute entry_{};
+  DeliveryTicket sourceAccount_{};
   std::array<uint32_t, 16> sourceCursors_{};
   uint8_t sourceCursorCount_ = 0;
   bool sourceOpenPending_ = false;

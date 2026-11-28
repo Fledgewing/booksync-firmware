@@ -33,6 +33,11 @@ class Fixture final : public Library {
     out.accountEpoch = 3;
     return out;
   }
+  AccountView accountView() const override {
+    AccountView value;
+    value.ticket = {17, 3};
+    return value;
+  }
   HomePage homePage() const override { return page; }
   bool requestHomePage(uint8_t) override { return true; }
   Subscription subscribe() const override { return {data.publication, 1, true}; }
