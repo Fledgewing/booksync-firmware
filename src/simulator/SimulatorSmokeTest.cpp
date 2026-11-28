@@ -10,6 +10,7 @@
 #include "../../test/simulator/AccountScenario.h"
 #include "../../test/simulator/CatalogScenario.h"
 #include "../../test/simulator/CredentialsScenario.h"
+#include "../../test/simulator/CatalogJobsScenario.h"
 #include "../../test/simulator/DeviceIndexScenario.h"
 #include "../../test/simulator/LayoutScenario.h"
 #include "../../test/simulator/UpdateScenario.h"
@@ -12175,6 +12176,7 @@ void prepareSimulatorSmokeState() {
   runLifecycleJournalScenario();
   runDeliveryScenario();
   runAccountScenario();
+  runCatalogJobsScenario();
   runCatalogScenario();
   runCredentialsScenario();
   runDeviceIndexScenario();
