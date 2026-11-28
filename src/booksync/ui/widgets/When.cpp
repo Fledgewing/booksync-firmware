@@ -11,12 +11,12 @@ bool When::hourColumn(const StatsCard& statsValue, const StatsHours& hours, Widg
   for (const auto& hour : hours.totals)
     if (hour.known && hour.value > peak) peak = hour.value;
   const int chartHeight = box.height * (statsValue.stale ? 19 : 30) / 108;
-  const int bottom = box.height * (statsValue.stale ? 70 : 87) / 108;
+  const int chartBottom = box.height * (statsValue.stale ? 70 : 87) / 108;
   const auto value = hours.totals[index];
   const int height = value.known ? int(value.value == peak ? chartHeight : value.value / (peak / chartHeight + 1)) : 0;
   const int left = 10 + int(index) * (box.width - 20) / 24;
   out = {left,
-         bottom - (height ? height : 1),
+         chartBottom - (height ? height : 1),
          ((box.width - 20) / 24 > 2 ? (box.width - 20) / 24 - 2 : 1),
          height ? height : 1,
          value.known,
