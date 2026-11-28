@@ -243,6 +243,10 @@ void workLocalLibrary() {
     state.wantedPage = state.edit.kind == LayoutEditKind::Reset && state.editResult.status == LayoutEditStatus::Saved
                            ? 0
                            : state.edit.page;
+    if (state.editResult.status == LayoutEditStatus::Saved) {
+      if (state.edit.kind == LayoutEditKind::CreatePage) state.wantedPage = state.edit.page + 1;
+      if (state.edit.kind == LayoutEditKind::MovePage) state.wantedPage = state.edit.index;
+    }
     state.layoutPending = true;
   }
   if (state.layoutPending) {

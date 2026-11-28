@@ -27,16 +27,19 @@ class Fixture final : public Library {
   bool queued = false;
   LayoutEditStatus forced = LayoutEditStatus::Idle;
   mutable unsigned paints = 0;
-  unsigned writes = 0, batches = 0;
+  unsigned writes = 0, batches = 0, opens = 0;
   Capabilities capabilities() const override { return {}; }
   Snapshot snapshot() const override { return {}; }
   HomePage homePage() const override { return page; }
-  bool requestHomePage(uint8_t) override { return true; }
+  bool requestHomePage(uint8_t index) override { return store.project(index, page); }
   bool requestBatch(WindowBatchRequest) override {
     ++batches;
     return true;
   }
-  CommandStatus submit(Intent) override { return CommandStatus::Unavailable; }
+  CommandStatus submit(Intent intent) override {
+    if (intent == Intent::OpenLastBook) ++opens;
+    return CommandStatus::Unavailable;
+  }
   CommandStatus editLayout(LayoutEdit edit) override {
     if (queued) return CommandStatus::Unavailable;
     request = edit;
@@ -55,7 +58,12 @@ class Fixture final : public Library {
     ++writes;
     reply.status = forced == LayoutEditStatus::Idle ? store.edit(worker, request) : forced;
     forced = LayoutEditStatus::Idle;
-    if (!store.project(0, page)) std::_Exit(11);
+    const auto index = reply.status != LayoutEditStatus::Saved      ? page.page
+                       : request.kind == LayoutEditKind::CreatePage ? request.page + 1
+                       : request.kind == LayoutEditKind::MovePage   ? request.index
+                       : request.kind == LayoutEditKind::Reset      ? 0
+                                                                    : request.page;
+    if (!store.project(index, page)) std::_Exit(11);
     reply.revision = page.revision;
   }
 };
@@ -195,7 +203,148 @@ inline bool settingsTick(const char* directory) {
   }
   return true;
 }
+inline bool pagesTick() {
+  const char* directory = std::getenv("BOOKSYNC_PAGES_CAPTURES");
+  if (!directory) return false;
+  mappedInputManager.simulatorClearInputFrame();
+  static Fixture fixture;
+  static unsigned frame = 0;
+  const auto f = frame++;
+  if (f == 0) {
+    fixture.store.load();
+    if (!fixture.store.project(0, fixture.page)) std::_Exit(40);
+    showHomeScene(renderer, mappedInputManager, fixture);
+  }
+  {
+    RenderLock lock;
+    fixture.work();
+  }
+  auto key = [](MappedInputManager::Button b) { mappedInputManager.simulatorInjectRelease(b); };
+  auto down = [&] { key(mappedInputManager.menuButton(MappedInputManager::Button::Down)); };
+  const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+#if CROSSINK_APP_CAP_TOUCH
+  const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+  auto tap = [&](int x, int y) {
+    mappedInputManager.simulatorInjectTouchDown(x, y);
+    mappedInputManager.simulatorInjectTouchRelease(x, y);
+  };
+  auto footer = [&](int i) { tap(safe.x + 12 + i * ((safe.width - 16) / 6), safe.y + safe.height - 28); };
+#endif
+  if (fixture.page.textOnly) {
+    if (f == 10) key(mappedInputManager.menuButton(MappedInputManager::Button::Right));
+    if (f == 20) capture(directory, "x3-pages-disabled");
+    if (f == 24) {
+      LayoutEdit edit;
+      edit.revision = 1;
+      edit.kind = LayoutEditKind::CreatePage;
+      if (fixture.store.edit(fixture.worker, edit) != LayoutEditStatus::Invalid) std::_Exit(41);
+    }
+  } else {
+#if CROSSINK_APP_CAP_TOUCH
+    if (mappedInputManager.hasTouch()) {
+      if (f == 10) tap(header.x + header.width - 40, header.y + 10);
+      if (f == 22) footer(3);
+      if (f == 24) capture(directory, "naming-default-home");
+      if (f == 26) key(MappedInputManager::Button::Back);
+      if (f == 40) footer(2);
+      if (f == 50 || f == 70) footer(3);
+      // Cancel the first name entry. The second saves a key from the SDK keyboard.
+      if (f == 56) key(MappedInputManager::Button::Back);
+      if (f == 76) tap(safe.x + 24, safe.y + safe.height - 250 + 24);
+      if (f == 86) {
+        {
+          RenderLock lock;
+          renderer.setOrientation(GfxRenderer::Orientation::LandscapeClockwise);
+        }
+        capture(directory, "naming-landscape");
+      }
+      if (f == 88) {
+        {
+          RenderLock lock;
+          renderer.setOrientation(GfxRenderer::Orientation::Portrait);
+        }
+        if (activityManager.requestUpdateAndWait() != RequestUpdateResult::Rendered) std::_Exit(47);
+      }
+      if (f == 104) tap(safe.x + safe.width - 32, safe.y + safe.height - 24);
+      if (f == 126) footer(4);
+    } else
+#endif
+    {
+      if (f == 10) key(mappedInputManager.menuButton(MappedInputManager::Button::Right));
+      if ((f >= 24 && f <= 38 && f % 2 == 0) || (f >= 44 && f <= 49) ||
+          ((f >= 60 && f <= 68 && f % 2 == 0) || f == 69) || (f >= 78 && f <= 100 && f % 2 == 0) ||
+          (f >= 110 && f <= 122 && f % 2 == 0))
+        down();
+      if (f == 40 || f == 50 || f == 70 || f == 76 || f == 104 || f == 126) key(MappedInputManager::Button::Confirm);
+      if (f == 56) key(MappedInputManager::Button::Back);
+    }
+    if (f == 20) capture(directory, "page-controls");
+    if (f == 42) {
+      if (fixture.page.page != 1 || fixture.page.pages != 2 || fixture.page.count || fixture.writes != 1)
+        std::_Exit(42);
+      capture(directory, "created");
+    }
+    if (f == 54) capture(directory, "naming-cancel");
+    if (f == 58 && fixture.writes != 1) std::_Exit(43);
+    if (f == 74) capture(directory, "naming");
+    if (f == 108) {
+      if (fixture.page.revision != 3 || fixture.writes != 2 ||
+          std::strcmp(fixture.page.title.data(), mappedInputManager.hasTouch() ? "Page 2q" : "Home"))
+        std::_Exit(44);
+      capture(directory, "named");
+    }
+    if (f == 130) {
+      if (fixture.page.page != 0 || fixture.page.count || fixture.page.revision != 4 || fixture.writes != 3)
+        std::_Exit(45);
+      capture(directory, "reordered");
+    }
+    if (f == 132) key(MappedInputManager::Button::Back);
+    if (f == 134) key(MappedInputManager::Button::Confirm);
+    if (f == 138 || f == 144) {
+#if CROSSINK_APP_CAP_TOUCH
+      if (mappedInputManager.hasTouch())
+        tap(safe.x + (f == 138 ? safe.width - 32 : 32), safe.y + safe.height - 28);
+      else
+#endif
+        key(mappedInputManager.menuButton(f == 138 ? MappedInputManager::Button::Down
+                                                   : MappedInputManager::Button::Up));
+    }
+    if (f == 142) {
+      if (fixture.page.page != 1 || fixture.page.count != 3 || fixture.opens) std::_Exit(48);
+      capture(directory, "empty-page-next");
+    }
+    if (f == 148) {
+      if (fixture.page.page != 0 || fixture.page.count || fixture.opens) std::_Exit(49);
+      capture(directory, "empty-page-return");
+    }
+    if (f == 150) {
+#if CROSSINK_APP_CAP_TOUCH
+      if (mappedInputManager.hasTouch())
+        tap(header.x + header.width - 40, header.y + 10);
+      else
+#endif
+        key(mappedInputManager.menuButton(MappedInputManager::Button::Right));
+    }
+    if (f == 154) ++fixture.page.revision;
+    if (f == 156) capture(directory, "stale");
+    if (f == 160 || f == 162) key(MappedInputManager::Button::Back);
+  }
+  if (f == 168) {
+    fixture.store.load();
+    if (!fixture.store.project(0, fixture.page) || fixture.page.revision != (fixture.page.textOnly ? 1u : 4u))
+      std::_Exit(46);
+    LOG_INF("BSE",
+            "BookSync F35c PASS: create/name/reorder/empty-page/cancel/stale/restart; workspace=%u; "
+            "payload-allocations=0; X3 "
+            "pages disabled",
+            unsigned(sizeof(LayoutEditor)));
+    std::fflush(nullptr);
+    std::_Exit(0);
+  }
+  return true;
+}
 inline bool tick() {
+  if (pagesTick()) return true;
   if (geometryTick()) return true;
   const char* directory = std::getenv("BOOKSYNC_EDITOR_CAPTURES");
   if (!directory) return false;

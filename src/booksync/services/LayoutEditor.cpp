@@ -18,8 +18,13 @@ bool LayoutEditor::patch(uint32_t begin, uint32_t end, const char* text) {
   return true;
 }
 bool LayoutEditor::patchSource(uint32_t at, uint32_t begin, uint32_t end) {
-  if (count_ == 68 || end < begin || end - begin > UINT16_MAX) return false;
-  patches_[count_++] = {at, at, 0, static_cast<uint16_t>(end - begin), begin};
+  if (end < begin || end > input_.bytes) return false;
+  do {
+    const auto length = end - begin > UINT16_MAX ? UINT16_MAX : end - begin;
+    if (count_ == 68) return false;
+    patches_[count_++] = {at, at, 0, static_cast<uint16_t>(length), begin};
+    begin += length;
+  } while (begin < end);
   return true;
 }
 bool LayoutEditor::read(size_t offset, void* output, size_t bytes) {
@@ -170,6 +175,83 @@ bool LayoutEditor::geometry(Layout::Span root, Layout::Span pg, const char* devi
   if (opened && !patch(overrides.end - 1, overrides.end - 1, "}")) return false;
   return installed == edit.count && p.ok_;
 }
+bool LayoutEditor::renamePage(Layout::Span pg, const char* name, bool manual) {
+  auto& p = parser_;
+  size_t length = 0;
+  while (length < 81 && name[length]) ++length;
+  if (!length || length == 81) return false;
+  size_t first = 0;
+  while (first < length && name[first] == ' ') ++first;
+  while (length > first && name[length - 1] == ' ') --length;
+  if (first == length) return false;
+  size_t n = 0;
+  scratch_[n++] = '"';
+  for (size_t i = first; i < length; ++i) {
+    const auto c = static_cast<unsigned char>(name[i]);
+    if (c < 32) return false;
+    if (c == '"' || c == '\\') scratch_[n++] = '\\';
+    scratch_[n++] = c;
+  }
+  scratch_[n++] = '"';
+  scratch_[n] = 0;
+  const auto field = p.field(pg, "name"), named = p.field(pg, "named");
+  if (field.type) {
+    if (!patch(field.begin, field.end, scratch_)) return false;
+  } else if (!patch(pg.end - 1, pg.end - 1, ",\"name\":") || !patch(pg.end - 1, pg.end - 1, scratch_))
+    return false;
+  return !manual ||
+         (named.type ? patch(named.begin, named.end, "true") : patch(pg.end - 1, pg.end - 1, ",\"named\":true"));
+}
+bool LayoutEditor::pages(Layout::Span root, const char* device, const LayoutEdit& edit) {
+  if (std::strcmp(device, "x4")) return false;
+  auto& p = parser_;
+  const auto list = p.field(root, "pages");
+  Layout::Span spans[16]{};  // 192 bytes, bounded by the schema's page limit.
+  uint8_t count = 0;
+  uint32_t pos = list.begin + 1;
+  p.space(pos);
+  while (p.at(pos) != ']') {
+    p.nodes_ = 0;
+    if (count == 16 || !p.value(pos, spans[count++])) return false;
+    p.space(pos);
+    if (p.at(pos) != ',') break;
+    ++pos;
+    p.space(pos);
+  }
+  if (edit.page >= count) return false;
+  if (edit.kind == LayoutEditKind::CreatePage) {
+    if (count == 16) return false;
+    // Check all page IDs, including IDs unknown to this firmware.
+    bool unique = false;
+    for (unsigned attempt = 0; attempt < 256 && !unique; ++attempt) {
+      std::snprintf(missing_, sizeof(missing_), "page-%u-%u", unsigned(edit.revision + 1), attempt);
+      unique = true;
+      for (unsigned i = 0; i < count; ++i) {
+        if (!p.text(p.field(spans[i], "id"), p.text_)) return false;
+        if (!std::strcmp(p.text_, missing_)) unique = false;
+      }
+    }
+    if (!unique || !p.text(p.field(spans[edit.page], "tab"), p.text_)) return false;
+    std::snprintf(scratch_, sizeof(scratch_),
+                  ",{\"id\":\"%s\",\"tab\":\"%s\",\"name\":\"Page %u\",\"named\":false,\"placements\":[]}", missing_,
+                  p.text_, unsigned(count + 1));
+    return patch(spans[edit.page].end, spans[edit.page].end, scratch_);
+  }
+  if (edit.kind == LayoutEditKind::NamePage) return renamePage(spans[edit.page], edit.name.data(), true);
+  if (edit.index >= count || edit.index == edit.page) return false;
+  // Reorder complete source spans: opaque page/widget settings stay byte-identical.
+  const auto moved = spans[edit.page];
+  if (edit.index < edit.page)
+    for (unsigned i = edit.page; i > edit.index; --i) spans[i] = spans[i - 1];
+  else
+    for (unsigned i = edit.page; i < edit.index; ++i) spans[i] = spans[i + 1];
+  spans[edit.index] = moved;
+  for (unsigned i = 0; i < count; ++i) {
+    if (i && !patch(list.begin + 1, list.begin + 1, ",")) return false;
+    if (!patchSource(list.begin + 1, spans[i].begin, spans[i].end)) return false;
+  }
+  return patch(list.begin + 1, list.end - 1, "");
+}
 LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, LayoutEdit edit) {
   bytes_ = used_ = count_ = 0;
   auto& p = parser_;
@@ -182,7 +264,8 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
   auto& page = page_;
   if (!p.project(input, device, edit.page, page)) return LayoutEditStatus::Invalid;
   if (edit.kind != LayoutEditKind::Add && edit.kind != LayoutEditKind::Remove && edit.kind != LayoutEditKind::Reset &&
-      edit.kind != LayoutEditKind::Geometry)
+      edit.kind != LayoutEditKind::Geometry && edit.kind != LayoutEditKind::CreatePage &&
+      edit.kind != LayoutEditKind::NamePage && edit.kind != LayoutEditKind::MovePage)
     return LayoutEditStatus::Invalid;
   if (edit.kind == LayoutEditKind::Add) {
     for (const char* c : {"android-tablet", "x4", "x3"}) {
@@ -214,7 +297,13 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
       }
     }
     const auto tiles = p.field(pg, "placements");
-    if (edit.kind == LayoutEditKind::Geometry) {
+    if (edit.kind == LayoutEditKind::CreatePage || edit.kind == LayoutEditKind::NamePage ||
+        edit.kind == LayoutEditKind::MovePage) {
+      if (!this->pages(root, device, edit)) {
+        LOG_ERR("BSL", "Page edit rejected; previous revision retained");
+        return LayoutEditStatus::Invalid;
+      }
+    } else if (edit.kind == LayoutEditKind::Geometry) {
       if (!geometry(root, pg, device, edit)) return LayoutEditStatus::Invalid;
     } else if (edit.kind == LayoutEditKind::Remove) {
       if (edit.index >= page.count) return LayoutEditStatus::Invalid;
@@ -302,6 +391,17 @@ LayoutEditStatus LayoutEditor::prepare(LayoutInput input, const char* device, La
           "%s{\"instance\":\"%s\",\"widget\":\"%s\",\"version\":1,\"x\":%u,\"y\":%u,\"w\":%u,\"h\":%u,\"settings\":{}}",
           p.at(pos) == ']' ? "" : ",", id, widget, xs[0], ys[0], edit.widget == WidgetKind::Continue ? 4 : 2, h);
       if (!patch(tiles.end - 1, tiles.end - 1, text)) return LayoutEditStatus::Invalid;
+      // UI supplies the localized first-widget title. Only untouched Page N
+      // names are automatic; manual and already-derived names remain stable.
+      if (edit.name[0] && p.at(pos) == ']' && p.field(pg, "named").type == 'f' &&
+          p.text(p.field(pg, "name"), p.text_) && !std::strncmp(p.text_, "Page ", 5)) {
+        unsigned digit = 5;
+        while (p.text_[digit] >= '0' && p.text_[digit] <= '9') ++digit;
+        if (digit > 5 && digit == p.textLength_ && !renamePage(pg, edit.name.data(), false)) {
+          LOG_ERR("BSL", "Automatic page name rejected; previous revision retained");
+          return LayoutEditStatus::Invalid;
+        }
+      }
       // Missing class groups are inserted together, preserving unknown groups.
       auto* missing = missing_;
       missing[0] = 0;
