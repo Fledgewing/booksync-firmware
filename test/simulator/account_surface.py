@@ -8,6 +8,7 @@ import time
 import subprocess
 import sys
 import tempfile
+from presentation_kit import check_geometry
 root = Path(__file__).resolve().parents[2]
 profile = sys.argv[1]
 if profile not in ('x4-pro-simulator', 'x4-classic-simulator', 'simulator-X3'):
@@ -19,6 +20,9 @@ with tempfile.TemporaryDirectory(prefix='booksync-account-surface-') as temporar
     sd.mkdir()
     env = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy',
                BOOKSYNC_ACCOUNT_SURFACE=str(out), CROSSPOINT_SIM_SD=str(sd))
+    geometry = out / 'geometry.txt'
+    geometry.write_text('')
+    env['BOOKSYNC_KIT_GEOMETRY'] = str(geometry)
     started = time.monotonic()
     result = subprocess.run([str(root / '.pio/build' / profile / 'program')],
                             cwd=temporary, env=env, capture_output=True, text=True, timeout=90)
@@ -35,4 +39,5 @@ with tempfile.TemporaryDirectory(prefix='booksync-account-surface-') as temporar
         'account_view_bound_bytes': 64, 'controller_bound_bytes': 96,
         'note': 'Native RSS includes simulator/SDL; ESP32 heap and stack are unavailable. No credential or framebuffer allocation.'
     }, indent=2) + '\n')
+check_geometry(geometry)
 print(f'BookSync F37a {profile}: 5 captures, selection/Back/epoch/closed-form/paint PASS')

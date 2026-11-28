@@ -74,10 +74,8 @@ inline bool tick() {
   if (f == 30) {
 #if CROSSINK_APP_CAP_TOUCH
     if (mappedInputManager.hasTouch()) {
-      const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-      const int height = renderer.getLineHeight(UI_10_FONT_ID) + 22;
-      const int x = safe.x + 50;
-      const int y = back ? safe.y + 15 : safe.y + safe.height - 42 - (later ? 1 : 2) * (height + 8) + 10;
+      int x = 0, y = 0;
+      if (!noticeControlCenter(back ? 2 : later ? 1 : 0, x, y)) std::_Exit(35);
       mappedInputManager.simulatorInjectTouchDown(x, y);
       mappedInputManager.simulatorInjectTouchRelease(x, y);
     } else

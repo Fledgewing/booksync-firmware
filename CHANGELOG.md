@@ -5,6 +5,7 @@
 - BookSync Home retains an independently saved account best-streak record when native history is unavailable.
 
 - BookSync Home keeps every installed widget reachable in Add through Classic button focus and Pro touch scrolling.
+- BookSync account, sign-in, upgrade and service-choice screens now share branded headers, separated rows, regular body text and correctly placed actions; manual sign-in actions are stacked, and waiting no longer shows a QR or link.
 
 - BookSync captures reader progress before a bounded sleep drain even with plugins disabled, retires stale sleep presentation ownership on return, and preserves native sleep screens while new artwork awaits approval.
 - BookSync stats cards no longer reduce sibling shelves to too few books when a Home page contains many summaries; the combined C3 row budget stays bounded.

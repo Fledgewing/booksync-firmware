@@ -13,6 +13,7 @@ void showHome(GfxRenderer& renderer, MappedInputManager& input, HalDisplay::Refr
 #ifdef SIMULATOR
 // Scenario-only counter; caller holds RenderLock.
 uint32_t homeScenePaints();
+bool noticeControlCenter(uint8_t index, int& x, int& y);
 void showHomeScene(GfxRenderer& renderer, MappedInputManager& input, Library& library, bool edit = false);
 #endif
 }  // namespace booksync

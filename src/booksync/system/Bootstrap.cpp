@@ -40,12 +40,14 @@
 #include "booksync/ui/widgets/Week.h"
 #include "booksync/ui/widgets/When.h"
 #include "booksync/ui/widgets/Year.h"
+#include "components/BookSyncPresentation.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
 namespace booksync {
 namespace {
 #ifdef SIMULATOR
+Rect noticeTargets[3];
 uint32_t scenePaints = 0;  // Read only while holding RenderLock in the scenario harness.
 #endif
 legacy::Activation upgrade;
@@ -916,39 +918,55 @@ class ShellActivity final : public Activity {
     }
     return y;
   }
-  Rect noticeAction(uint8_t row) const {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const int height = renderer.getLineHeight(UI_10_FONT_ID) + 22;
-    return Rect{safe.x + 24, safe.y + safe.height - 42 - (2 - row) * (height + 8), safe.width - 48, height};
+  BookSyncPresentation::Frame noticeFrame() const {
+    return BookSyncPresentation::frame(renderer, mappedInput.hasTouch(), gpio.deviceIsX3());
   }
-  void paintNotice() const {
-    const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-    const int x = safe.x + 24, width = safe.width - 48;
-    int y = safe.y + 12;
-    paintFittedText(UI_10_FONT_ID, x, y, tr(STR_BACK), 68);
-    y = paragraph(tr(STR_BOOKSYNC_NAME), x + 88, y, width - 88, 1, true);
-    y = paragraph(tr(STR_UPGRADE_FROM), x + 88, y, width - 88, 1) + 18;
-    y = paragraph(tr(STR_UPGRADE_TITLE), x, y, width, 2, true, BITTER_14_FONT_ID) + 18;
-    y = paragraph(tr(STR_UPGRADE_CARRIED), x, y, width, 1, true) + 4;
-    y = paragraph(tr(STR_UPGRADE_RETAINED), x, y, width, 5) + 16;
-    y = paragraph(tr(STR_UPGRADE_FRESH), x, y, width, 1, true) + 4;
-    y = paragraph(tr(STR_UPGRADE_DEFAULTS), x, y, width, 2) + 16;
-    y = paragraph(tr(STR_UPGRADE_RESTORE), x, y, width, 1, true) + 4;
+  int noticeContent(bool paint) const {
+    namespace kit = BookSyncPresentation;
+    const auto f = noticeFrame();
+    const auto c = f.content();
+    int y = c.y + f.unit(12);
+    auto flow = [&](const char* label, kit::Type type) {
+      const int height =
+          type == kit::Type::Section ? f.unit(16) : kit::paragraphHeight(renderer, f, c.width, label, type);
+      if (paint) {
+        if (type == kit::Type::Section)
+          kit::section(renderer, f, Rect{c.x, y, c.width, height}, label);
+        else
+          kit::paragraph(renderer, f, Rect{c.x, y, c.width, height}, label, type);
+      }
+      y += height;
+    };
+    flow(tr(STR_UPGRADE_TITLE), kit::Type::Title);
+    y += f.unit(16);
+    flow(tr(STR_UPGRADE_CARRIED), kit::Type::Section);
+    flow(tr(STR_UPGRADE_RETAINED), kit::Type::Body);
+    y += f.unit(22);
+    flow(tr(STR_UPGRADE_FRESH), kit::Type::Section);
+    flow(tr(STR_UPGRADE_DEFAULTS), kit::Type::Body);
+    y += f.unit(22);
+    flow(tr(STR_UPGRADE_RESTORE), kit::Type::Section);
     char text[192]{};
     std::snprintf(text, sizeof(text), tr(STR_UPGRADE_RESTORE_FORMAT), notice.serviceName());
-    paragraph(text, x, y, width, 4);
-    for (uint8_t i = 0; i < 2; ++i) {
-      const auto r = noticeAction(i);
-      const bool selected = notice.focus() == i;
-      if (selected)
-        renderer.fillRect(r.x, r.y, r.width, r.height, true);
-      else
-        renderer.drawRect(r.x, r.y, r.width, r.height, 1, true);
-      if (!i) std::snprintf(text, sizeof(text), tr(STR_UPGRADE_SYNC_FORMAT), notice.serviceName());
-      paintFittedText(UI_10_FONT_ID, r.x + 12, r.y + 8, i ? tr(STR_LATER) : text, r.width - 24, !selected);
-    }
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_HOME_PREV), tr(STR_HOME_NEXT));
-    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+    flow(text, kit::Type::Body);
+    return y + f.unit(22);
+  }
+  Rect noticeAction(uint8_t row) const { return noticeFrame().actions(noticeContent(false), 2).buttons[row]; }
+  void paintNotice() const {
+    namespace kit = BookSyncPresentation;
+    const auto f = noticeFrame();
+    kit::header(renderer, f, tr(STR_UPGRADE_FROM));
+    const int y = noticeContent(true);
+#ifdef SIMULATOR
+    noticeTargets[0] = f.actions(y, 2).buttons[0];
+    noticeTargets[1] = f.actions(y, 2).buttons[1];
+    noticeTargets[2] = f.back();
+#endif
+    char text[192]{};
+    std::snprintf(text, sizeof(text), tr(STR_UPGRADE_SYNC_FORMAT), notice.serviceName());
+    const char* labels[] = {text, tr(STR_LATER)};
+    kit::drawActions(renderer, f, f.actions(y, 2), labels, 0, notice.focus());
+    kit::footer(renderer, f, tr(STR_UPGRADE_TITLE));
   }
   bool noticeInput() {
     if (!notice.visible()) return false;
@@ -966,9 +984,8 @@ class ShellActivity final : public Activity {
         const auto r = noticeAction(i);
         if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) notice.choose(i);
       }
-      const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-      if (y >= safe.y && y < safe.y + 2 * renderer.getLineHeight(UI_10_FONT_ID) && x >= safe.x && x < safe.x + 100)
-        notice.back();
+      const auto back = noticeFrame().back();
+      if (x >= back.x && x < back.x + back.width && y >= back.y && y < back.y + back.height) notice.back();
     } else
       return true;
     requestUpdate();
@@ -1864,6 +1881,14 @@ void showHome(GfxRenderer& renderer, MappedInputManager& input, HalDisplay::Refr
   activityManager.replaceActivity(std::move(shell));
 }
 #ifdef SIMULATOR
+bool noticeControlCenter(uint8_t index, int& x, int& y) {
+  RenderLock lock;
+  if (index >= 3 || noticeTargets[index].width <= 0) return false;
+  const auto r = noticeTargets[index];
+  x = r.x + r.width / 2;
+  y = r.y + r.height / 2;
+  return true;
+}
 uint32_t homeScenePaints() { return scenePaints; }
 void showHomeScene(GfxRenderer& renderer, MappedInputManager& input, Library& library, bool edit) {
   auto shell = makeUniqueNoThrow<ShellActivity>(renderer, input, HalDisplay::FULL_REFRESH, library, edit);
