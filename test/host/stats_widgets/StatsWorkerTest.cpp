@@ -176,3 +176,21 @@ TEST_F(StatsWorkerTest, RetiredVisibleMaskStopsCursorAndMinuteCacheWork) {
   EXPECT_EQ(card.events.size(), events);
   EXPECT_EQ(saved.statsReads, reads);
 }
+
+TEST_F(StatsWorkerTest, NativeHistoryFailureKeepsAnIndependentAccountBestRecord) {
+  card.present = false;
+  saved.stats.finished = {};
+  saved.stats.goalAvailable = false;
+  saved.stats.streak = {5, true};
+  saved.stats.bestStreak = {12, true};
+  for (bool stale : {false, true}) {
+    saved.stats.snapshotAt = stale ? Noon - 2 * 86400 : Noon;
+    ASSERT_TRUE(worker.begin(statsWidgetBit(StatsWidget::Records), provenance, at(Noon), &saved));
+    EXPECT_EQ(value(StatsWidget::Records).state, StatsCardState::Ready);
+    const auto& records = worker.published().records;
+    for (unsigned column = 0; column < 4; ++column) EXPECT_FALSE(records.values[column].known);
+    EXPECT_TRUE(records.values[4].known);
+    EXPECT_EQ(records.values[4].value, 12);
+    EXPECT_EQ(value(StatsWidget::Records).stale, stale);
+  }
+}

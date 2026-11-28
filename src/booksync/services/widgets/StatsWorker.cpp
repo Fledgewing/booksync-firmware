@@ -125,7 +125,9 @@ void StatsWorker::publish() {
     projectWhen(snapshot_, options_, published_.cards[unsigned(StatsWidget::When)], published_.hours);
   }
   if (published_.requested & statsWidgetBit(StatsWidget::Records)) {
-    freshness(snapshot_.recordsCoverage.saved ? snapshot_.recordsCoverage : snapshot_.finishedCoverage);
+    freshness(snapshot_.recordsCoverage.saved ? snapshot_.recordsCoverage
+              : snapshot_.finished.known      ? snapshot_.finishedCoverage
+                                              : snapshot_.streakCoverage);
     projectRecords(snapshot_, options_, published_.cards[unsigned(StatsWidget::Records)], published_.records);
   }
   if (published_.requested & statsWidgetBit(StatsWidget::Goal)) {

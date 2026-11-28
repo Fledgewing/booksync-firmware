@@ -2,6 +2,8 @@
 
 ### Fixed
 
+- BookSync Home retains an independently saved account best-streak record when native history is unavailable.
+
 - BookSync Home keeps every installed widget reachable in Add through Classic button focus and Pro touch scrolling.
 
 - BookSync captures reader progress before a bounded sleep drain even with plugins disabled, retires stale sleep presentation ownership on return, and preserves native sleep screens while new artwork awaits approval.

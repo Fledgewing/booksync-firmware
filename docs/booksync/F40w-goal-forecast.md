@@ -46,7 +46,7 @@ clears displayed statistics. Local date, timezone or backward clock changes
 rebuild the bounded F39 cursor. A minute refresh reprojects saved adapter values
 and ages without journal I/O. Leaving a stats page retires its cursor and timer.
 A failed native journal is discarded independently;
-healthy account goals and saved qualified forecasts remain available.
+healthy account goals, independent account records and saved qualified forecasts remain available.
 
 The ten-card batch is 3,528 bytes and the host is 9,624 bytes on the host compiler.
 The host limit advances to 10 KiB for the two additional fixed cards; the single
