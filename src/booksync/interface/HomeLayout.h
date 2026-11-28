@@ -12,7 +12,8 @@ struct WidgetPlacement {
 // Worker-projected installed widgets only. Unknown instances remain in storage.
 struct HomePage {
   std::array<WidgetPlacement, HomeWidgets> widgets{};
-  std::array<char, 81> title{};  // User-provided page name; empty uses the translated Home label.
+  std::array<uint16_t, 12> reserved{};  // Unknown visible instances still own their cells.
+  std::array<char, 81> title{};         // User-provided page name; empty uses the translated Home label.
   uint32_t revision = 0;
   bool textOnly = false;
   uint8_t page = 0, pages = 1, cols = 2, rows = 7, count = 0;

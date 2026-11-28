@@ -37,6 +37,7 @@ class Library {
   virtual HomePage homePage() const { return {}; }
   virtual bool requestHomePage(uint8_t) { return false; }
   virtual CommandStatus editLayout(LayoutEdit) { return CommandStatus::Unavailable; }
+  virtual LayoutPreview previewLayout(HomePage, uint8_t, LayoutStep) const { return {}; }
   virtual LayoutEditResult layoutEditResult() const { return {}; }
   virtual Subscription subscribe() const { return {}; }
   virtual bool changed(Subscription) const { return false; }

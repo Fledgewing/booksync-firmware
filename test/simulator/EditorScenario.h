@@ -8,6 +8,7 @@
 #include <filesystem>
 
 #include "activities/Activity.h"
+#include "booksync/services/LayoutGeometry.h"
 #include "booksync/storage/LayoutStore.h"
 #include "booksync/system/Bootstrap.h"
 #include "components/UITheme.h"
@@ -42,6 +43,10 @@ class Fixture final : public Library {
     reply.status = LayoutEditStatus::Pending;
     return CommandStatus::Accepted;
   }
+  LayoutPreview previewLayout(HomePage draft, uint8_t index, LayoutStep movement) const override {
+    if (draft.revision != page.revision) return {draft, LayoutEditStatus::Stale};
+    return previewGeometry(draft, index, movement);
+  }
   LayoutEditResult layoutEditResult() const override { return reply; }
   void work() {
     if (!queued) return;
@@ -72,7 +77,101 @@ inline void capture(const char* directory, const char* name) {
     for (int x = 0; x < renderer.getScreenWidth(); ++x) std::fputc(renderer.isPixelBlack(x, y) ? 0 : 255, file);
   std::fclose(file);
 }
+inline bool geometryTick() {
+  const char* directory = std::getenv("BOOKSYNC_GEOMETRY_CAPTURES");
+  if (!directory) return false;
+  mappedInputManager.simulatorClearInputFrame();
+  static Fixture fixture;
+  static unsigned frame = 0;
+  const auto f = frame++;
+  if (f == 0) {
+    fixture.store.load();
+    if (!fixture.store.project(0, fixture.page)) std::_Exit(30);
+    showHomeScene(renderer, mappedInputManager, fixture);
+  }
+  {
+    RenderLock lock;
+    fixture.work();
+  }
+  auto key = [](MappedInputManager::Button button) { mappedInputManager.simulatorInjectRelease(button); };
+  auto down = [&] { key(mappedInputManager.menuButton(MappedInputManager::Button::Down)); };
+  const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
+#if CROSSINK_APP_CAP_TOUCH
+  auto tap = [&](int x, int y) {
+    mappedInputManager.simulatorInjectTouchDown(x, y);
+    mappedInputManager.simulatorInjectTouchRelease(x, y);
+  };
+  auto moveButton = [&](unsigned i) { tap(safe.x + 12 + i * ((safe.width - 16) / 7), safe.y + safe.height - 28); };
+#endif
+  if (fixture.page.textOnly) {
+    if (f == 10) key(mappedInputManager.menuButton(MappedInputManager::Button::Right));
+    if (f == 20) capture(directory, "editor-disabled");
+    if (f == 24) {
+      auto draft = fixture.page;
+      draft.textOnly = false;  // Service parity only; no X3 presentation.
+      auto preview = previewGeometry(draft, 0, LayoutStep::Down);
+      if (preview.status != LayoutEditStatus::Saved) std::_Exit(31);
+      LayoutEdit edit;
+      edit.kind = LayoutEditKind::Geometry;
+      edit.revision = 1;
+      edit.count = draft.count;
+      for (uint8_t i = 0; i < edit.count; ++i) {
+        const auto& t = preview.page.widgets[i];
+        edit.geometry[i] = {t.x, t.y, t.w, t.h};
+      }
+      if (fixture.store.edit(fixture.worker, edit) != LayoutEditStatus::Invalid) std::_Exit(32);
+    }
+  } else {
+#if CROSSINK_APP_CAP_TOUCH
+    if (mappedInputManager.hasTouch()) {
+      if (f == 10) tap(header.x + header.width - 40, header.y + 10);
+      if (f == 24 || f == 48 || f == 72) {
+        const auto& tile = fixture.page.widgets[0];
+        const int top = header.y + header.height + 16;
+        const int height = safe.y + safe.height - top - 56;
+        tap(safe.x + 30, top + height * tile.y / fixture.page.rows + 24);
+      }
+      if (f == 30 || f == 52 || f == 77) moveButton(2);
+      if (f == 36) moveButton(4);
+      if (f == 56)
+        tap(header.x + 18 + (header.width - 24) / 2, header.y + renderer.getLineHeight(BITTER_14_FONT_ID) + 18);
+    } else
+#endif
+    {
+      if (f == 10 || f == 36) key(mappedInputManager.menuButton(MappedInputManager::Button::Right));
+      if (f == 24 || f == 48 || f == 56 || f == 72) key(MappedInputManager::Button::Confirm);
+      if (f == 30 || f == 52 || f == 77) down();
+    }
+    if (f == 20) capture(directory, "edit-grid");
+    if (f == 28) capture(directory, "carrying");
+    if (f == 34) capture(directory, "band-moved");
+    if (f == 38) capture(directory, "resized");
+    if (f == 40) key(MappedInputManager::Button::Back);
+    if (f == 44 && (fixture.writes || fixture.page.revision != 1 || fixture.page.widgets[0].y)) std::_Exit(33);
+    if (f == 64 && (fixture.writes != 1 || fixture.page.revision != 2 || fixture.page.widgets[0].y != 2 ||
+                    fixture.page.widgets[1].y != 0))
+      std::_Exit(34);
+    if (f == 68) capture(directory, "saved");
+    if (f == 76) ++fixture.page.revision;
+    if (f == 80) capture(directory, "stale");
+    if (f == 84 || f == 88) key(MappedInputManager::Button::Back);
+  }
+  if (f == 96) {
+    fixture.store.load();
+    if (!fixture.store.project(0, fixture.page) || fixture.page.revision != (fixture.page.textOnly ? 1u : 2u))
+      std::_Exit(35);
+    LOG_INF("BSE",
+            "BookSync F35b PASS: band/resize/cancel/drop/focus/stale/restart; workspace=%u; payload-allocations=0; X3 "
+            "editor disabled",
+            unsigned(sizeof(LayoutEditor)));
+    std::fflush(nullptr);
+    std::_Exit(0);
+  }
+  return true;
+}
 inline bool tick() {
+  if (geometryTick()) return true;
   const char* directory = std::getenv("BOOKSYNC_EDITOR_CAPTURES");
   if (!directory) return false;
   mappedInputManager.simulatorClearInputFrame();
@@ -134,7 +233,8 @@ inline bool tick() {
       if (f == 24 || f == 26 || f == 28 || f == 34 || f == 36 || f == 76 || f == 78 || f == 80 || f == 82 || f == 96 ||
           f == 98 || f == 100 || f == 102 || f == 106)
         down();
-      if (f == 30 || f == 38 || f == 54 || f == 60 || f == 84 || f == 92 || f == 104 || f == 108)
+      if (f == 54) key(mappedInputManager.menuButton(MappedInputManager::Button::Right));
+      if (f == 30 || f == 38 || f == 60 || f == 84 || f == 92 || f == 104 || f == 108)
         key(MappedInputManager::Button::Confirm);
     }
     if (f == 14) {

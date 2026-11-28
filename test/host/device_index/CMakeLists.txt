@@ -10,6 +10,7 @@ add_executable(BookSyncIndexTest IndexTest.cpp
   ${REPO_ROOT}/src/booksync/services/NativeHistory.cpp
   ${REPO_ROOT}/src/booksync/services/Layout.cpp
   ${REPO_ROOT}/src/booksync/services/LayoutEditor.cpp
+  ${REPO_ROOT}/src/booksync/services/LayoutGeometry.cpp
   ${REPO_ROOT}/src/booksync/storage/LayoutStore.cpp
   ${REPO_ROOT}/src/booksync/services/Queries.cpp
   ${REPO_ROOT}/src/booksync/storage/ProjectionStore.cpp

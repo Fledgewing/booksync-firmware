@@ -11,19 +11,29 @@ void EditorAddRemove::enter() {
 uint8_t EditorAddRemove::rows() const {
   if (panel_ == Panel::Select) return library_.homePage().count + 3;  // Add, Reset, Done after tiles.
   if (panel_ == Panel::Add) return 3;
-  if (panel_ == Panel::Selected) return 2;  // Remove, Done.
-  if (panel_ == Panel::Reset) return 2;     // Keep first.
+  if (panel_ == Panel::Selected || panel_ == Panel::Options) return 2;  // Remove, Done.
+  if (panel_ == Panel::Reset) return 2;                                 // Keep first.
   return 1;
 }
 void EditorAddRemove::stepEditor(int direction) {
   if (panel_ == Panel::Closed || panel_ == Panel::Waiting) return;
+  if (panel_ == Panel::Selected) {
+    geometryStep(direction > 0 ? LayoutStep::Next : LayoutStep::Previous);
+    return;
+  }
   const int nextFocus = focus_ + direction;
   if (nextFocus >= 0 && nextFocus < rows()) focus_ = nextFocus;
 }
 void EditorAddRemove::chooseEditor(uint8_t index) {
   if (index >= rows() || panel_ == Panel::Waiting) return;
   focus_ = index;
-  activateEditor();
+  if (panel_ == Panel::Selected) {
+    if (index == 0)
+      send(LayoutEditKind::Remove);
+    else
+      send(LayoutEditKind::Geometry);
+  } else
+    activateEditor();
 }
 void EditorAddRemove::back() {
   // Accepted work finishes atomically; Back retires only this presentation.
@@ -32,8 +42,11 @@ void EditorAddRemove::back() {
   else if (panel_ == Panel::Error)
     enter();
   else if (panel_ != Panel::Closed) {
-    panel_ = Panel::Select;
-    focus_ = 0;
+    const bool carrying = panel_ == Panel::Selected || panel_ == Panel::Options;
+    enter();
+    const auto count = library_.homePage().count;
+    if (carrying && panel_ == Panel::Select) focus_ = count ? (selected_ < count ? selected_ : count - 1) : 0;
+    blocked_ = false;
   }
 }
 void EditorAddRemove::send(LayoutEditKind kind, WidgetKind widget) {
@@ -43,6 +56,14 @@ void EditorAddRemove::send(LayoutEditKind kind, WidgetKind widget) {
   request.revision = revision_;
   request.page = page_;
   request.index = selected_;
+  pendingKind_ = kind;
+  if (kind == LayoutEditKind::Geometry) {
+    request.count = draft_.count;
+    for (uint8_t i = 0; i < draft_.count; ++i) {
+      const auto& tile = draft_.widgets[i];
+      request.geometry[i] = {tile.x, tile.y, tile.w, tile.h};
+    }
+  }
   if (library_.editLayout(request) == CommandStatus::Accepted)
     panel_ = Panel::Waiting;
   else {
@@ -57,11 +78,15 @@ void EditorAddRemove::activateEditor() {
     if (page.revision != revision_ || page.page != page_) {
       panel_ = Panel::Error;
       error_ = LayoutEditStatus::Stale;
+      focus_ = 0;
       return;
     }
     if (focus_ < page.count) {
       selected_ = focus_;
+      draft_ = page;
+      blocked_ = false;
       panel_ = Panel::Selected;
+      updateSizePreview();
       focus_ = 0;
     } else if (focus_ == page.count) {
       panel_ = Panel::Add;
@@ -72,6 +97,8 @@ void EditorAddRemove::activateEditor() {
     } else
       panel_ = Panel::Closed;
   } else if (panel_ == Panel::Selected) {
+    send(LayoutEditKind::Geometry);
+  } else if (panel_ == Panel::Options) {
     if (focus_ == 0)
       send(LayoutEditKind::Remove);
     else
@@ -88,16 +115,61 @@ void EditorAddRemove::activateEditor() {
   }
 }
 bool EditorAddRemove::pollEditor() {
-  if (panel_ != Panel::Waiting) return false;
+  if (panel_ != Panel::Waiting) {
+    if (panel_ == Panel::Closed || panel_ == Panel::Error) return false;
+    const auto page = library_.homePage();
+    if (page.revision != revision_ || page.page != page_) {
+      panel_ = Panel::Error;
+      error_ = LayoutEditStatus::Stale;
+      focus_ = 0;
+      return true;
+    }
+    if (focus_ >= rows()) {
+      focus_ = rows() - 1;
+      return true;
+    }
+    return false;
+  }
   const auto editReply = library_.layoutEditResult();
   if (editReply.status == LayoutEditStatus::Pending || editReply.status == LayoutEditStatus::Idle) return false;
-  if (editReply.status == LayoutEditStatus::Saved)
+  if (editReply.status == LayoutEditStatus::Saved) {
     enter();
-  else {
+    const auto count = library_.homePage().count;
+    if (pendingKind_ == LayoutEditKind::Geometry || pendingKind_ == LayoutEditKind::Remove)
+      focus_ = count ? (selected_ < count ? selected_ : count - 1) : 0;
+  } else {
     panel_ = Panel::Error;
     error_ = editReply.status;
     focus_ = 0;
   }
   return true;
+}
+void EditorAddRemove::geometryStep(LayoutStep movement) {
+  if (panel_ != Panel::Selected) return;
+  const auto preview = library_.previewLayout(draft_, selected_, movement);
+  if (preview.status == LayoutEditStatus::Saved) {
+    draft_ = preview.page;
+    blocked_ = false;
+    updateSizePreview();
+  } else if (preview.status == LayoutEditStatus::Stale) {
+    panel_ = Panel::Error;
+    error_ = preview.status;
+    focus_ = 0;
+  } else
+    blocked_ = true;
+}
+void EditorAddRemove::updateSizePreview() {
+  const auto sizePreview = library_.previewLayout(draft_, selected_, LayoutStep::Size);
+  nextW_ = sizePreview.status == LayoutEditStatus::Saved ? sizePreview.page.widgets[selected_].w : 0;
+  nextH_ = sizePreview.status == LayoutEditStatus::Saved ? sizePreview.page.widgets[selected_].h : 0;
+}
+void EditorAddRemove::moreEditor() {
+  if (panel_ == Panel::Selected)
+    geometryStep(LayoutStep::Size);
+  else if (panel_ == Panel::Select && focus_ < library_.homePage().count) {
+    selected_ = focus_;
+    panel_ = Panel::Options;
+    focus_ = 0;
+  }
 }
 }  // namespace booksync

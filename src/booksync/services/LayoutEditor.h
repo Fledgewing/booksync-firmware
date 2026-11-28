@@ -18,15 +18,18 @@ class LayoutEditor {
   struct Patch {
     uint32_t begin = 0, end = 0;
     uint16_t offset = 0, bytes = 0;
+    uint32_t source = UINT32_MAX;
   };
-  Patch patches_[4]{};
-  char inserted_[768]{};
+  Patch patches_[68]{};
+  char inserted_[1024]{};
   uint16_t used_ = 0;
   uint8_t count_ = 0;
   size_t bytes_ = 0;
   bool patch(uint32_t begin, uint32_t end, const char* text);
+  bool patchSource(uint32_t at, uint32_t begin, uint32_t end);
+  bool geometry(Layout::Span root, Layout::Span pg, const char* device, const LayoutEdit& edit);
   bool read(size_t offset, void* output, size_t bytes);
   bool freeCell(Layout::Span root, Layout::Span page, const char* device, uint8_t w, uint8_t h, uint8_t& x, uint8_t& y);
 };
-static_assert(sizeof(LayoutEditor) <= 3072);
+static_assert(sizeof(LayoutEditor) <= 4096);
 }  // namespace booksync
