@@ -43,7 +43,10 @@ staging never becomes authoritative on load. Missing storage starts with no time
 rows and eye rest Off/20. If neither committed file validates, bytes are retained
 and scheduling/mutations are refused. Corrupt current plus valid backup schedules
 only the validated backup and reports recovery. Explicit saves do not overwrite a
-damaged current. Exact streaming comparison plus F06 confirmation reconciles a failed final publication barrier
+damaged current. A recovered bedtime candidate remains pending when its durable
+claim cannot be saved; it draws only after a successful claim within the normal
+missed window. Recovery does not authorize overwriting damaged bytes. The RAM-only
+interval still follows the validated recovered interval setting. Exact streaming comparison plus F06 confirmation reconciles a failed final publication barrier
 before reporting success. Handles are explicitly closed.
 
 Budgets are enforced at compile time: combined runtime service, store scratch and
