@@ -120,6 +120,9 @@ TEST_F(SeriesQueueTest, ExactFrozenChoicesRunSequentiallyWithoutOpenIntent) {
   EXPECT_TRUE(view.complete);
   EXPECT_EQ(source.opens, 3u);
   EXPECT_EQ(links, 3u);
+  EXPECT_EQ(view.saved, 3);
+  EXPECT_EQ(view.skipped, 0);
+  EXPECT_EQ(view.failed, 0);
   for (unsigned i = 0; i < 3; ++i) {
     EXPECT_EQ(view.items[i].state, SeriesItemState::Complete);
     EXPECT_EQ(card.files[reviewed.books[i].file.path.data()], "abc");
@@ -384,6 +387,9 @@ TEST_F(SeriesQueueTest, FutureRowsAreCancelableBeforeAnyTransferJobExists) {
   EXPECT_EQ(view.items[1].state, SeriesItemState::Canceled);
   EXPECT_FALSE(view.items[1].cancelable);
   EXPECT_EQ(source.opens, 2u);
+  EXPECT_EQ(view.saved, 2);
+  EXPECT_EQ(view.skipped, 1);
+  EXPECT_EQ(view.failed, 0);
   EXPECT_FALSE(card.files.count(reviewed.books[1].file.path.data()));
 }
 TEST_F(SeriesQueueTest, JournalSwitchNeverReusesALiveEngineHandle) {

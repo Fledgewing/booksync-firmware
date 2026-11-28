@@ -325,6 +325,7 @@ void SeriesQueue::tick(DeliveryTicket current) {
 void SeriesQueue::queueState(SeriesQueueView& out) {
   out.complete = true;
   out.paused = false;
+  out.saved = out.skipped = out.failed = 0;
   out.sequence = revision_;
   const int target = locate(out.id);
   for (uint8_t i = 0; i < out.count; ++i) {
@@ -334,6 +335,12 @@ void SeriesQueue::queueState(SeriesQueueView& out) {
       if (row.state != SeriesItemState::Running) row.state = SeriesItemState::Canceled;
     }
     row.cancelable = !queueTerminal(row.state) && !row.cancelWanted;
+    if (row.state == SeriesItemState::Complete)
+      ++out.saved;
+    else if (row.state == SeriesItemState::Canceled)
+      ++out.skipped;
+    else if (row.state == SeriesItemState::Failed || row.state == SeriesItemState::Unsupported)
+      ++out.failed;
     if (!queueTerminal(row.state)) {
       out.complete = false;
       if (target < 0 || !requested_[target]) {

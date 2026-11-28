@@ -28,14 +28,14 @@ struct SeriesQueueView {
   std::array<SeriesQueueItem, SeriesNextMax> items{};
   std::array<char, 64> series{};
   uint64_t id = 0, sequence = 0, received = 0, total = 0;
-  uint8_t count = 0, active = 0;
+  uint8_t count = 0, active = 0, saved = 0, skipped = 0, failed = 0;
   Availability availability = Availability::NotSaved;
   bool paused = false, complete = false, totalKnown = false;
   void clear() {
     for (uint8_t i = 0; i < SeriesNextMax; ++i) items[i].clear();
     series.fill(0);
     id = sequence = received = total = 0;
-    count = active = 0;
+    count = active = saved = skipped = failed = 0;
     availability = Availability::NotSaved;
     paused = complete = totalKnown = false;
   }
