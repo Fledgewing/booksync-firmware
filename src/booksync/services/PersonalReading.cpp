@@ -2,13 +2,14 @@
 // Selection semantics follow BookSync companion PersonalReading.kt. Provider
 // arrays are replaced by bounded cooperative cursors for C3 memory constraints.
 #include "PersonalReading.h"
-#include "widgets/PersonalWidgets.h"
 
 #include <Logging.h>
 
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+
+#include "widgets/PersonalWidgets.h"
 #if defined(SIMULATOR) && defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
 #elif defined(SIMULATOR)
@@ -301,6 +302,19 @@ struct ReadingLinkInput {
   const booksync::PersonalWidgetCapture* widgetCapture = nullptr;
   const booksync::PersonalWidgetAllowance* widgetAllowance = nullptr;
 };
+// Keep the dynamic link probe's outgoing widget arguments in a separate frame;
+// no runtime instance or additional workspace is introduced.
+__attribute__((noinline)) bool projectLinkedPersonalWidgets(ReadingLinkInput& input) {
+  bool widgets = true;
+  if (input.discoverWidget && input.widgetCapture && input.widgetAllowance) {
+    widgets &= input.discoverWidget->begin(input.day, input.pick, *input.widgetCapture, *input.widgetAllowance);
+    widgets &= input.discoverWidget->tick(*input.widgetCapture);
+  }
+  if (input.recommendedWidget && input.widgetCapture && input.widgetAllowance)
+    widgets &= booksync::projectRecommendedWidget(input.personal.result(), *input.widgetCapture, *input.widgetAllowance,
+                                                  *input.recommendedWidget);
+  return widgets;
+}
 }  // namespace
 extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
   const auto scope = input.source.scope;
@@ -310,13 +324,5 @@ extern "C" bool booksync_personal_reading_link(ReadingLinkInput& input) {
   input.personal.begin(input.kind, input.day, input.pick, scope);
   input.personal.card({}, scope, input.card);
   const bool base = input.stats.tick() && input.personal.tick();
-  bool widgets = true;
-  if (input.discoverWidget && input.widgetCapture && input.widgetAllowance) {
-    widgets &= input.discoverWidget->begin(input.day, input.pick, *input.widgetCapture, *input.widgetAllowance);
-    widgets &= input.discoverWidget->tick(*input.widgetCapture);
-  }
-  if (input.recommendedWidget && input.widgetCapture && input.widgetAllowance)
-    widgets &= booksync::projectRecommendedWidget(input.personal.result(), *input.widgetCapture, *input.widgetAllowance,
-                                                *input.recommendedWidget);
-  return base && widgets;
+  return base && projectLinkedPersonalWidgets(input);
 }
