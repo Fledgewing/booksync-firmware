@@ -17,6 +17,7 @@ uint32_t paints = 0;
 #endif
 class ServiceChoiceActivity final : public Activity {
   ServiceChoice choice;
+  Library& library;
   Rect row(uint8_t index) const {
     const auto safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
     const auto header = UITheme::getHeaderRect(renderer, UITheme::getInstance().getMetrics().headerHeight, safe);
@@ -32,7 +33,7 @@ class ServiceChoiceActivity final : public Activity {
 
  public:
   ServiceChoiceActivity(GfxRenderer& renderer, MappedInputManager& input, Library& library)
-      : Activity("ServiceChoice", renderer, input), choice(library) {}
+      : Activity("ServiceChoice", renderer, input), choice(library), library(library) {}
   void onEnter() override {
     Activity::onEnter();
     choice.enter();
@@ -48,6 +49,8 @@ class ServiceChoiceActivity final : public Activity {
       activityManager.popActivity();
       return;
     }
+    const bool selectedAccount = choice.selected() == 0;
+    bool continued = false;
     bool changed = false;
     int x = 0, y = 0;
     const bool tapped = mappedInput.wasScreenTapped(x, y);
@@ -62,19 +65,23 @@ class ServiceChoiceActivity final : public Activity {
       choice.stepChoice(-1);
       changed = true;
     } else if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+      continued = choice.focus() == 2;
       choice.activateChoice();
       changed = true;
     } else if (tapped) {
       for (uint8_t i = 0; i < 4; ++i) {
         const auto r = row(i);
         if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) {
+          continued = i == 2;
           choice.chooseChoice(i);
           changed = true;
           break;
         }
       }
     }
-    if (!choice.live())
+    if (!choice.live() && continued && selectedAccount)
+      showAccountForm(renderer, mappedInput, library);
+    else if (!choice.live())
       activityManager.popActivity();
     else if (changed)
       requestUpdate();

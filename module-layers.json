@@ -15510,23 +15510,23 @@
     },
     "src/booksync/interface/AccountView.h": {
       "role": "interface",
-      "rationale": "F37a approved B5 service picker: bounded Library-only account projection and epoch-scoped selection; foreground host draws cached values without I/O. Account forms remain unapproved and absent."
+      "rationale": "F37a service picker and F37b approved account flow: Library-only values/intents; foreground render host owns bounded entry and QR workspace; no paint-time service calls."
     },
     "src/booksync/ui/account/ServiceChoice.h": {
       "role": "ui",
-      "rationale": "F37a approved B5 service picker: bounded Library-only account projection and epoch-scoped selection; foreground host draws cached values without I/O. Account forms remain unapproved and absent."
+      "rationale": "F37a service picker and F37b approved account flow: Library-only values/intents; foreground render host owns bounded entry and QR workspace; no paint-time service calls."
     },
     "src/booksync/ui/account/ServiceChoice.cpp": {
       "role": "ui",
-      "rationale": "F37a approved B5 service picker: bounded Library-only account projection and epoch-scoped selection; foreground host draws cached values without I/O. Account forms remain unapproved and absent."
+      "rationale": "F37a service picker and F37b approved account flow: Library-only values/intents; foreground render host owns bounded entry and QR workspace; no paint-time service calls."
     },
     "src/booksync/system/AccountScreen.h": {
       "role": "system",
-      "rationale": "F37a approved B5 service picker: bounded Library-only account projection and epoch-scoped selection; foreground host draws cached values without I/O. Account forms remain unapproved and absent."
+      "rationale": "F37a service picker and F37b approved account flow: Library-only values/intents; foreground render host owns bounded entry and QR workspace; no paint-time service calls."
     },
     "src/booksync/system/AccountScreen.cpp": {
       "role": "system",
-      "rationale": "F37a approved B5 service picker: bounded Library-only account projection and epoch-scoped selection; foreground host draws cached values without I/O. Account forms remain unapproved and absent."
+      "rationale": "F37a service picker and F37b approved account flow: Library-only values/intents; foreground render host owns bounded entry and QR workspace; no paint-time service calls."
     },
     "src/booksync/server/bookorbit/LifecycleProgress.h": {
       "role": "server",
@@ -15654,6 +15654,22 @@
     "src/booksync/services/Finish.cpp": {
       "role": "services",
       "rationale": "F20 bounded finish/status/rating journal, confirmed-position barrier and durable Undo receipts; only SyncOwner can deliver; no UI or protocol."
+    },
+    "src/booksync/interface/AccountForm.h": {
+      "role": "interface",
+      "rationale": "F37b approved account state values and foreground form controller; only Library intents and cached bounded display values, no private service or transport edges."
+    },
+    "src/booksync/ui/account/AccountForm.h": {
+      "role": "ui",
+      "rationale": "F37b approved account state values and foreground form controller; only Library intents and cached bounded display values, no private service or transport edges."
+    },
+    "src/booksync/ui/account/AccountForm.cpp": {
+      "role": "ui",
+      "rationale": "F37b approved account state values and foreground form controller; only Library intents and cached bounded display values, no private service or transport edges."
+    },
+    "src/booksync/system/AccountFormScreen.cpp": {
+      "role": "system",
+      "rationale": "F37b approved foreground Library form rendering/input host; SDK keyboard tables and QR encoding prepared outside paint, bounded lifetime buffers, no transport or reader changes."
     }
   },
   "generators": {

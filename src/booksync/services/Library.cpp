@@ -48,6 +48,10 @@ static_assert(sizeof(LocalState) <= 28 * 1024);
 std::unique_ptr<LocalState> local;
 ClockStatus currentClock{};
 AccountView accountPresentation{};
+// One fixed <=368-byte cached form plus an 8-byte monotonic counter: avoids
+// a heap allocation for the offline capability view and never holds credentials.
+AccountFormView formPresentation{};
+uint64_t nextAccountForm = 0;
 bool noticeDismissalPending = false;
 // Presentation retirement spans Home instances, independently of SD checkpoint
 // success. A failed write must not reopen a dismissed notice during this boot.
@@ -71,6 +75,29 @@ class OfflineLibrary final : public Library {
     accountPresentation.selectedService = selection.service;
     return CommandStatus::Accepted;
   }
+  CommandStatus accountAction(AccountFormRequest request) override {
+    if (request.ticket.owner != accountPresentation.ticket.owner ||
+        request.ticket.epoch != accountPresentation.ticket.epoch)
+      return CommandStatus::Unavailable;
+    if (request.action == AccountAction::Begin) {
+      // The default adapter currently supports retained connectors only. This
+      // local facade must never imply a live account/phone transport exists.
+      if (accountPresentation.accountSupported || nextAccountForm == UINT64_MAX) return CommandStatus::Unavailable;
+      formPresentation = {};
+      formPresentation.account = accountPresentation;
+      formPresentation.origin = request.ticket;
+      formPresentation.form = ++nextAccountForm;
+      formPresentation.revision = 1;
+      formPresentation.scene = AccountScene::Limited;
+      return CommandStatus::Accepted;
+    }
+    if (request.form == formPresentation.form && request.action == AccountAction::Cancel) {
+      formPresentation = {};
+      return CommandStatus::Accepted;
+    }
+    return CommandStatus::Unsupported;
+  }
+  void readAccountForm(AccountFormView& out) const override { out = formPresentation; }
   Snapshot snapshot() const override {
     Snapshot value;
     value.canOpenLastBook = available;

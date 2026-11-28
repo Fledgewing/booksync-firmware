@@ -12,10 +12,11 @@
 - BookSync Home can create, name and reorder pages on X4 Pro touch and Classic buttons with revision checks and atomic saves. The Pro naming keyboard stays docked at the bottom; X3 page editing remains disabled.
 - BookSync distinguishes live synchronized, accepted RTC and validated deep-sleep time from a stale persisted expiry floor, so bedtime scheduling can wait for a known clock.
 - BookSync journals finish, status and rating intents behind confirmed outgoing position delivery, preserving uncertain results and restart-safe Undo; new recovery presentations and live delivery remain off.
+- BookSync adds the approved account states and manual/phone sign-in presentations on X4 Pro, Classic and X3, with masked transient input, explicit Check and closed-form epoch guards; the offline adapter continues to report account sign-in as unsupported.
 
 - BookSync selects saved personal reading records with stable provider precedence and deterministic picks, and projects local/account reading statistics with explicit coverage and overlap-safe Today watermarks.
 - BookSync Home supports snapped widget movement, supported-size cycling and cancelable carry/drop on X4 Pro touch and Classic buttons, saved as one revision-checked atomic edit.
-- BookSync adds the approved three-profile library-service picker with epoch-scoped selection and a secret-free account projection. Account/sign-in screens remain pending design approval; setup navigation integration remains deferred.
+- BookSync adds the approved three-profile library-service picker with epoch-scoped selection and a secret-free account projection. Setup navigation integration remains deferred.
 - BookSync checkpoints reading-progress delivery and fetch through its single sync owner, retaining uncertain outcomes and raw locators across restarts; fake-server coverage leaves position decisions and reader movement to the next slice.
 - BookSync prepares verified in-place copy updates, deferring open books, retaining the old EPUB for rollback and preserving native reading, annotation and sidecar state across interrupted replacement. Live scheduling remains deferred.
 - BookSync prepares account- and artwork-revision-scoped cover references after paint, with bounded JPEG thumbnails and quiet completion for closed views; live catalog screens remain deferred.

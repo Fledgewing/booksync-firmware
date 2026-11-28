@@ -100,6 +100,7 @@ subprocess.run([sys.executable, 'test/simulator/activation.py', profile], cwd=ro
 subprocess.run([sys.executable, 'test/simulator/lifecycle_annotations.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/personal_reading.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/account_surface.py', profile], cwd=root, env=env, check=True)
+subprocess.run([sys.executable, 'test/simulator/account_forms.py', profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, "test/simulator/lifecycle_progress.py", profile], cwd=root, env=env, check=True)
 subprocess.run([sys.executable, 'test/simulator/copy_jobs.py', profile], cwd=root, env=env, check=True)
 
