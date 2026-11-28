@@ -15,14 +15,14 @@ HistoryStep NativeHistory::next(void* context, ReadingVisit& visit) {
   storage::JournalEntry entry;
   if (self.journal_.read(id, entry, self.bytes_.data(), self.bytes_.size()) != storage::JournalResult::Ok)
     return HistoryStep::Error;
-  if (entry.payload.size() < 8 || entry.payload.substr(0, 4) != "BSO1") return HistoryStep::Skip;
-  const auto n = static_cast<uint8_t>(entry.payload[6]) | (uint16_t(static_cast<uint8_t>(entry.payload[7])) << 8);
-  if (entry.payload.size() != size_t(n) + 8 || !n || n > 1024) return HistoryStep::Error;
+  if (entry.document != "native-source") return HistoryStep::Skip;
+  reader::OpenCapture opened;
+  if (!reader::Capture::decodeOpen(entry.payload, opened)) return HistoryStep::Error;
   bool closed = false;
   if (entry.checkpoint.empty()) return HistoryStep::Skip;
   if (!reader::Capture::decode(entry.checkpoint, visit.sample, closed)) return HistoryStep::Error;
-  visit.source = {};
-  visit.path = entry.payload.substr(8);
+  visit.source = opened.bound ? opened.binding.source : storage::SourceIdentity{};
+  visit.path = opened.path;
   visit.revision = id;
   return HistoryStep::Record;
 }

@@ -3,6 +3,7 @@
 #include <array>
 #include <string_view>
 
+#include "booksync/storage/Identity.h"
 #include "booksync/storage/LifecycleJournal.h"
 
 namespace booksync::reader {
@@ -22,6 +23,10 @@ struct Sample {
   std::array<uint8_t, 16> openingCounter{};
   bool hasSourceOffset = false, hasStats = false;
   std::array<uint8_t, 16> counter{};
+  // Frozen F09 half-open page interval and observation time. Only the bound
+  // version records these; zero time remains unknown and cannot be uploaded.
+  uint32_t pageBegin = 0, pageEnd = 0;
+  uint64_t observedAt = 0, nativeOpen = 0;
   bool operator==(const Sample&) const = default;
 };
 struct SessionObservation {
@@ -31,17 +36,34 @@ struct SessionObservation {
   int16_t utcOffsetMinutes = 0;
   bool operator==(const SessionObservation&) const = default;
 };
+// Immutable evidence prepared on a worker before the native open. IDs must be
+// independently issued; revision is the verified complete source SHA-256. Proof
+// is adapter-private opaque bytes, never interpreted by the reader.
+struct CaptureBinding {
+  storage::SourceIdentity source;
+  storage::ScopeView scope;
+  std::string_view proof;
+};
+struct OpenCapture {
+  std::string_view path;
+  uint16_t format = 0;
+  bool bound = false;
+  CaptureBinding binding{};
+};
 // Main-task only, under the reader's RenderLock. Never called by paint. This
 // local producer has no delivery/ack API and never changes native stores.
 class Capture {
  public:
   explicit Capture(storage::LifecycleJournal& journal, uint64_t resume = 0) : journal_(journal), id_(resume) {}
   storage::JournalResult open(std::string_view path, uint16_t nativeFormat);
+  storage::JournalResult open(std::string_view path, uint16_t nativeFormat, const CaptureBinding& binding);
+  static bool decodeOpen(std::string_view payload, OpenCapture& opened);
   storage::JournalResult update(Sample sample, bool closed);
   storage::JournalResult session(const SessionObservation& observation);
   storage::JournalResult artifact(std::string_view kind, std::string_view book, const char* path, bool deleted = false);
   const Sample& lastSample() const { return previous_; }
-  bool unchanged(const Sample& sample, bool closed) const {
+  bool unchanged(Sample sample, bool closed) const {
+    if (bound_) sample.nativeOpen = id_;
     return sampled_ && previous_ == sample && closed_ == closed;
   }
   uint64_t id() const { return id_; }
@@ -51,7 +73,7 @@ class Capture {
   storage::LifecycleJournal& journal_;
   uint64_t id_ = 0;
   Sample previous_{};
-  bool sampled_ = false, closed_ = false;
+  bool sampled_ = false, closed_ = false, bound_ = false;
   SessionObservation session_{};
   uint64_t sessionId_ = 0;
 };

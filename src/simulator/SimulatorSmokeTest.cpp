@@ -21,6 +21,7 @@
 #include "../../test/simulator/CredentialsScenario.h"
 #include "../../test/simulator/CatalogJobsScenario.h"
 #include "../../test/simulator/LiveAdapterScenario.h"
+#include "../../test/simulator/NativeEvidenceScenario.h"
 
 #include "../../test/simulator/ActivationScenario.h"
 
@@ -12202,6 +12203,7 @@ bool simulatorInterceptNetworkRestart(const uint32_t target, const uint32_t payl
 void runSimulatorUpgradeBootScenario() { runActivationScenario(); }
 
 void prepareSimulatorSmokeState() {
+  runNativeEvidenceScenario();
   runLiveAdapterScenario();
   runFilePublishScenario();
   runLifecycleMatchScenario();

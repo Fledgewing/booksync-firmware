@@ -40,11 +40,14 @@ storage::JournalResult Capture::open(std::string_view path, uint16_t nativeForma
 }
 storage::JournalResult Capture::update(Sample sample, bool closed) {
   if (!id_ || (closed_ && !closed)) return storage::JournalResult::Invalid;
+  if (bound_) sample.nativeOpen = id_;
   sample.openingTotalSeconds = sampled_ ? previous_.openingTotalSeconds : sample.totalSeconds;
   sample.openingCounter = sampled_ ? previous_.openingCounter : sample.counter;
   if (sampled_ && previous_ == sample && closed_ == closed) return storage::JournalResult::Ok;
-  char bytes[Bytes]{};
-  memcpy(bytes, "BSC1", 4);
+  if (bound_ && (sample.pageBegin > sample.pageEnd || sample.pageEnd > 50001 || (closed_ && previous_ != sample)))
+    return storage::JournalResult::Invalid;
+  char bytes[Bytes + 24]{};  // 140-byte versioned sample, below the 256-byte stack bound.
+  memcpy(bytes, bound_ ? "BSC2" : "BSC1", 4);
   bytes[4] = closed;
   bytes[5] = sample.hasSourceOffset;
   bytes[6] = sample.hasStats;
@@ -64,7 +67,13 @@ storage::JournalResult Capture::update(Sample sample, bool closed) {
   put(bytes + 96, sampled_ ? previous_.openingTotalSeconds : sample.totalSeconds);
   const auto& openingCounter = sampled_ ? previous_.openingCounter : sample.counter;
   memcpy(bytes + 100, openingCounter.data(), openingCounter.size());
-  const auto result = journal_.checkpoint(id_, {bytes, sizeof(bytes)});
+  if (bound_) {
+    put(bytes + Bytes, sample.pageBegin);
+    put(bytes + Bytes + 4, sample.pageEnd);
+    putWide(bytes + Bytes + 8, sample.observedAt, 8);
+    putWide(bytes + Bytes + 16, sample.nativeOpen, 8);
+  }
+  const auto result = journal_.checkpoint(id_, {bytes, bound_ ? sizeof(bytes) : Bytes});
   if (result == storage::JournalResult::Ok) {
     previous_ = sample;
     previous_.openingTotalSeconds = get(bytes + 96);
@@ -77,8 +86,10 @@ storage::JournalResult Capture::update(Sample sample, bool closed) {
   return result;
 }
 bool Capture::decode(std::string_view checkpoint, Sample& sample, bool& closed) {
-  if (checkpoint.size() != Bytes || checkpoint.substr(0, 4) != "BSC1" || static_cast<uint8_t>(checkpoint[4]) > 1 ||
-      static_cast<uint8_t>(checkpoint[5]) > 1 || static_cast<uint8_t>(checkpoint[6]) > 1 || checkpoint[7])
+  const bool version2 = checkpoint.substr(0, 4) == "BSC2";
+  if (checkpoint.size() != (version2 ? Bytes + 24 : Bytes) || (!version2 && checkpoint.substr(0, 4) != "BSC1") ||
+      static_cast<uint8_t>(checkpoint[4]) > 1 || static_cast<uint8_t>(checkpoint[5]) > 1 ||
+      static_cast<uint8_t>(checkpoint[6]) > 1 || checkpoint[7])
     return false;
   if (static_cast<uint8_t>(checkpoint[92]) > 20 || static_cast<uint8_t>(checkpoint[93]) > 20) return false;
   Sample value;
@@ -98,6 +109,13 @@ bool Capture::decode(std::string_view checkpoint, Sample& sample, bool& closed) 
   value.nativeSessions = static_cast<uint8_t>(checkpoint[94]) | (uint16_t(static_cast<uint8_t>(checkpoint[95])) << 8);
   value.openingTotalSeconds = get(checkpoint.data() + 96);
   memcpy(value.openingCounter.data(), checkpoint.data() + 100, value.openingCounter.size());
+  if (version2) {
+    value.pageBegin = get(checkpoint.data() + Bytes);
+    value.pageEnd = get(checkpoint.data() + Bytes + 4);
+    for (unsigned i = 0; i < 8; ++i) value.observedAt |= uint64_t(uint8_t(checkpoint[Bytes + 8 + i])) << (8 * i);
+    for (unsigned i = 0; i < 8; ++i) value.nativeOpen |= uint64_t(uint8_t(checkpoint[Bytes + 16 + i])) << (8 * i);
+    if (!value.nativeOpen || value.pageBegin > value.pageEnd || value.pageEnd > 50001) return false;
+  }
   sample = value;
   closed = checkpoint[4];
   return true;

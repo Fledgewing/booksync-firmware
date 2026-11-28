@@ -62,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix='booksync-contract-') as temp:
                    *[str(ROOT / ('src/booksync/' + source)) for source in (
                        'services/Reminders.cpp','services/RemindersFacade.cpp','server/bookorbit/LiveAdapter.cpp','server/bookorbit/Catalog.cpp','services/Queries.cpp','storage/ProjectionStore.cpp','services/Account.cpp','server/bookorbit/Auth.cpp','services/DeviceIndex.cpp','services/ReadModel.cpp','services/SdIndexSource.cpp',
                        'services/NativeHistory.cpp','services/LayoutEditor.cpp','services/LayoutGeometry.cpp','services/Layout.cpp','storage/LayoutStore.cpp','storage/Index.cpp','storage/FilePublish.cpp',
-                       'storage/Identity.cpp','storage/LifecycleJournal.cpp','reader/Capture.cpp','reader/Locator.cpp')],
+                       'storage/Identity.cpp','storage/LifecycleJournal.cpp','reader/Capture.cpp','reader/CaptureBinding.cpp','reader/Locator.cpp')],
                    str(ROOT / 'src/booksync/server/bookorbit/Factory.cpp'), str(ROOT / 'test/host/live_adapter/OfflineHttp.cpp'), str(obj), *([] if sys.platform == 'darwin' else ['-lcrypto']), '-o', str(app)], check=True)
     for boot in range(2):
         subprocess.run([str(app)], check=True)
