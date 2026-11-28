@@ -26,6 +26,8 @@ parser.add_argument("--zopfli", dest="zopfli", action="store_true", help="Use Zo
 parser.add_argument("--force-autohint", dest="force_autohint", action="store_true", help="Force FreeType auto-hinter instead of native font hinting. Improves stem width consistency for fonts with weak or no native TrueType hints.")
 parser.add_argument("--pnum", dest="pnum", action="store_true", help="Use proportional numerals (pnum OpenType feature) instead of default tabular figures. Reduces visual gaps between digits in running prose.")
 parser.add_argument("--darken-aa", dest="darken_aa", action="store_true", help="Use darker 2-bit anti-aliasing thresholds for reader fonts.")
+parser.add_argument("--dpi", type=int, default=150, help="Rasterization DPI; retained faces default to 150.")
+parser.add_argument("--bw-threshold", type=int, choices=range(1, 16), default=2, help="1-bit coverage threshold (1..15); default 2 preserves existing faces.")
 parser.add_argument("--no-default-intervals", action="store_true", help="Export only explicitly requested intervals, without default characters or controls.")
 args = parser.parse_args()
 
@@ -325,7 +327,7 @@ for i_start, i_end in unvalidated_intervals:
         intervals.append((start, i_end))
 
 for face in font_stack:
-    face.set_char_size(size << 6, size << 6, 150, 150)
+    face.set_char_size(size << 6, size << 6, args.dpi, args.dpi)
 
 total_size = 0
 all_glyphs = []
@@ -417,7 +419,8 @@ for i_start, i_end in intervals:
             #     print(line)
             # print('')
         else:
-            # Downsample to 1-bit bitmap - treat any 2+ as black
+            # Default coverage 2 preserves retained faces. Compact BookSync UI uses
+            # half coverage (8), so light edge pixels do not inflate body weight.
             pixelsbw = []
             px = 0
             pitch = (bitmap.width // 2) + (bitmap.width % 2)
@@ -425,7 +428,8 @@ for i_start, i_end in intervals:
                 for x in range(bitmap.width):
                     px = px << 1
                     bm = pixels4g[y * pitch + (x // 2)]
-                    px += 1 if ((x & 1) == 0 and bm & 0xE > 0) or ((x & 1) == 1 and bm & 0xE0 > 0) else 0
+                    coverage = (bm & 0xF) if (x & 1) == 0 else (bm >> 4)
+                    px += 1 if coverage >= args.bw_threshold else 0
 
                     if (y * bitmap.width + x) % 8 == 7:
                         pixelsbw.append(px)
@@ -608,9 +612,9 @@ def extract_kerning_fonttools(font_path, codepoints, ppem, pnum_subs=None):
     return result
 
 # The ppem used by the existing glyph rasterization:
-#   face.set_char_size(size << 6, size << 6, 150, 150)
-# means size_pt at 150 DPI -> ppem = size * 150 / 72
-ppem = size * 150.0 / 72.0
+#   face.set_char_size(size << 6, size << 6, args.dpi, args.dpi)
+# Glyph advances and kerning use the same explicit DPI.
+ppem = size * args.dpi / 72.0
 
 kern_map = {}  # (leftCp, rightCp) -> adjust
 for face_idx, cps in face_idx_cps.items():

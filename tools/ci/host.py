@@ -8,6 +8,7 @@ root = Path(__file__).resolve().parents[2]
 def run(*args):
     subprocess.run(args, cwd=root, check=True)
 
+run(sys.executable, 'test/host/test_presentation_geometry.py')
 run(sys.executable, 'tools/ci/test_size_report.py')
 run(sys.executable, 'tools/ci/test_harness.py')
 run(sys.executable, 'tools/ci/test_size.py')

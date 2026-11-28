@@ -257,6 +257,23 @@ EpdFont ui12RegularFont(&inter_12_regular);
 EpdFont ui12BoldFont(&inter_12_bold);
 EpdFontFamily ui12FontFamily(&ui12RegularFont, &ui12BoldFont, nullptr, nullptr, &uiSymbols10Font);
 
+// FK shares four compact UI families across every BookSync presentation.
+// Immutable bitmaps stay in flash; four renderer-map registrations are
+// the only added runtime ownership, with no per-screen font allocation.
+EpdFont booksyncBodyRegular(&booksync_body_regular), booksyncBodyBold(&booksync_body_bold);
+EpdFont booksyncCaptionRegular(&booksync_caption_regular), booksyncCaptionBold(&booksync_caption_bold);
+EpdFontFamily booksyncBodyFamily =
+    EpdFontFamily(&booksyncBodyRegular, &booksyncBodyBold).withFallbackFonts(&smallFont, &ui10BoldFont);
+EpdFontFamily booksyncCaptionFamily =
+    EpdFontFamily(&booksyncCaptionRegular, &booksyncCaptionBold).withFallbackFonts(&smallFont, &smallFont);
+
+EpdFont booksyncLabelBold(&booksync_label_bold);
+EpdFontFamily booksyncLabelFamily =
+    EpdFontFamily(&booksyncLabelBold, &booksyncLabelBold).withFallbackFonts(&ui10RegularFont, &ui10BoldFont);
+
+EpdFont booksyncValueRegular(&booksync_value_regular);
+EpdFontFamily booksyncValueFamily = EpdFontFamily(&booksyncValueRegular).withFallbackFonts(&smallFont, &smallFont);
+
 const char* resetReasonName(const esp_reset_reason_t reason) {
   switch (reason) {
     case ESP_RST_POWERON:
@@ -1356,6 +1373,10 @@ void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, c
   renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
+  renderer.insertFont(BOOKSYNC_BODY_FONT_ID, booksyncBodyFamily);
+  renderer.insertFont(BOOKSYNC_CAPTION_FONT_ID, booksyncCaptionFamily);
+  renderer.insertFont(BOOKSYNC_LABEL_FONT_ID, booksyncLabelFamily);
+  renderer.insertFont(BOOKSYNC_VALUE_FONT_ID, booksyncValueFamily);
   // Network screens can return Home without another reboot. Keep the lookup
   // callback available for the next reader, without loading font data here.
   sdFontSystem.begin(renderer, loadReaderResources);

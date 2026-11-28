@@ -50,6 +50,7 @@
 #include "../../test/simulator/EditorScenario.h"
 #include "../../test/simulator/AccountSurfaceScenario.h"
 #include "../../test/simulator/UpgradeNoticeScenario.h"
+#include "../../test/simulator/PresentationKitScenario.h"
 
 #include <Epub.h>
 #include <Epub/WordSpacing.h>
@@ -12191,7 +12192,7 @@ SimulatorSmokeTest smokeTest;
 }  // namespace
 
 void runSimulatorSmokeTestTick() {
-  if (!catalogSurfaceScenario::tick() && !seriesSurfaceScenario::tick() && !upgradeNoticeScenario::tick() &&
+  if (!presentationKitScenario::tick() && !catalogSurfaceScenario::tick() && !seriesSurfaceScenario::tick() && !upgradeNoticeScenario::tick() &&
       !accountSurfaceScenario::tick() && !editorScenario::tick() &&
       !goalWidgetScenario::tick() && !recordsWidgetScenario::tick() && !dailyWidgetScenario::tick() && !calendarWidgetScenario::tick() && !statsWidgetScenario::tick() && !widgetScenario::tick() && !runBookSyncHomeSmokeTestTick() &&
       !EpubReaderCompletionSmokeTest::sleepScenarioTick() &&

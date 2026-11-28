@@ -45,3 +45,10 @@
 #include <builtinFonts/inter_12_bold.h>
 #include <builtinFonts/inter_12_regular.h>
 #include <builtinFonts/inter_8_regular.h>
+
+#include <builtinFonts/booksync_caption_regular.h>
+#include <builtinFonts/booksync_caption_bold.h>
+#include <builtinFonts/booksync_body_regular.h>
+#include <builtinFonts/booksync_body_bold.h>
+#include <builtinFonts/booksync_label_bold.h>
+#include <builtinFonts/booksync_value_regular.h>

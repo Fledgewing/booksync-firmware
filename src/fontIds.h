@@ -12,6 +12,10 @@
 #define UI_10_FONT_ID (219014595)
 #define UI_12_FONT_ID (1073124561)
 #define SMALL_FONT_ID (-995923120)
+#define BOOKSYNC_BODY_FONT_ID (1585020332)
+#define BOOKSYNC_CAPTION_FONT_ID (1856584492)
+#define BOOKSYNC_LABEL_FONT_ID (-1984902479)
+#define BOOKSYNC_VALUE_FONT_ID (477757613)
 
 // Font ID 0 is reserved as the "not found" sentinel.
 // Guard against any hash accidentally producing 0.
@@ -26,3 +30,7 @@ static_assert(BITTER_16_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UI_10_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UI_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(SMALL_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(BOOKSYNC_BODY_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(BOOKSYNC_CAPTION_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(BOOKSYNC_LABEL_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(BOOKSYNC_VALUE_FONT_ID != 0, "Font ID collision with sentinel");
